@@ -60,7 +60,7 @@ def markdown(text):
 WIKI_PAGES=[
     ('Начало работы', [('Home','Обзор','Всё для первого запуска'),('Installation','Установка приложения','Установите и настройте приложение в HA'),('Compatibility','Совместимость','Модели, прошивки и требования'),('Bridge','Подключение колонки','SSH, ключ и установка моста')]),
     ('Каждый день', [('Commands','Голосовые команды','Фразы, автоматизации и устройства'),('LLM','Умные ответы','LLM и маршрутизация запросов')]),
-    ('Обслуживание', [('Recovery','Обновление и восстановление','Резервные копии и решение проблем'),('Migration','Перенос установки','Переход с существующего менеджера'),('Security','Безопасность и данные','Доступ, ключи и приватные данные'),('Release','О проекте и релизах','Подготовка публичного выпуска')])]
+    ('Обслуживание', [('Recovery','Обновление и восстановление','Резервные копии и решение проблем'),('Migration','Переход со старого моста','Переход с существующего менеджера'),('Security','Безопасность и данные','Доступ, ключи и приватные данные'),('Release','О проекте и релизах','Подготовка публичного выпуска')])]
 
 
 def wiki_page(name, root):
@@ -87,7 +87,7 @@ def wiki_page(name, root):
         for number,slug in enumerate(('Installation','Compatibility','Bridge','Commands'),1):
             _,label,description=next(page for page in pages if page[0]==slug)
             cards+='<a class="docs-task" href="wiki/'+slug+'"><span class="docs-task-number">0'+str(number)+'</span><h2>'+label+'</h2><p>'+description+'</p><span class="docs-task-arrow" aria-hidden="true">↗</span></a>'
-        content='<div class="docs-hero"><span class="docs-eyebrow">СПРАВОЧНИК АЛИСЫ</span><h1>От первой колонки<br>до привычных команд.</h1><p>Подключите станцию, настройте фразы и управляйте домом голосом. Инструкции всегда рядом — даже без интернета.</p></div><div class="docs-tasks">'+cards+'</div><section class="docs-callout"><span aria-hidden="true">i</span><div><h2>Перед подключением</h2><p>Нужны Home Assistant OS с Supervisor и совместимая колонка с уже настроенным root SSH. Приложение устанавливает мост; способ подготовки колонки зависит от модели и прошивки.</p><a href="wiki/Compatibility">Проверить совместимость →</a></div></section><div class="docs-home-links"><a href="wiki/Recovery">Что-то не работает?<span>Обновление и восстановление →</span></a><a href="wiki/Migration">Уже пользуетесь мостом?<span>Перенос существующей установки →</span></a></div>'
+        content='<div class="docs-hero"><span class="docs-eyebrow">СПРАВОЧНИК АЛИСЫ</span><h1>От первой колонки<br>до привычных команд.</h1><p>Подключите станцию, настройте фразы и управляйте домом голосом. Инструкции всегда рядом — даже без интернета.</p></div><div class="docs-tasks">'+cards+'</div><section class="docs-callout"><span aria-hidden="true">i</span><div><h2>Перед подключением</h2><p>Нужны Home Assistant OS с Supervisor и совместимая колонка с уже настроенным root SSH. Приложение устанавливает мост; способ подготовки колонки зависит от модели и прошивки.</p><a href="wiki/Compatibility">Проверить совместимость →</a></div></section><div class="docs-home-links"><a href="wiki/Recovery">Что-то не работает?<span>Обновление и восстановление →</span></a><a href="wiki/Migration">Уже пользуетесь мостом?<span>Переход со старого моста →</span></a></div>'
     else:
         content='<div class="docs-breadcrumb"><a href="wiki/Home">Справочник</a><span>/</span>'+html.escape(meta[1])+'</div><article class="docs-article">'+markdown(source)+'</article>'
         position=next((i for i,p in enumerate(pages) if p[0]==name),0)

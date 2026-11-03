@@ -801,7 +801,7 @@ class Manager:
             return expected, receipt_job_id
         ownership_path = Path(self.config['artifact_dir']) / 'existing-startup-sha256.json'
         if not ownership_path.is_file():
-            raise Error('Существующий мост требует проверки принадлежности перед обновлением.', 409)
+            raise Error('На колонке уже установлен мост от другой установки. Новое приложение не получило данные для его обновления. Откройте руководство «Перенос существующей установки». Повторная установка без переноса заблокирована.', 409)
         expected = json.loads(ownership_path.read_text())
         if speaker['profile'] in expected:
             expected = expected[speaker['profile']]

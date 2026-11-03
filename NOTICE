@@ -1,0 +1,22 @@
+Alice Home Assistant App
+Packaging, manager, UI, Home Functions adaptations and embedded documentation.
+
+Includes modified Quasar Bridge (Apache License 2.0):
+Copyright 2026 Sergey Krashevich and contributors.
+Original project: https://github.com/skrashevich/quasar-bridge
+The bridge's LICENSE, NOTICE and THIRD_PARTY_NOTICES are retained in its source
+tree and installed alongside the speaker artifact. See BRIDGE-SOURCE.json.
+
+Includes Home Functions (MIT, as declared by the upstream package metadata):
+Author: radioegor146 and contributors.
+Original project: https://github.com/v3rt3p/home-functions
+Modifications include exact voice phrases, controlled execution, speaker
+assignments, preview and activity metadata. No upstream attribution is removed.
+
+Includes Alice Gemini Bridge integration patches and device packaging:
+Copyright 2026 vladokan42 and contributors.
+Original integration project's notices are retained; see bridge source notices.
+
+Node, Python and Go dependencies retain their own licenses. Container base
+images retain their own license notices. This project is not endorsed by
+Yandex or the Home Assistant project.

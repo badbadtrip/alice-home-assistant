@@ -1,0 +1,6 @@
+{
+  "repository": "https://github.com/skrashevich/quasar-bridge",
+  "upstream_base": "8c1438269232171464d80b8b8fa50795cbf8c177",
+  "reviewed_source_commit": "1b4358b1d984666fe5fa86be6c234555c70cb691",
+  "changes": "Reviewed working source including Home Functions, microphone, quiet completion, speech validation and activity; optional LLM adapter for HA App. Full source included; SHA-256 in source-manifest.json."
+}

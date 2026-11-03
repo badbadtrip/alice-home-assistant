@@ -1,0 +1,8 @@
+**/__pycache__
+**/.git
+**/node_modules
+**/.env*
+**/runtime.env
+**/id_ed25519*
+**/state
+**/*.before*

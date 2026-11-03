@@ -1,0 +1,12 @@
+.build/
+__pycache__/
+dist/
+*.private.json
+.env*
+node_modules/
+*.tar
+*.tar.gz
+*.zip
+runtime.env
+id_ed25519*
+state/

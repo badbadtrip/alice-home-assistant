@@ -105,6 +105,9 @@ class AppTests(unittest.TestCase):
                 self.assertIn('/alice-app/speakers',body)
                 self.assertIn('wiki/Installation',body)
                 self.assertNotIn('SUPERVISOR_TOKEN',body)
+            server.status={'dashboard_ready':True,'configured':False}
+            with urlopen(Request(base+'/',headers={'X-Ingress-Path':'/api/hassio_ingress/test'})) as response:
+                self.assertNotIn('Добро пожаловать!',response.read().decode())
             with self.assertRaises(HTTPError) as error:urlopen(base+'/api/setup')
             self.assertEqual(error.exception.code,401)
             error.exception.close()

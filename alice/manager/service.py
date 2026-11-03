@@ -406,7 +406,7 @@ class Manager:
             base64.b64decode(parts[1], validate=True)
         except ValueError:
             raise Error('Некорректный публичный SSH-ключ менеджера.', 503) from None
-        result = {'public_key': public_key, 'installation_ready': self.config.get('installation_ready') is not False, 'advertised_url': self.config.get('advertised_url', ''), 'profiles': {
+        result = {'public_key': public_key, 'adoption_enabled':self.config.get('adoption_enabled') is True, 'installation_ready': self.config.get('installation_ready') is not False, 'advertised_url': self.config.get('advertised_url', ''), 'profiles': {
             'midi': {'name': 'Станция MIDI', 'authorized_keys_path': '/root/.ssh/authorized_keys',
                      'instructions': [
                          'Откройте уже доверенную root SSH-сессию к MIDI и проверьте способ авторизации своей прошивки.',
@@ -486,11 +486,13 @@ class Manager:
             return self.store.metadata(speaker_id, trusted_fingerprint=pending['fingerprint'])
 
     def job(self, speaker_id, operation, params=None):
-        if operation not in ('check', 'install', 'reboot', 'confirm', 'rollback', 'restart', 'configure'):
+        if operation not in ('check', 'install', 'adopt', 'reboot', 'confirm', 'rollback', 'restart', 'configure'):
             raise Error('Неизвестная операция.')
         speaker = self.store.speaker(speaker_id)
         if not speaker.get('trusted_fingerprint'):
             raise Error('Сначала проверьте и подтвердите SSH-ключ колонки.', 409)
+        if speaker.get('install', {}).get('state') in ('awaiting_acceptance', 'adopting') and operation not in ('check', 'confirm', 'rollback'):
+            raise Error('Сначала подтвердите голосовую проверку или верните прежний мост.', 409)
         params = dict(params or {})
         if operation == 'configure':
             if set(params) - {'area', 'name', 'media_entity'} or 'area' not in params:
@@ -650,6 +652,63 @@ class Manager:
                                                   'kind': 'fresh', 'startup_receipt_job_id': job['id']})
         return {'state': 'awaiting_reboot', 'message': 'Мост установлен. Перезагрузите колонку, затем проверьте голос и «стоп». После загрузки действует 10-минутное автоматическое восстановление.'}
 
+    def _packaged_startup(self, speaker):
+        # Trust comes from shipped source, never from observed device hashes.
+        if self.config.get('adoption_enabled') is not True:
+            raise Error('Переход со старого моста недоступен в этой версии приложения.', 409)
+        expected = {}
+        for name in STARTUP_FILES:
+            path = Path(self.config['packaging_dir']) / name
+            if not path.is_file() or path.is_symlink():
+                raise Error('Нет проверенного профиля старого моста.', 503)
+            raw = path.read_bytes()
+            if speaker['profile'] == 'midi':
+                raw = raw.replace(b'/etc/init.d/S99quasar', b'/etc/init.d/S97quasar').replace(b'/etc/init.d/S98quasarbridge', b'/etc/init.d/S96quasarbridge')
+            expected[name] = hashlib.sha256(raw).hexdigest()
+        return expected
+
+    @staticmethod
+    def _runtime_values(raw):
+        result = {}
+        for line in raw.splitlines():
+            if not line.strip() or line.lstrip().startswith('#'):
+                continue
+            key, sep, value = line.partition('=')
+            if not sep or not re.fullmatch(r'[A-Z][A-Z0-9_]*', key):
+                raise Error('Неподдерживаемый формат runtime старого моста. Колонка не изменена.', 409)
+            try:
+                parts = shlex.split(value, comments=True)
+            except ValueError:
+                raise Error('Неподдерживаемый формат runtime старого моста. Колонка не изменена.', 409) from None
+            if len(parts) > 1 or key in result:
+                raise Error('Неоднозначная настройка runtime. Колонка не изменена.', 409)
+            result[key] = parts[0] if parts else ''
+        return result
+
+    def _adoption_runtime(self, speaker, original):
+        values = self._runtime_values(original)
+        template = self._runtime_values((Path(self.config['artifact_dir']) / 'runtime.env').read_text())
+        url = self.config.get('advertised_url', '')
+        parsed = urlsplit(url)
+        try:
+            valid = parsed.scheme == 'http' and lan_ip(parsed.hostname) == parsed.hostname and parsed.port and parsed.path in ('', '/') and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment
+        except (Error, ValueError, TypeError):
+            valid = False
+        token = template.get('QUASAR_HOME_FUNCTIONS_TOKEN', '')
+        if not valid or not re.fullmatch(r'[A-Za-z0-9_-]{40,100}', token):
+            raise Error('Сначала сохраните локальный адрес приложения в первом шаге мастера.', 409)
+        values.update(QUASAR_HOME_FUNCTIONS_URL=url, QUASAR_HOME_FUNCTIONS_TOKEN=token,
+                      QUASAR_HOME_AREA=speaker['area'], QUASAR_HOME_SPEAKER_ID=speaker['id'])
+        return ''.join(key+'='+shlex.quote(value)+'\n' for key, value in values.items())
+
+    def _adopt(self, speaker, job):
+        if self.config.get('installation_ready') is False:
+            raise Error('Сначала сохраните адрес приложения в первом шаге мастера.', 409)
+        if not self._check(speaker, job)['bridge_present']:
+            raise Error('Старый мост не найден. Используйте обычную установку.', 409)
+        expected = self._packaged_startup(speaker)
+        return self._upgrade(speaker, job, adoption=expected)
+
     def _restart_process(self, speaker):
         pids = self.ssh(speaker, 'pidof quasar-bridge').decode().split()
         if not pids or any(not p.isdecimal() for p in pids):
@@ -711,20 +770,24 @@ class Manager:
         self._monitor_speaker(item)
         return {'state': 'ready', 'message': 'Комната применена и проверена.', 'speaker': item}
 
-    def _upgrade(self, speaker, job):
+    def _upgrade(self, speaker, job, adoption=None):
         # Existing installations are recognized by server-pinned startup hashes,
         # their own current manifest and an unchanged, exactly owned init hook.
         artifact = Path(self.config['artifact_dir'])
-        expected, receipt_job_id = self._startup_ownership(speaker)
+        expected, receipt_job_id = (adoption, None) if adoption is not None else self._startup_ownership(speaker)
         if not isinstance(expected, dict) or not expected or any(not re.fullmatch(r'[A-Za-z0-9_.-]+', key) or not re.fullmatch(r'[a-f0-9]{64}', value) for key, value in expected.items()):
             raise Error('Некорректный серверный список разрешённых файлов запуска.', 503)
         startup = self.ssh(speaker, 'cd ' + DEVICE + ' && sha256sum ' + ' '.join(expected)).decode()
         observed = {row.split(None, 1)[1].strip().lstrip('*'): row.split(None, 1)[0] for row in startup.splitlines()}
         if observed != expected:
             raise Error('Файлы запуска существующего моста неизвестны. Автоматическое обновление запрещено.', 409)
+        if adoption is not None:
+            for name in (*STARTUP_FILES, 'config.json', 'runtime.env', 'manifest.json', 'original.cfg', 'bin/quasar-bridge'):
+                self.ssh(speaker, 'test -f '+DEVICE+'/'+name+' && test ! -L '+DEVICE+'/'+name)
         hook = '/etc/init.d/S96quasarbridge' if speaker['profile'] == 'midi' else '/etc/init.d/S98quasarbridge'
         self.ssh(speaker, 'test ! -f ' + DEVICE + '/acceptance.pending && test ! -f ' + DEVICE + '/disabled && cmp -s ' + hook + ' ' + DEVICE + '/S98quasarbridge')
-        manifest = json.loads(self.ssh(speaker, 'cat ' + DEVICE + '/manifest.json'))
+        manifest_raw = self.ssh(speaker, 'cat ' + DEVICE + '/manifest.json')
+        manifest = json.loads(manifest_raw)
         config_bytes = self.ssh(speaker, 'cat ' + DEVICE + '/config.json')
         old_binary_hash = self.ssh(speaker, 'sha256sum ' + DEVICE + '/bin/quasar-bridge').decode().split()[0]
         if manifest.get('bin/quasar-bridge') != old_binary_hash or manifest.get('config.json') != hashlib.sha256(config_bytes).hexdigest():
@@ -735,13 +798,35 @@ class Manager:
         with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
             binary = tar.extractfile('bin/quasar-bridge').read()
         runtime = self.ssh(speaker, 'cat ' + DEVICE + '/runtime.env').decode()
+        old_runtime = runtime
+        old_id = self._runtime_values(runtime).get('QUASAR_HOME_SPEAKER_ID') if adoption is not None else None
         runtime = '\n'.join(line for line in runtime.splitlines() if not line.startswith(('QUASAR_HOME_AREA=', 'QUASAR_HOME_SPEAKER_ID=')))
         runtime += '\nQUASAR_HOME_AREA=' + shlex.quote(speaker['area']) + '\nQUASAR_HOME_SPEAKER_ID=' + shlex.quote(speaker['id']) + '\n'
+        if adoption is not None:
+            if not isinstance(old_id, str) or not ID.fullmatch(old_id):
+                raise Error('Старый мост не сообщил корректный идентификатор. Переход остановлен.', 409)
+            runtime = self._adoption_runtime(speaker, old_runtime)
+            # Store only private rollback data; never expose runtime via the API.
+            server_backup = self.store.directory / 'backups' / speaker['id'] / job['id']
+            server_backup.mkdir(parents=True, mode=0o700)
+            for name, raw in [('runtime.env', old_runtime.encode()), ('config.json', config_bytes), ('manifest.json', json.dumps(manifest).encode()), ('original.cfg', original)]:
+                path = server_backup/name
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(fd, 'wb') as stream:
+                    stream.write(raw)
+            atomic_json(server_backup/'receipt.json', {'speaker_id':speaker['id'], 'job_id':job['id'], 'manifest':expected, 'source':'packaged-startup'})
+            receipt_job_id = job['id']
+        def unchanged():
+            if adoption is not None:
+                hashes = {**expected, 'bin/quasar-bridge':old_binary_hash, 'config.json':hashlib.sha256(config_bytes).hexdigest(),
+                          'runtime.env':hashlib.sha256(old_runtime.encode()).hexdigest(), 'manifest.json':hashlib.sha256(manifest_raw).hexdigest()}
+                self.ssh(speaker, 'cd '+DEVICE+' && sha256sum -c -', ''.join(value+'  '+name+'\n' for name,value in hashes.items()).encode())
         self._space(speaker, len(binary) + len(runtime.encode()) + 512 * 1024)
         suffix = '.manager-' + job['id']
         backup = DEVICE + '/manager-backup-' + job['id']
         # Same-filesystem hard link preserves the old inode across atomic mv,
         # without allocating a second full binary on small UBIFS partitions.
+        unchanged()
         self.ssh(speaker, 'umask 077; test -f ' + DEVICE + '/bin/quasar-bridge && test ! -L ' + DEVICE + '/bin/quasar-bridge && mkdir ' + backup
                  + ' && ln ' + DEVICE + '/bin/quasar-bridge ' + backup + '/quasar-bridge && cp -p ' + DEVICE + '/config.json ' + DEVICE + '/runtime.env ' + DEVICE + '/manifest.json ' + backup + '/')
         try:
@@ -753,6 +838,7 @@ class Manager:
             preflight = 'set -a; . ' + DEVICE + '/runtime.env' + suffix + '; set +a; ' + DEVICE + '/bin/quasar-bridge' + suffix + ' -config ' + DEVICE + '/config.json '
             self.ssh(speaker, preflight + '-check-config', timeout=90)
             self.ssh(speaker, preflight + '-check-backends', timeout=90)
+            unchanged()
         except Exception:
             # Remove only this job's exact staging paths. Never prune backups.
             try:
@@ -761,23 +847,37 @@ class Manager:
                 pass
             raise
         job['stage'] = 'Обновление и проверка запуска'
+        pending = {'job_id':job['id'], 'kind':'upgrade', 'adopted':True, 'state':'adopting', 'backup':backup,
+                   'previous_speaker_id':old_id, 'startup_receipt_job_id':receipt_job_id}
+        if adoption is not None:
+            self.store.metadata(speaker['id'], install=pending)
         try:
             self.ssh(speaker, 'mv ' + DEVICE + '/bin/quasar-bridge' + suffix + ' ' + DEVICE + '/bin/quasar-bridge && mv ' + DEVICE + '/runtime.env' + suffix + ' ' + DEVICE + '/runtime.env')
             self._restart_process(speaker)
             health = json.loads(self.ssh(speaker, 'sleep 5; wget -T 4 -q -O - http://127.0.0.1:18861/healthz', timeout=15))
             if health.get('status') != 'ok' or health.get('speaker_id') != speaker['id']:
                 raise Error('Новая версия не подтвердила идентификатор и исправность.', 502)
+            if adoption is not None and health.get('speaker_area') != speaker['area']:
+                raise Error('Мост не подтвердил комнату после перехода.', 502)
             manifest['bin/quasar-bridge'] = hashlib.sha256(binary).hexdigest()
             self.ssh(speaker, 'umask 077; cat > ' + DEVICE + '/manifest.json', (json.dumps(manifest) + '\n').encode())
         except Exception:
-            self.ssh(speaker, 'ln ' + backup + '/quasar-bridge ' + DEVICE + '/bin/quasar-bridge.rollback && mv ' + DEVICE + '/bin/quasar-bridge.rollback ' + DEVICE + '/bin/quasar-bridge && cp -p ' + backup + '/config.json ' + backup + '/runtime.env ' + backup + '/manifest.json ' + DEVICE + '/')
-            self._restart_process(speaker)
+            try:
+                self.ssh(speaker, 'ln ' + backup + '/quasar-bridge ' + DEVICE + '/bin/quasar-bridge.rollback && mv ' + DEVICE + '/bin/quasar-bridge.rollback ' + DEVICE + '/bin/quasar-bridge && cp -p ' + backup + '/config.json ' + backup + '/runtime.env ' + backup + '/manifest.json ' + DEVICE + '/')
+                self._restart_process(speaker)
+                if adoption is not None:
+                    self._verified_health({**speaker, 'id':old_id})
+                    self.store.metadata(speaker['id'], install={**pending, 'state':'rolled_back'})
+            except Exception:
+                raise Error('Переход остановлен, восстановление пока не подтверждено. Резерв сохранён. Проверьте связь и нажмите «Вернуть прежний мост».', 502) from None
             raise Error('Проверка обновления не прошла. Предыдущие файлы восстановлены; проверьте состояние колонки.', 502) from None
         install = {'job_id': job['id'], 'state': 'ready', 'backup': backup, 'kind': 'upgrade'}
         if receipt_job_id:
             install['startup_receipt_job_id'] = receipt_job_id
+        if adoption is not None:
+            install.update(adopted=True, previous_speaker_id=old_id, state='awaiting_acceptance')
         self.store.metadata(speaker['id'], install=install)
-        return {'state': 'ready', 'message': 'Мост обновлён, идентификатор и исправность проверены.', 'backup': backup}
+        return {'state': install['state'], 'message': 'Колонка подключена к приложению. Проверьте голос; при проблеме нажмите «Вернуть прежний мост».' if adoption is not None else 'Мост обновлён, идентификатор и исправность проверены.', 'backup': backup}
 
     def _startup_ownership(self, speaker):
         install = self.store.speaker(speaker['id']).get('install', {})
@@ -825,7 +925,10 @@ class Manager:
         install = self._managed_install(speaker)
         if install['state'] != 'awaiting_acceptance':
             raise Error('Колонка не ожидает проверки голоса.', 409)
-        self.ssh(speaker, 'sh ' + DEVICE + '/install-device.sh confirm', timeout=30)
+        if install.get('adopted'):
+            self._verified_health(speaker, speaker['area'])
+        else:
+            self.ssh(speaker, 'sh ' + DEVICE + '/install-device.sh confirm', timeout=30)
         self.store.metadata(speaker['id'], install={**install, 'state': 'ready'})
         return {'state': 'ready'}
 
@@ -837,6 +940,8 @@ class Manager:
                 raise Error('Неизвестная резервная копия.', 409)
             self.ssh(speaker, 'ln ' + backup + '/quasar-bridge ' + DEVICE + '/bin/quasar-bridge.rollback && mv ' + DEVICE + '/bin/quasar-bridge.rollback ' + DEVICE + '/bin/quasar-bridge && cp -p ' + backup + '/config.json ' + backup + '/runtime.env ' + backup + '/manifest.json ' + DEVICE + '/')
             self._restart_process(speaker)
+            if install.get('adopted'):
+                self._verified_health({**speaker, 'id':install['previous_speaker_id']})
             self.store.metadata(speaker['id'], install={**install, 'state': 'rolled_back'})
             return {'state': 'rolled_back', 'message': 'Предыдущая версия восстановлена.'}
         self.ssh(speaker, 'sh ' + DEVICE + '/install-device.sh rollback', timeout=120)

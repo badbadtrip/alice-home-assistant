@@ -92,6 +92,8 @@ class AppTests(unittest.TestCase):
         for path in ('/ha/api/services/light/turn_on','/api/shell','/api/speakers/a/../../shell','/api/speakers/a%2Frestart','/api/setup?token=test'):
             self.assertIsNone(allowed_path(path,'POST'))
         self.assertEqual(allowed_path('/api/speakers/a/restart','POST'),'/api/speakers/a/restart')
+        self.assertEqual(allowed_path('/api/speakers/a/adopt','POST'),'/api/speakers/a/adopt')
+        self.assertIsNone(allowed_path('/api/speakers/a/adopt','GET'))
 
     def test_ingress_wiki_and_anonymous_api(self):
         server=ThreadingHTTPServer(('127.0.0.1',0),Handler)

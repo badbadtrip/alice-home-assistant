@@ -108,6 +108,6 @@ def configure(data, root, raw, overrides=Path('/config/functions-overrides.json'
              'speaker_network':value['speaker_network'],'bind':'127.0.0.1','local_only':True,'port':18085,
              'ha_origin':'http://homeassistant:8123','ha_url':'http://homeassistant:8123',
              'home_functions_url':'http://127.0.0.1:18080','home_functions_local':True,'home_functions_env':str(data/'functions.env'),
-             'installation_ready':bool(value['advertised_url']),'advertised_url':value['advertised_url']}
+             'installation_ready':bool(value['advertised_url']),'advertised_url':value['advertised_url'],'adoption_enabled':True}
     write_private(data/'manager.json',json.dumps(manager))
     return value,token

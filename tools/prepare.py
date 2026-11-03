@@ -63,7 +63,13 @@ def prepare(bridge):
     copy(kit/'LICENSE',out/'LICENSE')
     copy(ROOT/'NOTICE',out/'NOTICE')
     if (ROOT/'BRIDGE-SOURCE.json').exists():copy(ROOT/'BRIDGE-SOURCE.json',out/'BRIDGE-SOURCE.json')
-    manifest={p.relative_to(out).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in out.rglob('*') if p.is_file() and p.name!='source-manifest.json' and '__pycache__' not in p.parts}
+    sources=[p for p in out.rglob('*') if p.is_file() and p.name!='source-manifest.json' and '__pycache__' not in p.parts]
+    # App-owned files are edited on Windows too. Hash the LF bytes Git ships,
+    # not local CRLF bytes that .gitattributes will normalize during commit.
+    for source in sources:
+        raw=source.read_bytes()
+        if b'\r\n' in raw:source.write_bytes(raw.replace(b'\r\n',b'\n'))
+    manifest={p.relative_to(out).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}
     (out/'source-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
     print('Prepared source context:',len(manifest),'files; no device state or credentials copied.')
 

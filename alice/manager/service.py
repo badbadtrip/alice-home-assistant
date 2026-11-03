@@ -406,7 +406,7 @@ class Manager:
             base64.b64decode(parts[1], validate=True)
         except ValueError:
             raise Error('Некорректный публичный SSH-ключ менеджера.', 503) from None
-        result = {'public_key': public_key, 'profiles': {
+        result = {'public_key': public_key, 'installation_ready': self.config.get('installation_ready') is not False, 'profiles': {
             'midi': {'name': 'Станция MIDI', 'authorized_keys_path': '/root/.ssh/authorized_keys',
                      'instructions': [
                          'Откройте уже доверенную root SSH-сессию к MIDI и проверьте способ авторизации своей прошивки.',

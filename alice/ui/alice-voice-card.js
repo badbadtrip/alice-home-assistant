@@ -188,6 +188,16 @@
       if(!this._config.manager_url) return;
       try {const [data,assign]=await Promise.all([this._api('/api/speakers'),this._api('/api/assignments')]);this._speakers=data.speakers??[];this._key=data.public_key;this._installationReady=data.installation_ready;this._advertisedUrl=data.advertised_url;this._assignments=assign.assignments??{};this._managerError='';await Promise.all(this._speakers.filter(s=>s.media_entity).map(async speaker=>{try{const entry=await this._hass.callWS({type:'config/entity_registry/get',entity_id:speaker.media_entity});this._mediaPlatforms[speaker.media_entity]=entry?.platform??null;}catch{this._mediaPlatforms[speaker.media_entity]=null;}}));}
       catch(error){this._managerError=error.message;}
+      this._resumeAddressSetup();
+    }
+    _addressResumeKey(){return 'alice-address-resume:'+this._config.manager_app;}
+    _resumeAddressSetup(){
+      try{const key=this._addressResumeKey(),saved=JSON.parse(sessionStorage.getItem(key)||'null');if(!saved)return;
+        if(Date.now()-saved.at>600000){sessionStorage.removeItem(key);return;}
+        if(this._managerError||!this._installationReady||this._advertisedUrl!==saved.url)return;
+        if(!this._utility&&this._speakers.some(s=>s.id===saved.speakerId))this._utility={type:'settings',section:'bridge',speakerId:saved.speakerId,message:'Адрес сохранён. Приложение перезапущено. Продолжим подключение колонки.'};
+        sessionStorage.removeItem(key);
+      }catch{}
     }
     _audience(target){const ids=this._assignments[target];return ids===undefined?'Все колонки':ids.length?ids.map(id=>this._speakers.find(s=>s.id===id)?.name??id).join(' · '):'Не назначено ни одной колонке';}
     _render() {
@@ -284,6 +294,7 @@
         await this._hass.callWS({type:'supervisor/api',endpoint:endpoint+'/options',method:'POST',data:{options:{...info.options,advertised_url:value}}});
         const verified=await this._hass.callWS({type:'supervisor/api',endpoint:endpoint+'/info',method:'GET'});
         if(verified.options?.advertised_url!==value)throw Error('Home Assistant не подтвердил сохранение адреса.');
+        try{sessionStorage.setItem(this._addressResumeKey(),JSON.stringify({speakerId:u.speakerId,url:value,at:Date.now()}));}catch{}
         u.message='Адрес сохранён. Перезапускаем приложение…';this._utilityMessage();
         try{await this._hass.callWS({type:'supervisor/api',endpoint:endpoint+'/restart',method:'POST',data:{}});}catch{} // Verify actual readiness before reporting success; never replay restart.
         const ready=await this._waitAppSetup(value);this._installationReady=true;this._advertisedUrl=ready.advertised_url;

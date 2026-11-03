@@ -180,7 +180,7 @@ class Handler(BaseHTTPRequestHandler):
             return b'Ingress path unavailable'
         status=self.server.status
         notice=''
-        if not status.get('configured'):
+        if not status.get('configured') and not status.get('dashboard_ready'):
             notice='<div class="notice"><strong>Добро пожаловать! Подключим первую колонку.</strong><p>Сначала задайте локальный адрес Home Functions в настройках приложения, затем перезапустите его.</p><a href="wiki/Installation">Открыть пошаговую инструкцию →</a></div>'
         if not status.get('dashboard_ready'):
             notice+='<p class="notice">Панель подготавливается. Если сообщение не исчезает после обновления страницы, проверьте журнал приложения и Wiki.</p>'

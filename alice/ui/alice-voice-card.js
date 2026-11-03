@@ -195,7 +195,7 @@
       try{const key=this._addressResumeKey(),saved=JSON.parse(sessionStorage.getItem(key)||'null');if(!saved)return;
         if(Date.now()-saved.at>600000){sessionStorage.removeItem(key);return;}
         if(this._managerError||!this._installationReady||this._advertisedUrl!==saved.url)return;
-        if(!this._utility&&this._speakers.some(s=>s.id===saved.speakerId))this._utility={type:'settings',section:'bridge',speakerId:saved.speakerId,message:'Адрес сохранён. Приложение перезапущено. Продолжим подключение колонки.'};
+        if(!this._utility&&this._speakers.some(s=>s.id===saved.speakerId)){this._utility={type:'settings',section:'bridge',speakerId:saved.speakerId,message:'Адрес сохранён. Приложение перезапущено. Продолжим подключение колонки.'};this._render();}
         sessionStorage.removeItem(key);
       }catch{}
     }

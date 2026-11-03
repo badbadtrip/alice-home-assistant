@@ -195,7 +195,8 @@
       try{const key=this._addressResumeKey(),saved=JSON.parse(sessionStorage.getItem(key)||'null');if(!saved)return;
         if(Date.now()-saved.at>600000){sessionStorage.removeItem(key);return;}
         if(this._managerError||!this._installationReady||this._advertisedUrl!==saved.url)return;
-        if(!this._utility&&this._speakers.some(s=>s.id===saved.speakerId)){this._utility={type:'settings',section:'bridge',speakerId:saved.speakerId,message:'Адрес сохранён. Приложение перезапущено. Продолжим подключение колонки.'};this._render();}
+        if(this._utility)return;
+        if(this._speakers.some(s=>s.id===saved.speakerId)){this._utility={type:'settings',section:'bridge',speakerId:saved.speakerId,message:'Адрес сохранён. Приложение перезапущено. Продолжим подключение колонки.'};this._render();}
         sessionStorage.removeItem(key);
       }catch{}
     }
@@ -409,7 +410,7 @@
       if(action==='settings-general'||action==='settings-bridge'){if(this._utility&&!this._utility.busy&&!this._stationBusy.has(this._utility.speakerId)){this._utility.section=action==='settings-bridge'?'bridge':'general';this._utility.setupStep=undefined;this._utility.message='';this._render();}return;}
       if(action==='setup-back'||action==='setup-next'){const u=this._utility,s=this._speakers.find(s=>s.id===u?.speakerId);if(u&&s&&!this._stationBusy.has(s.id)){u.setupStep=Math.max(0,Math.min(4,(u.setupStep??this._bridgeStage(s))+(action==='setup-next'?1:-1)));this._render();}return;}
       if(action==='copy-key')return this._copyPublicKey();
-      if(action==='close-utility'){if(!this._utility?.busy){this._utility=null;this._render();}return;}
+      if(action==='close-utility'){if(!this._utility?.busy){try{sessionStorage.removeItem(this._addressResumeKey());}catch{}this._utility=null;this._render();}return;}
       if(action==='media')return this._mediaAction(id,button.dataset.service);
       if(action==='test-sound'){const s=this._speakers.find(item=>item.id===id);const ok=await this._mediaAction(id,'play_media',{media_content_id:'Проверка звука. Колонка '+s.name+' готова к работе.',media_content_type:'text'});if(this._utility){this._utility.message=ok?'Тестовая фраза отправлена. Подтвердите звучание на слух.':'Не удалось отправить тестовую фразу.';this._utilityMessage();}return;}
       if(action==='restart')return this._stationJob(id,'restart');

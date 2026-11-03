@@ -43,7 +43,7 @@ def prepare(bridge):
         copy(hf/'manager'/name,out/'manager'/name)
     copy(hf/'manager/ha-ingress-proxy/proxy.py',out/'manager/proxy.py')
     proxy=out/'manager/proxy.py'
-    proxy.write_text(re.sub(r"UPSTREAM_HOST = '[^']+'", "UPSTREAM_HOST = '127.0.0.1'", proxy.read_text(encoding='utf-8')),encoding='utf-8')
+    proxy.write_text(re.sub(r"UPSTREAM_HOST = '[^']+'", "UPSTREAM_HOST = '127.0.0.1'", proxy.read_text(encoding='utf-8')),encoding='utf-8',newline='\n')
     # Gateway imports only allowed_path; never starts the legacy fixed transport.
     copy(hf/'ui/alice-voice-card.js',out/'ui/alice-voice-card.js')
     ui=out/'ui/alice-voice-card.js'
@@ -55,7 +55,7 @@ def prepare(bridge):
     config['conversation_log']={'enabled':False}
     config['routing']['rules'].insert(0,{'name':'home_lighting','route':'home','match':{'regex':r'^\s*(?:алиса[,\s]+)?(?:включи|выключи|погаси|зажги)\s+(?:свет|освещение)(?:\s+(?:(?:в|на)\s+[а-яёa-z0-9 -]+|здесь|тут))?\s*[.!]?\s*$'}})
     # The app supplies endpoints and secrets at runtime, not from a personal template.
-    (out/'bridge-config.json').write_text(json.dumps(config,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    (out/'bridge-config.json').write_text(json.dumps(config,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')
     for source in (ROOT/'wiki').glob('*.md'):
         copy(source,out/'wiki'/source.name)
     copy(ROOT/'wiki/Installation.md',out/'DOCS.md')

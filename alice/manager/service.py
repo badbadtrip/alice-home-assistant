@@ -406,7 +406,7 @@ class Manager:
             base64.b64decode(parts[1], validate=True)
         except ValueError:
             raise Error('Некорректный публичный SSH-ключ менеджера.', 503) from None
-        result = {'public_key': public_key, 'installation_ready': self.config.get('installation_ready') is not False, 'profiles': {
+        result = {'public_key': public_key, 'installation_ready': self.config.get('installation_ready') is not False, 'advertised_url': self.config.get('advertised_url', ''), 'profiles': {
             'midi': {'name': 'Станция MIDI', 'authorized_keys_path': '/root/.ssh/authorized_keys',
                      'instructions': [
                          'Откройте уже доверенную root SSH-сессию к MIDI и проверьте способ авторизации своей прошивки.',
@@ -522,8 +522,12 @@ class Manager:
                     result = getattr(self, '_' + job['operation'])(speaker, job)
             job.update(status='succeeded', stage='Готово', result=result)
         except Error as error:
+            if job['operation'] == 'check':
+                self.store.metadata(speaker['id'], last_check={'root':False,'checked_at':int(time.time()),'error':str(error)})
             job.update(status='failed', stage='Операция остановлена', error=str(error))
         except Exception:
+            if job['operation'] == 'check':
+                self.store.metadata(speaker['id'], last_check={'root':False,'checked_at':int(time.time())})
             job.update(status='failed', stage='Операция остановлена', error='Внутренняя ошибка. Подробности и секреты не передаются в браузер.')
         finally:
             job['finished_at'] = int(time.time())

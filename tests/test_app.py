@@ -72,7 +72,7 @@ class AppTests(unittest.TestCase):
             self.assertEqual(first,second)
             self.assertEqual(json.loads((data/'artifacts/config.json').read_text())['routing']['default_route'],'yandex')
             manager=json.loads((data/'manager.json').read_text())
-            self.assertTrue(manager['local_only']);self.assertTrue(manager['installation_ready'])
+            self.assertTrue(manager['local_only']);self.assertTrue(manager['installation_ready']);self.assertEqual(manager['advertised_url'],'http://192.168.10.10:18080')
             configure(data,root,{})
             self.assertFalse(json.loads((data/'manager.json').read_text())['installation_ready'])
             self.assertNotIn('SUPERVISOR_TOKEN',(data/'artifacts/runtime.env').read_text())

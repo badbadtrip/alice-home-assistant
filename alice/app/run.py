@@ -31,6 +31,16 @@ def home_timezone():
     return value if isinstance(value,str) and value else None
 
 
+def refresh_store(stop,interval=900):
+    # Supervisor polls repositories rarely; only re-read them, never install here.
+    while not stop.wait(interval):
+        req=Request('http://supervisor/store/reload',data=b'',method='POST',headers={'Authorization':'Bearer '+os.environ['SUPERVISOR_TOKEN']})
+        try:
+            with urlopen(req,timeout=120):pass
+        except OSError as error:
+            print('Проверка обновлений не выполнена: '+type(error).__name__,flush=True)
+
+
 def main():
     os.umask(0o077)
     root=Path('/app');data=Path('/data')
@@ -42,6 +52,7 @@ def main():
     threading.Thread(target=server.serve_forever,daemon=True).start()
     children=[];stop=threading.Event()
     for sig in (signal.SIGTERM,signal.SIGINT):signal.signal(sig,lambda *_:stop.set())
+    threading.Thread(target=refresh_store,args=(stop,),daemon=True).start()
     try:
         for attempt in range(30):
             if stop.is_set():return 0

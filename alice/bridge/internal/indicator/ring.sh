@@ -25,8 +25,12 @@ restore() {
  if test "$dim_owned" = 1; then printf '%s\n' "$original_dim" > "$backlight" || true; fi
 }
 unmuted() {
- line=$(grep 'mute-switch' "$gpio" 2>/dev/null) || return 1
- case "$line" in *'in  hi ACTIVE LOW'*) return 0;; *) return 1;; esac
+ while IFS= read -r line; do
+  case "$line" in *'|mute-switch '*)
+   case "$line" in *'in  hi ACTIVE LOW'*) return 0;; *) return 1;; esac;;
+  esac
+ done < "$gpio"
+ return 1
 }
 trap restore EXIT
 trap 'exit 0' HUP INT TERM

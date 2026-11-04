@@ -106,3 +106,33 @@ func TestCancelReleasesOnlyItsOwnTurn(t *testing.T) {
 		t.Fatal("last turn did not release ring")
 	}
 }
+func TestPlumRainbowFrames(t *testing.T) {
+	brightness := 80
+	cfg := Config{Enabled: true, Color: "#00d5ff", Brightness: &brightness, Mode: "rainbow", PeriodMS: 2400}
+	if !cfg.valid() {
+		t.Fatal("rainbow rejected")
+	}
+	want := [9]int{128, 0, 0, 0, 128, 0, 0, 0, 128}
+	if got := cfg.Frame(0); got != want {
+		t.Fatalf("zones are not phase shifted: %v", got)
+	}
+	if cfg.Frame(2400*time.Millisecond) != want {
+		t.Fatal("rainbow does not loop")
+	}
+	for ms := 0; ms < 5000; ms += 17 {
+		for _, v := range cfg.Frame(time.Duration(ms) * time.Millisecond) {
+			if v < 0 || v > 128 {
+				t.Fatalf("frame exceeds brightness limit: %d", v)
+			}
+		}
+	}
+	cfg.Mode = "steady"
+	frame := cfg.Frame(0)
+	for zone := 1; zone < 3; zone++ {
+		for c := 0; c < 3; c++ {
+			if frame[zone*3+c] != frame[c] {
+				t.Fatal("solid color differs across zones")
+			}
+		}
+	}
+}

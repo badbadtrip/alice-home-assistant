@@ -44,5 +44,15 @@ class AdminTests(unittest.TestCase):
   for change in ({'color':'#fff;reboot'},{'enabled':'true'},{'revision':'stale'},{'brightness':101},{'brightness':True},{'period_ms':0},{'mode':'strobe'}):
    m.ssh=Mock(side_effect=[b'ready\n',raw])
    with self.assertRaises(Error):station(m,'test','indicator',{'action':'save','enabled':True,'color':'#00bfff','revision':revision(raw),**change})
+ def test_rainbow_requires_updated_plum_bridge(self):
+  raw=b'{"enabled":true,"color":"#00bfff"}\n'
+  m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'}),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(side_effect=[b'ready\n',raw,b'']))
+  payload={'action':'save','enabled':True,'color':'#00bfff','mode':'rainbow','revision':revision(raw)}
+  with self.assertRaises(Error):station(m,'test','indicator',payload)
+  self.assertEqual(m.ssh.call_count,3)
+  m.ssh=Mock(side_effect=[b'ready\n',raw,b'rainbow\n',b''])
+  result=station(m,'test','indicator',payload)
+  self.assertEqual(result['config']['mode'],'rainbow')
+  self.assertFalse(result['restarted'])
 if __name__=='__main__':unittest.main()
 

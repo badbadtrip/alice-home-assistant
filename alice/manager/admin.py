@@ -149,8 +149,12 @@ def station(manager, speaker_id, operation, payload):
             brightness=payload.get('brightness',100)
             mode=payload.get('mode','steady')
             period=payload.get('period_ms',2400)
-            if type(brightness) is not int or not 1<=brightness<=100 or mode not in ('steady','breathe','double') or type(period) is not int or not 800<=period<=8000:
-                raise Error('Яркость: 1–100%, режим: постоянный или пульсация, период: 800–8000 мс.')
+            if type(brightness) is not int or not 1<=brightness<=100 or mode not in ('steady','breathe','double','rainbow') or type(period) is not int or not 800<=period<=8000:
+                raise Error('Яркость: 1–100%, эффект: постоянный, дыхание, пульсация или радуга; период: 800–8000 мс.')
+            if mode == 'rainbow':
+                capable = manager.ssh(speaker, 'if test -d /sys/class/leds/plum:red:ring3 && test "$(cat /data/opt/quasar-bridge/indicator-ready)" = 2; then echo rainbow; fi', timeout=12).decode().strip()
+                if capable != 'rainbow':
+                    raise Error('Радуга доступна на Лайт 2 после обновления моста.', 409)
             config = {'enabled': payload['enabled'], 'color': payload['color'].lower(),'brightness':brightness,'mode':mode,'period_ms':period}
             raw = (json.dumps(config) + '\n').encode()
             suffix = '.alice-backup-' + secrets.token_hex(8)

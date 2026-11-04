@@ -5,7 +5,9 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json/v2"
+	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,8 +20,40 @@ import (
 var script string
 
 type Config struct {
-	Enabled bool   `json:"enabled"`
-	Color   string `json:"color"`
+	Enabled    bool   `json:"enabled"`
+	Color      string `json:"color"`
+	Brightness *int   `json:"brightness,omitempty"`
+	Mode       string `json:"mode,omitempty"`
+	PeriodMS   int    `json:"period_ms,omitempty"`
+}
+
+func (c Config) valid() bool {
+	return hex.MatchString(c.Color) && (c.Brightness == nil || (*c.Brightness >= 1 && *c.Brightness <= 100)) &&
+		(c.Mode == "" || c.Mode == "steady" || c.Mode == "breathe" || c.Mode == "double") &&
+		(c.PeriodMS == 0 || (c.PeriodMS >= 800 && c.PeriodMS <= 8000))
+}
+
+// Level changes only the ring's global dimmer, keeping RGB channels stable.
+func (c Config) Level(elapsed time.Duration) int {
+	brightness := 100
+	if c.Brightness != nil {
+		brightness = *c.Brightness
+	}
+	period := c.PeriodMS
+	if period == 0 {
+		period = 2400
+	}
+	phase := math.Mod(float64(elapsed)/float64(time.Millisecond), float64(period)) / float64(period)
+	factor := 1.0
+	switch c.Mode {
+	case "breathe":
+		factor = .625 + .375*math.Cos(2*math.Pi*phase)
+	case "double":
+		distance := func(center float64) float64 { d := math.Abs(phase - center); return math.Min(d, 1-d) }
+		peak := func(center float64) float64 { d := distance(center) / .065; return math.Exp(-d * d) }
+		factor = .2 + .8*math.Max(peak(0), peak(.24))
+	}
+	return int(math.Round(float64(brightness) * factor))
 }
 
 var hex = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -88,10 +122,10 @@ func (c *Controller) Begin() func() {
 	if c.active == 1 {
 		var cfg Config
 		raw, err := os.ReadFile(c.Path)
-		if err == nil && json.Unmarshal(raw, &cfg) == nil && cfg.Enabled && hex.MatchString(cfg.Color) {
+		if err == nil && json.Unmarshal(raw, &cfg) == nil && cfg.Enabled && cfg.valid() {
 			ctx, cancel := context.WithCancel(context.Background())
 			c.cancel, c.done = cancel, make(chan struct{})
-			go c.run(ctx, cfg.Color, c.done)
+			go c.run(ctx, cfg, c.done)
 		}
 	}
 	var once sync.Once
@@ -109,10 +143,10 @@ func (c *Controller) Begin() func() {
 	}
 }
 
-func (c *Controller) run(ctx context.Context, color string, done chan struct{}) {
+func (c *Controller) run(ctx context.Context, cfg Config, done chan struct{}) {
 	defer close(done)
 	// Do not use CommandContext: the helper must process EOF and restore triggers.
-	cmd := exec.Command("/bin/sh", "-c", script, "alice-ring", color[1:])
+	cmd := exec.Command("/bin/sh", "-c", script, "alice-ring", cfg.Color[1:])
 	input, err := cmd.StdinPipe()
 	if err != nil {
 		return
@@ -121,7 +155,9 @@ func (c *Controller) run(ctx context.Context, color string, done chan struct{}) 
 		input.Close()
 		return
 	}
-	ticker := time.NewTicker(250 * time.Millisecond)
+	started := time.Now()
+	_, _ = fmt.Fprintf(input, "%d\n", cfg.Level(0))
+	ticker := time.NewTicker(80 * time.Millisecond)
 	defer ticker.Stop()
 	running := true
 	for running {
@@ -129,7 +165,7 @@ func (c *Controller) run(ctx context.Context, color string, done chan struct{}) 
 		case <-ctx.Done():
 			running = false
 		case <-ticker.C:
-			if _, err := io.WriteString(input, "tick\n"); err != nil {
+			if _, err := io.WriteString(input, fmt.Sprintf("%d\n", cfg.Level(time.Since(started)))); err != nil {
 				running = false
 			}
 		}

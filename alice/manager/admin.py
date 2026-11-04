@@ -139,13 +139,19 @@ def station(manager, speaker_id, operation, payload):
             path = root + 'indicator.json'
             current = manager.ssh(speaker, 'if test -L ' + path + '; then exit 1; elif test -f ' + path + '; then head -c 1024 ' + path + '; else printf \'{"enabled":false,"color":"#00bfff"}\\n\'; fi', timeout=12)
             config = json.loads(current)
+            config = {'brightness':100,'mode':'steady','period_ms':2400,**config}
             if payload.get('action', 'get') == 'get':
                 return {'config': config, 'revision': revision(current)}
             if payload.get('action') != 'save' or not isinstance(payload.get('enabled'), bool) or not isinstance(payload.get('color'), str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', payload['color']):
                 raise Error('Выберите цвет и включите или выключите индикацию.')
             if payload.get('revision') != revision(current):
                 raise Error('Настройка уже изменена. Загрузите её заново.', 409)
-            config = {'enabled': payload['enabled'], 'color': payload['color'].lower()}
+            brightness=payload.get('brightness',100)
+            mode=payload.get('mode','steady')
+            period=payload.get('period_ms',2400)
+            if type(brightness) is not int or not 1<=brightness<=100 or mode not in ('steady','breathe','double') or type(period) is not int or not 800<=period<=8000:
+                raise Error('Яркость: 1–100%, режим: постоянный или пульсация, период: 800–8000 мс.')
+            config = {'enabled': payload['enabled'], 'color': payload['color'].lower(),'brightness':brightness,'mode':mode,'period_ms':period}
             raw = (json.dumps(config) + '\n').encode()
             suffix = '.alice-backup-' + secrets.token_hex(8)
             # Color is read on the next model request; no service restart needed.

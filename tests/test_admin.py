@@ -38,10 +38,10 @@ class AdminTests(unittest.TestCase):
   raw=b'{"enabled":false,"color":"#00bfff"}\n'
   m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'}),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(side_effect=[b'ready\n',raw,b'']))
   result=station(m,'test','indicator',{'action':'save','enabled':True,'color':'#12ABef','revision':revision(raw)})
-  self.assertEqual(result['config'],{'enabled':True,'color':'#12abef'})
+  self.assertEqual(result['config'],{'enabled':True,'color':'#12abef','brightness':100,'mode':'steady','period_ms':2400})
   self.assertFalse(result['restarted'])
   self.assertIn('mv ',m.ssh.call_args.args[1]);self.assertIn('cp -p',m.ssh.call_args.args[1])
-  for change in ({'color':'#fff;reboot'},{'enabled':'true'},{'revision':'stale'}):
+  for change in ({'color':'#fff;reboot'},{'enabled':'true'},{'revision':'stale'},{'brightness':101},{'brightness':True},{'period_ms':0},{'mode':'strobe'}):
    m.ssh=Mock(side_effect=[b'ready\n',raw])
    with self.assertRaises(Error):station(m,'test','indicator',{'action':'save','enabled':True,'color':'#00bfff','revision':revision(raw),**change})
 if __name__=='__main__':unittest.main()

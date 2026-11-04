@@ -149,7 +149,8 @@ export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>)
     return entries.map(item => {
       const areaId = item.area_id ?? (item.device_id ? locationCache?.devices.get(item.device_id) : undefined)
       return {
-        aliases: (aliases.get(item.entity_id) ?? []).filter((alias): alias is string => typeof alias === 'string'),
+        aliases: (aliases.get(item.entity_id) ?? [])
+          .filter((alias): alias is string => typeof alias === 'string'),
         areaAliases: areaId ? locationCache?.areaAliases.get(areaId) : undefined,
         areaId,
         areaName: areaId ? locationCache?.areas.get(areaId) : undefined,
@@ -212,5 +213,14 @@ export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>)
     return 'removed'
   }
 
-  return { addEntityAlias, callService, getEntityHistory, getEntityState, getRegistry, hasService, loadServiceIndex, removeEntityAlias }
+  return {
+    addEntityAlias,
+    callService,
+    getEntityHistory,
+    getEntityState,
+    getRegistry,
+    hasService,
+    loadServiceIndex,
+    removeEntityAlias
+  }
 }

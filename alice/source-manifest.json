@@ -165,7 +165,7 @@
   "server/src/domains/types.ts": "c1b1b11477c9f8557b7a9f258b1fcd8d9cc324b0e6e18645a705f950bb2a4b55",
   "server/src/execution.ts": "0d8552790b920ee633a76c10a9b977bbaa93eb3421792cc0886de07eb9b41955",
   "server/src/history.ts": "529b183ae9b7340f36f2f64cea3833e417442805c56f573d77d82c19fb4efa51",
-  "server/src/home-assistant.ts": "da07e9e4d546a12673ee2f91aac78eddd3ee26006e8898f4cb1feacafe34d792",
+  "server/src/home-assistant.ts": "353fd710121f88cddec8223403db5705d8527e628fb859dfa942ebb7185ef4da",
   "server/src/logger.ts": "a1e6971e000aeac516f4e6a581a4735fa3222d5df16f8d7693d789d2745f7e22",
   "server/src/main.ts": "573a13b3bda5f377a0a43c6c54ba306aa865449a2bfe4d85ba4239a9a8a73492",
   "server/src/preview.ts": "79c5f5e9e5e8cce1d6dcefc10cb624b6b91e790ca37a0d4cdfbaea54c34238f5",

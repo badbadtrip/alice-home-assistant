@@ -31,7 +31,7 @@ def allowed_path(raw, method):
         return None
     routes = {
         'GET': [r'/api/inventory', r'/api/access', r'/api/setup', r'/api/speakers', r'/api/assignments', r'/api/activity', r'/api/jobs/' + SPEAKER_ID],
-        'POST': [r'/api/speakers', r'/api/phrase-check', r'/api/speakers/' + SPEAKER_ID + r'/(?:file-read|file-write|console|fingerprint|trust|check|install|adopt|reboot|confirm|rollback|restart|configure)'],
+        'POST': [r'/api/speakers', r'/api/phrase-check', r'/api/speakers/' + SPEAKER_ID + r'/(?:file-read|file-write|console|indicator|fingerprint|trust|check|install|adopt|reboot|confirm|rollback|restart|configure)'],
         'PATCH': [r'/api/speakers/' + SPEAKER_ID],
         'DELETE': [r'/api/speakers/' + SPEAKER_ID],
         'PUT': [r'/api/access', r'/api/assignments/' + TARGET],

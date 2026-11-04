@@ -3,7 +3,7 @@ WORKDIR /src
 COPY bridge/go.mod bridge/go.sum ./
 RUN go mod download
 COPY bridge/ ./
-RUN --mount=type=cache,target=/root/.cache/go-build GOEXPERIMENT=jsonv2 go test ./internal/telemetry ./internal/llm ./internal/home ./internal/bridge ./cmd/quasar-bridge \
+RUN --mount=type=cache,target=/root/.cache/go-build GOEXPERIMENT=jsonv2 go test ./internal/indicator ./internal/telemetry ./internal/llm ./internal/home ./internal/bridge ./cmd/quasar-bridge \
  && GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o /quasar-bridge ./cmd/quasar-bridge
 
 FROM node:25-bookworm-slim AS dependencies

@@ -34,5 +34,15 @@ class AdminTests(unittest.TestCase):
   result=station(m,'test','console',{'command':"printf 'hello'; exit 3"});self.assertEqual(result['exit_code'],3);self.assertEqual(result['output'],'hello')
   m.jobs={'job':{'speaker_id':'test','status':'running'}}
   with self.assertRaises(Error):station(m,'test','console',{'command':'uname'})
+ def test_indicator_validates_and_uses_atomic_persistent_write(self):
+  raw=b'{"enabled":false,"color":"#00bfff"}\n'
+  m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'}),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(side_effect=[b'ready\n',raw,b'']))
+  result=station(m,'test','indicator',{'action':'save','enabled':True,'color':'#12ABef','revision':revision(raw)})
+  self.assertEqual(result['config'],{'enabled':True,'color':'#12abef'})
+  self.assertFalse(result['restarted'])
+  self.assertIn('mv ',m.ssh.call_args.args[1]);self.assertIn('cp -p',m.ssh.call_args.args[1])
+  for change in ({'color':'#fff;reboot'},{'enabled':'true'},{'revision':'stale'}):
+   m.ssh=Mock(side_effect=[b'ready\n',raw])
+   with self.assertRaises(Error):station(m,'test','indicator',{'action':'save','enabled':True,'color':'#00bfff','revision':revision(raw),**change})
 if __name__=='__main__':unittest.main()
 

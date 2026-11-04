@@ -1037,7 +1037,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == ['api', 'access'] and method in ('GET', 'PUT'):
             from admin import access
             return 200, access(manager, payload if method == 'PUT' else None)
-        if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] in ('file-read', 'file-write', 'console') and method == 'POST':
+        if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] in ('file-read', 'file-write', 'console', 'indicator') and method == 'POST':
             from admin import station
             return 200, station(manager, path[2], path[3], payload)
         if path == ['api', 'setup'] and method == 'GET':

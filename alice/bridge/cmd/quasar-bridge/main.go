@@ -25,6 +25,7 @@ import (
 	"quasarbridge/internal/dialogue"
 	"quasarbridge/internal/home"
 	"quasarbridge/internal/journal"
+	"quasarbridge/internal/indicator"
 	"quasarbridge/internal/llm"
 	"quasarbridge/internal/wire"
 )
@@ -146,6 +147,9 @@ func main() {
 		ChatParameters: cfg.LLMChatParameters,
 	}
 	var planner home.Planner = lc
+	if diagnostics == 0 {
+		lc.OnRequest = indicator.New(*path).Begin
+	}
 	llmDisabled := os.Getenv("QUASAR_LLM_DISABLED") == "1"
 	if llmDisabled { planner = noLLMPlanner{} }
 	engine := &bridge.Engine{LLM: planner, Dialogue: dialogue.New(cfg.DialogueContext), SystemPrompt: cfg.SystemPrompt}

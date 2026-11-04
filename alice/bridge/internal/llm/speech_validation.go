@@ -8,6 +8,9 @@ import (
 
 var serviceMarkup = regexp.MustCompile(`(?i)(?:</?[|｜]|<\s*/?\s*(?:[\w.-]+:)?(?:(?:tool_calls?|function_calls?|tool_responses?|tool_results?|think(?:ing)?|analysis|reasoning(?:_content)?)\b|(?:function|parameter|invoke)(?:\s*=|\s+|\s*>|$)))`)
 
+// ErrDisabled marks a request that needs a model when none is configured.
+var ErrDisabled = errors.New("LLM disabled: configure a provider for free-form requests")
+
 func ValidateAnswer(text string) error {
     if serviceMarkup.MatchString(text) {
         return errors.New("LLM returned service markup instead of a final answer")

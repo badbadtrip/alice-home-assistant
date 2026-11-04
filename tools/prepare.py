@@ -8,6 +8,8 @@ import re
 
 ROOT=Path(__file__).resolve().parents[1]
 WORK=ROOT.parent
+# Maintained only in this repository; no external source can restore them.
+APP_OWNED=('manager/admin.py','ui/IMAGE_SOURCES.md')
 
 
 def copy(source,target):
@@ -22,6 +24,7 @@ def prepare(bridge):
     if not all((bridge/x).is_file() for x in ('go.mod','go.sum','LICENSE','NOTICE','THIRD_PARTY_NOTICES')):
         raise ValueError('Expected audited bridge source with Go module and license notices')
     out=ROOT/'alice'
+    owned={name:(out/name).read_bytes() for name in APP_OWNED}
     for directory in ('bridge','server','manager','packaging','ui','wiki'):
         target=out/directory
         if target.exists():
@@ -44,6 +47,9 @@ def prepare(bridge):
     copy(hf/'manager/ha-ingress-proxy/proxy.py',out/'manager/proxy.py')
     proxy=out/'manager/proxy.py'
     proxy.write_text(re.sub(r"UPSTREAM_HOST = '[^']+'", "UPSTREAM_HOST = '127.0.0.1'", proxy.read_text(encoding='utf-8')),encoding='utf-8',newline='\n')
+    for name,raw in owned.items():
+        (out/name).parent.mkdir(parents=True,exist_ok=True)
+        (out/name).write_bytes(raw)
     # Gateway imports only allowed_path; never starts the legacy fixed transport.
     copy(hf/'ui/alice-voice-card.js',out/'ui/alice-voice-card.js')
     ui=out/'ui/alice-voice-card.js'

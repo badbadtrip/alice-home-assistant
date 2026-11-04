@@ -20,6 +20,17 @@ def self_info():
         return json.load(response)['data']
 
 
+def home_timezone():
+    # History periods must follow the home's calendar, not a built-in default.
+    req=Request('http://supervisor/core/api/config',headers={'Authorization':'Bearer '+os.environ['SUPERVISOR_TOKEN']})
+    try:
+        with urlopen(req,timeout=15) as response:
+            value=json.load(response).get('time_zone')
+    except (OSError,ValueError):
+        return None
+    return value if isinstance(value,str) and value else None
+
+
 def main():
     os.umask(0o077)
     root=Path('/app');data=Path('/data')
@@ -45,6 +56,8 @@ def main():
         if not status['dashboard_ready']:raise RuntimeError('Не удалось подготовить панель HA; проверьте доступ к Core API.')
         env={**os.environ,'CONFIG_PATH':str(data/'functions.json'),'PORT':'18080','HOME_FUNCTIONS_TOKEN':token,
              'ALICE_ASSIGNMENTS_PATH':str(data/'state/assignments.json'),'ALICE_EVENTS_PATH':str(data/'state/activity/events.json')}
+        timezone=home_timezone()
+        if timezone:env['HOME_TIMEZONE']=timezone
         # Manager creates durable state before Home Functions starts reading it.
         children.append(subprocess.Popen([sys.executable,str(root/'manager/service.py')],env={**env,'ALICE_MANAGER_CONFIG':str(data/'manager.json')}))
         children.append(subprocess.Popen(['node',str(root/'home-functions/node_modules/tsx/dist/cli.mjs'),str(root/'home-functions/src/main.ts')],cwd=root/'home-functions',env=env))

@@ -385,4 +385,4 @@ func main() {
 }
 
 type noLLMPlanner struct{}
-func (noLLMPlanner) Complete(context.Context, []llm.Message, bool) (string, error) { return "", fmt.Errorf("LLM disabled: configure a provider for free-form requests") }
+func (noLLMPlanner) Complete(context.Context, []llm.Message, bool) (string, error) { return "", llm.ErrDisabled }

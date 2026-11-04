@@ -23,6 +23,14 @@ import tarfile
 import types
 
 
+class PrepareTest(unittest.TestCase):
+    def test_app_owned_files_survive_reimport(self):
+        sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
+        import prepare
+        for name in prepare.APP_OWNED:self.assertTrue((prepare.ROOT/'alice'/name).is_file(),name)
+        self.assertIn('manager/admin.py',prepare.APP_OWNED)
+
+
 class AppTests(unittest.TestCase):
     def test_private_import_and_traversal_rejection(self):
         with tempfile.TemporaryDirectory() as directory:

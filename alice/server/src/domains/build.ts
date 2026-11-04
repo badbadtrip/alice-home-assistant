@@ -295,10 +295,8 @@ function buildHumidifier (context: DeviceContext): DeviceFunction[] {
 
 function buildLawnMower (context: DeviceContext): DeviceFunction[] {
   return [
-    stateFunction(context, 'turn_on', 'turn_off',
-      `set ${context.name} state (on or off)`),
     actionFunction(context, 'start', 'start_mowing', `start ${context.name} mowing`),
-    actionFunction(context, 'pause', 'pause_mowing', `pause ${context.name} mowing`),
+    actionFunction(context, 'pause', 'pause', `pause ${context.name} mowing`),
     actionFunction(context, 'dock', 'dock', `send ${context.name} to dock`)
   ]
 }
@@ -339,12 +337,12 @@ function buildLight (context: DeviceContext): DeviceFunction[] {
 
     ...(colorModes.includes('color_temp')
       ? [function_(`set_${slug}_color_temperature`, `set ${context.name} color temperature`, {
-          temperature: numberMinMax('color temperature in mireds',
-            asNumber(attributes.min_mireds) || 153,
-            asNumber(attributes.max_mireds) || 500)
+          temperature: numberMinMax('color temperature in kelvin',
+            asNumber(attributes.min_color_temp_kelvin) || 2000,
+            asNumber(attributes.max_color_temp_kelvin) || 6500)
         }, async values => {
           await callService(domain, 'turn_on', {
-            color_temp_mireds: Math.round(asNumber(values.temperature)),
+            color_temp_kelvin: Math.round(asNumber(values.temperature)),
             entity_id: entity.entityId
           })
         })]
@@ -541,6 +539,31 @@ function buildVacuum (context: DeviceContext): DeviceFunction[] {
 
 // #MARK: lawn_mower
 
+function buildValve (context: DeviceContext): DeviceFunction[] {
+  const { callService, domain, entity, slug } = context
+  const features = featuresOf(context)
+
+  return [
+    stateFunction(context, 'open_valve', 'close_valve',
+      `open or close ${context.name}`),
+
+    ...(hasFeature(features, 'valve', 'STOP')
+      ? [actionFunction(context, 'stop', 'stop_valve', `stop ${context.name}`)]
+      : []),
+
+    ...(hasFeature(features, 'valve', 'SET_POSITION')
+      ? [function_(`set_${slug}_position`, `set ${context.name} open position percent`, {
+          position: numberMinMax('position percent', 0, 100)
+        }, async values => {
+          await callService(domain, 'set_valve_position', {
+            entity_id: entity.entityId,
+            position: clampPercent(asNumber(values.position))
+          })
+        })]
+      : [])
+  ]
+}
+
 function buildWaterHeater (context: DeviceContext): DeviceFunction[] {
   const { config, domain, entity, slug } = context
   const attributes = entity.attributes
@@ -608,7 +631,7 @@ const BUILDERS: Record<string, (context: DeviceContext) => DeviceFunction[]> = {
   siren: buildSiren,
   switch: buildSwitch,
   vacuum: buildVacuum,
-  valve: buildCover,
+  valve: buildValve,
   water_heater: buildWaterHeater
 }
 

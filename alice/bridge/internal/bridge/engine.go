@@ -143,10 +143,17 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 		} else {
 			answer, err = e.Home.Handle(ctx, text)
 		}
+		if errors.Is(err, llm.ErrDisabled) {
+			return Resolution{Route: "yandex"}, nil
+		}
 		result.Answer = answer
 		return result, err
 	case "llm":
-		return e.Fallback(ctx, text)
+		answer, err := e.Fallback(ctx, text)
+		if errors.Is(err, llm.ErrDisabled) {
+			return Resolution{Route: "yandex"}, nil
+		}
+		return answer, err
 	default:
 		return Resolution{Route: "yandex"}, nil
 	}

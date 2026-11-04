@@ -84,7 +84,7 @@ def optional_llm():
     source=source.replace('fmt.Printf("LLM: ok; Home functions: %d functions\\n", len(catalog))','fmt.Printf("LLM: %s; Home functions: %d functions\\n", llmStatus, len(catalog))')
     source=source.replace('fmt.Println("LLM: ok; Home Assistant: disabled")','fmt.Printf("LLM: %s; Home Assistant: disabled\\n", llmStatus)')
     source=source.replace('fmt.Printf("LLM: ok; Home Assistant: %d entities\\n", len(entities))','fmt.Printf("LLM: %s; Home Assistant: %d entities\\n", llmStatus, len(entities))')
-    source+='\ntype noLLMPlanner struct{}\nfunc (noLLMPlanner) Complete(context.Context, []llm.Message, bool) (string, error) { return "", fmt.Errorf("LLM disabled: configure a provider for free-form requests") }\n'
+    source+='\ntype noLLMPlanner struct{}\nfunc (noLLMPlanner) Complete(context.Context, []llm.Message, bool) (string, error) { return "", llm.ErrDisabled }\n'
     path.write_text(source,encoding='utf-8')
 
 

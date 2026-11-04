@@ -83,6 +83,13 @@ def configure(data, root, raw, overrides=Path('/config/functions-overrides.json'
         if not isinstance(extra,dict) or set(extra)-{'entities','voice_commands'} or any(not isinstance(v,dict) for v in extra.values()):
             raise ValueError('functions-overrides.json поддерживает объекты entities и voice_commands')
         functions.update(extra)
+    panel_access = overrides.parent/'panel-access.json'
+    if panel_access.exists():
+        import sys
+        sys.path.insert(0, str(root/'manager'))
+        from admin import validate_access
+        saved = validate_access(json.loads(panel_access.read_text()))
+        functions.update({k: v for k, v in saved.items() if k != 'voice_command_label'})
     write_private(data/'functions.json', json.dumps(functions))
     artifacts=data/'artifacts'
     artifacts.mkdir(exist_ok=True,mode=0o700)

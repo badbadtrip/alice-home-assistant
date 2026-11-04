@@ -8,6 +8,7 @@ const modesType = z.record(z.string(), renameType)
 const entityConfigType = z.object({
   area: z.string().optional(),
   description: z.string().optional(),
+  enabled: z.boolean().optional(),
   lighting: z.boolean().optional(),
   modes: z.record(z.string(), modesType).default({}),
   names: z.array(z.string()).default([]),
@@ -24,6 +25,7 @@ const voiceCommandType = z.object({
 const voiceCommandKeyType = z.string().regex(/^[a-z][a-z0-9_]*$/u)
 const configType = z.object({
   entities: z.record(z.string(), entityConfigType).default({}),
+  expose_all: z.boolean().optional(),
   labels: z.array(z.string()).default([]),
   voice_command_label: z.string().min(1).optional(),
   voice_commands: z.record(voiceCommandKeyType, voiceCommandType).optional()

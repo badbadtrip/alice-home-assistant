@@ -54,7 +54,9 @@ export async function buildDevices (homeAssistant: HomeAssistantApi,
   const usedSlugs = new Set<string>()
 
   for (const item of registry) {
-    if (item.labels.every(label => !labelSet.has(label))) {
+    const selection = config.entities[item.entityId]?.enabled
+    if (selection === false ||
+      (selection !== true && !config.expose_all && item.labels.every(label => !labelSet.has(label)))) {
       continue
     }
     const state = homeAssistant.getEntityState(item.entityId)

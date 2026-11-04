@@ -9,7 +9,7 @@ import re
 ROOT=Path(__file__).resolve().parents[1]
 WORK=ROOT.parent
 # Maintained only in this repository; no external source can restore them.
-APP_OWNED=('manager/admin.py','ui/IMAGE_SOURCES.md')
+APP_OWNED=('manager/admin.py','ui/IMAGE_SOURCES.md','ui/alice-voice-card.js')
 
 
 def copy(source,target):
@@ -51,8 +51,6 @@ def prepare(bridge):
         (out/name).parent.mkdir(parents=True,exist_ok=True)
         (out/name).write_bytes(raw)
     # Gateway imports only allowed_path; never starts the legacy fixed transport.
-    copy(hf/'ui/alice-voice-card.js',out/'ui/alice-voice-card.js')
-    ui=out/'ui/alice-voice-card.js'
     kit=WORK/'alice-gemini-bridge'
     for name in ('start.sh','supervise.sh','rollback-bind.sh','S98quasarbridge','recovery.sh','install-device.sh'):
         copy(kit/'packaging'/name,out/'packaging'/name)

@@ -1,5 +1,5 @@
 name: Алиса
-version: "0.9.2"
+version: "0.10.0"
 slug: alice
 description: Колонки Алисы, голосовые команды, установка мостов и встроенная Wiki
 url: https://github.com/badbadtrip/alice-home-assistant

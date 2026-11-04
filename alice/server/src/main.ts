@@ -11,7 +11,7 @@ import z from 'zod'
 
 import { ActivityEvent, ActivityJournal } from './activity'
 import { loadConfig } from './config'
-import { localVoicePhrases, resolveLightCommand } from './control'
+import { dictionaryReport, localVoicePhrases, resolveLightCommand } from './control'
 import { buildDevices, DeviceEntry, snapshotEntity } from './devices'
 import { executeFunction } from './execution'
 import { createHomeAssistantApi, HomeAssistantApi } from './home-assistant'
@@ -183,6 +183,11 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     if (!speaker || !body.success) { response.status(400).json({ error: 'Invalid preview' }); return }
     response.json(previewCommand(body.data.text, body.data.area, speaker, await getDevices()))
   })
+  app.get('/dictionary', async (request, response) => {
+    const devices = speakerDevices(await getDevices(), request.get('x-alice-speaker'))
+    response.json(dictionaryReport(devices))
+  })
+
   app.get('/voice-phrases', async (request, response) => {
     const commands = []
     const devices = await getDevices()

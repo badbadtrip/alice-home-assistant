@@ -194,7 +194,73 @@ function spokenNames (device: DeviceEntry): string[] {
 const MAX_LOCAL_PHRASES = 3500
 const MAX_LOCAL_BYTES = 150_000
 
+export interface DictionaryReport {
+  bytes: number;
+  groups: { phrases: string[]; title: string }[];
+  maxBytes: number;
+  maxPhrases: number;
+  total: number;
+  truncated: boolean;
+  warnings: string[];
+}
+
+// Read-only view of what a speaker keeps locally, for the settings page.
+export function dictionaryReport (devices: Map<string, DeviceEntry>): DictionaryReport {
+  const { candidates, phrases } = selectPhrases(devices)
+  const index = localIndex(devices)
+  const kept = new Set(phrases)
+  const byDevice = new Map<DeviceEntry, string[]>()
+  const shared: string[] = []
+  const warnings: string[] = []
+  for (const phrase of phrases) {
+    const intent = index.get(phrase)
+    if (!intent) {
+      shared.push(phrase)
+      continue
+    }
+    byDevice.set(intent.device, [...byDevice.get(intent.device) ?? [], phrase])
+  }
+  const groups = [...byDevice].map(([device, list]) => ({ phrases: list, title: device.name ?? device.entityId }))
+  if (shared.length > 0) groups.unshift({ phrases: shared, title: 'Свет и датчики по комнате' })
+  for (const device of devices.values()) {
+    if (device.voicePhrases) continue
+    const title = device.name ?? device.entityId
+    if (device.isLighting && !device.areaId) warnings.push(`${title}: свет не привязан к комнате.`)
+    if (spokenNames(device).length === 0) warnings.push(`${title}: нет устного имени, добавьте алиас в Home Assistant.`)
+  }
+  for (const [phrase, intent] of index) {
+    if (!intent) warnings.push(`«${phrase}» подходит нескольким устройствам и пропущена.`)
+  }
+  return {
+    bytes: phrases.reduce((sum, phrase) => sum + Buffer.byteLength(phrase) + 3, 0),
+    groups,
+    maxBytes: MAX_LOCAL_BYTES,
+    maxPhrases: MAX_LOCAL_PHRASES,
+    total: phrases.length,
+    truncated: candidates.some(phrase => !kept.has(phrase) && !isReserved(devices, phrase)),
+    warnings
+  }
+}
+
 export function localVoicePhrases (devices: Map<string, DeviceEntry>): string[] {
+  return selectPhrases(devices).phrases
+}
+
+function areaNames (area: string, aliases: string[] = []): string[] {
+  const name = normalize(area)
+  const { accusative, prepositional } = inflect(name)
+  const spoken = aliases.map(alias => normalizeVoicePhrase(alias).replace(PLACE_PREPOSITION, ''))
+  return [name, prepositional, accusative, ...spoken]
+}
+
+function isReserved (devices: Map<string, DeviceEntry>, phrase: string): boolean {
+  for (const device of devices.values()) {
+    if (device.voicePhrases?.some(owned => normalizeVoicePhrase(owned) === phrase)) return true
+  }
+  return false
+}
+
+function selectPhrases (devices: Map<string, DeviceEntry>): { candidates: string[]; phrases: string[] } {
   const reserved = new Set<string>()
   for (const device of devices.values()) {
     const owned = device.voicePhrases ?? []
@@ -225,14 +291,7 @@ export function localVoicePhrases (devices: Map<string, DeviceEntry>): string[] 
     if (phrases.size >= MAX_LOCAL_PHRASES || bytes > MAX_LOCAL_BYTES) break
     phrases.add(phrase)
   }
-  return [...phrases]
-}
-
-function areaNames (area: string, aliases: string[] = []): string[] {
-  const name = normalize(area)
-  const { accusative, prepositional } = inflect(name)
-  const spoken = aliases.map(alias => normalizeVoicePhrase(alias).replace(PLACE_PREPOSITION, ''))
-  return [name, prepositional, accusative, ...spoken]
+  return { candidates, phrases: [...phrases] }
 }
 
 const PLACE_PREPOSITION = /^(?:в|во|на) /u

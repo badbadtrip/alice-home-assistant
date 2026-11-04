@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { localVoicePhrases, normalizeVoicePhrase, resolveLightCommand } from '../src/control'
+import { dictionaryReport, localVoicePhrases, normalizeVoicePhrase, resolveLightCommand } from '../src/control'
 import { buildDevices, DeviceEntry } from '../src/devices'
 import { executeFunction } from '../src/execution'
 import { HomeAssistantApi } from '../src/home-assistant'
@@ -232,4 +232,16 @@ test('a bare light command follows the room named by a switch', () => {
     [{ arguments: { state: 1 }, name: 'set_switch_kitchen_state' }])
   assert.deepEqual(resolveLightCommand('погаси свет', 'Комната', realHome(), true).calls,
     [{ arguments: { state: 0 }, name: 'set_light_room_state' }])
+})
+
+test('dictionary report groups phrases by device and flags what cannot be said', () => {
+  const home = realHome()
+  home.set('switch.hidden', { ...home.get('switch.pc') as DeviceEntry, entityId: 'switch.hidden', name: 'Выключатель прихожей', slug: 'hidden' })
+  const report = dictionaryReport(home)
+  assert.equal(report.total, localVoicePhrases(home).length)
+  assert.equal(report.truncated, false)
+  assert.ok(report.groups.find(group => group.title === 'Компьютер')?.phrases.includes('включи компьютер'))
+  assert.ok(report.groups[0]?.phrases.includes('какая температура'))
+  assert.ok(report.warnings.some(text => text.startsWith('Выключатель прихожей: нет устного имени')))
+  assert.ok(report.warnings.some(text => text.includes('свет не привязан к комнате')))
 })

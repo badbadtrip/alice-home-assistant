@@ -188,18 +188,26 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     const devices = speakerDevices(await getDevices(), speaker)
     let events: ActivityRecord[] = []
     try { events = await activity.list() } catch { /* the page still shows the table */ }
-    response.json(dictionaryReport(devices, events.filter(event => event.speaker_id === speaker)))
+    // Aliases live in HA and serve every speaker, so misses are collected from all of them.
+    response.json(dictionaryReport(devices, events))
   })
 
   // Written only by an explicit button in settings; the answer is always 200 so
   // the settings page can show the reason.
   app.post('/dictionary/alias', async (request, response) => {
-    const aliasBody = z.object({ alias: z.string().trim().min(2).max(60), entity_id: z.string().max(200) }).strict()
+    const aliasBody = z.object({
+      alias: z.string().trim().min(2).max(60), entity_id: z.string().max(200), remove: z.boolean().optional()
+    }).strict()
     const body = aliasBody.safeParse(request.body)
     const devices = await getDevices()
     const device = body.success ? devices.get(body.data.entity_id) : undefined
     if (!device || !body.success || device.voicePhrases) {
       response.json({ error: 'Устройство недоступно Алисе.', saved: false })
+      return
+    }
+    if (body.data.remove) {
+      const result = await homeAssistant.removeEntityAlias(device.entityId, body.data.alias)
+      response.json(result === 'removed' ? { saved: true } : { error: 'Это имя задано не в Home Assistant.', saved: false })
       return
     }
     const owner = aliasConflict(body.data.alias, device.entityId, devices)

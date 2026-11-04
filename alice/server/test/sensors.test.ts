@@ -48,7 +48,7 @@ test('binary sensor polarity follows device class, including lock and battery', 
 test('labelled sensors expose state, remain distinct and never create commands', async () => {
   let serviceCalls = 0
   const api: HomeAssistantApi = {
-    addEntityAlias: async () => { /* unused */ },
+    addEntityAlias: async () => { /* unused */ }, removeEntityAlias: async () => 'missing' as const,
     callService: async () => { serviceCalls++ },
     getEntityHistory: async () => [],
     getEntityState: () => ({ attributes: { device_class: 'temperature' }, name: 'Температура', state: '22' }),

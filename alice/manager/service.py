@@ -1050,9 +1050,9 @@ class Handler(BaseHTTPRequestHandler):
         if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] == 'dictionary' and method == 'GET':
             return 200, manager._hf_request('/dictionary', manager.store.speaker(path[2]))
         if path == ['api', 'dictionary', 'alias'] and method == 'POST':
-            if set(payload) != {'alias', 'entity_id'}:
+            if not {'alias', 'entity_id'} <= set(payload) <= {'alias', 'entity_id', 'remove'}:
                 raise Error('Ожидаются alias и entity_id.')
-            return 200, manager._hf_request('/dictionary/alias', None, {'alias': text(payload['alias'], 'alias', 60), 'entity_id': text(payload['entity_id'], 'entity_id', 200)})
+            return 200, manager._hf_request('/dictionary/alias', None, {'alias': text(payload['alias'], 'alias', 60), 'entity_id': text(payload['entity_id'], 'entity_id', 200), 'remove': payload.get('remove') is True})
         if path == ['api', 'phrase-check'] and method == 'POST':
             return 200, manager.phrase_check(payload)
         if path == ['api', 'activity'] and method == 'GET':

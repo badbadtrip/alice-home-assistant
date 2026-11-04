@@ -202,6 +202,7 @@ export interface DictionaryMiss {
 }
 
 export interface DictionaryReport {
+  aliases: { alias: string; entityId: string; name: string }[];
   bytes: number;
   groups: { phrases: string[]; title: string }[];
   maxBytes: number;
@@ -243,7 +244,16 @@ export function dictionaryReport (devices: Map<string, DeviceEntry>,
   for (const [phrase, intent] of index) {
     if (!intent) warnings.push(`«${phrase}» подходит нескольким устройствам и пропущена.`)
   }
+  const aliases: DictionaryReport['aliases'] = []
+  for (const device of devices.values()) {
+    if (device.voicePhrases) continue
+    const owned = device.aliases ?? []
+    for (const alias of owned) {
+      aliases.push({ alias, entityId: device.entityId, name: device.name ?? device.entityId })
+    }
+  }
   return {
+    aliases,
     bytes: phrases.reduce((sum, phrase) => sum + Buffer.byteLength(phrase) + 3, 0),
     groups,
     maxBytes: MAX_LOCAL_BYTES,
@@ -257,7 +267,8 @@ export function dictionaryReport (devices: Map<string, DeviceEntry>,
 }
 
 const HOME_QUESTION = /^(?:включи|выключи|отключи|погаси|зажги|открой|закрой|какая|какой|какое|какие|сколько) (.+)$/u
-const NOT_HOME = /музык|песн|радио|подкаст|фильм|мультик|сказк|погод|новост|время|будильник|таймер/u
+// History questions and arithmetic are real requests, but no alias can answer them.
+const NOT_HOME = /музык|песн|радио|подкаст|фильм|мультик|сказк|погод|новост|время|будильник|таймер|\d| за |будет|посмотри/u
 const MAX_MISSES = 20
 
 // A new alias must not silently take a name that another device answers to.

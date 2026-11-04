@@ -24,6 +24,7 @@ export interface HomeAssistantApi {
   getRegistry (): Promise<RegistryEntry[]>;
   hasService (domain: string, service: string): boolean;
   loadServiceIndex (): Promise<void>;
+  removeEntityAlias (entityId: string, alias: string): Promise<'missing' | 'removed'>;
 }
 
 export interface RegistryEntry {
@@ -71,6 +72,7 @@ interface RawRegistryEntry {
  */
 export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>): HomeAssistantApi {
   const serviceIndex = new Set<string>()
+  let aliasCache: undefined | { aliases: Map<string, (null | string)[]>; until: number }
   let locationCache: undefined | {
     areaAliases: Map<string, string[]>; areas: Map<string, string>; devices: Map<string, string>; until: number;
   }
@@ -112,6 +114,18 @@ export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>)
       }))
   }
 
+  // The list command omits aliases, so they come from one bulk read.
+  async function entityAliases (entries: RawRegistryEntry[]): Promise<Map<string, (null | string)[]>> {
+    if (aliasCache && aliasCache.until >= Date.now()) return aliasCache.aliases
+    const full = await hass.socket.sendMessage({
+      entity_ids: entries.map(item => item.entity_id), type: 'config/entity_registry/get_entries'
+    }) as Record<string, null | RawRegistryEntry>
+    const aliases = new Map<string, (null | string)[]>()
+    for (const [entityId, entry] of Object.entries(full)) aliases.set(entityId, entry?.aliases ?? [])
+    aliasCache = { aliases, until: Date.now() + 10_000 }
+    return aliases
+  }
+
   async function getRegistry (): Promise<RegistryEntry[]> {
     if (!locationCache || locationCache.until < Date.now()) {
       const [areas, devices] = await Promise.all([
@@ -130,16 +144,12 @@ export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>)
     }
     const listed = await hass.socket.sendMessage({ type: 'config/entity_registry/list' })
     if (!Array.isArray(listed)) throw new TypeError('Invalid HA entity registry')
-    const raw = await Promise.all((listed as RawRegistryEntry[]).map(async item => {
-      if (!/^(automation|script)\./u.test(item.entity_id) || !item.labels?.length) return item
-      return await hass.socket.sendMessage({
-        entity_id: item.entity_id, type: 'config/entity_registry/get'
-      }) as RawRegistryEntry
-    }))
-    return raw.map(item => {
+    const entries = listed as RawRegistryEntry[]
+    const aliases = await entityAliases(entries)
+    return entries.map(item => {
       const areaId = item.area_id ?? (item.device_id ? locationCache?.devices.get(item.device_id) : undefined)
       return {
-        aliases: (item.aliases ?? []).filter((alias): alias is string => typeof alias === 'string'),
+        aliases: (aliases.get(item.entity_id) ?? []).filter((alias): alias is string => typeof alias === 'string'),
         areaAliases: areaId ? locationCache?.areaAliases.get(areaId) : undefined,
         areaId,
         areaName: areaId ? locationCache?.areas.get(areaId) : undefined,
@@ -182,11 +192,25 @@ export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>)
       entity_id: entityId, type: 'config/entity_registry/get'
     }) as RawRegistryEntry
     const aliases = entry.aliases ?? []
-    if (aliases.includes(alias)) return
+    if (aliases.some(item => item?.toLocaleLowerCase('ru') === alias.toLocaleLowerCase('ru'))) return
     await hass.socket.sendMessage({
       aliases: [...aliases, alias], entity_id: entityId, type: 'config/entity_registry/update'
     })
+    aliasCache = undefined
   }
 
-  return { addEntityAlias, callService, getEntityHistory, getEntityState, getRegistry, hasService, loadServiceIndex }
+  async function removeEntityAlias (entityId: string, alias: string): Promise<'missing' | 'removed'> {
+    const entry = await hass.socket.sendMessage({
+      entity_id: entityId, type: 'config/entity_registry/get'
+    }) as RawRegistryEntry
+    const current = entry.aliases ?? []
+    // Null is HA's switch for the entity's own name, not an alias.
+    const kept = current.filter(item => item?.toLocaleLowerCase('ru') !== alias.toLocaleLowerCase('ru'))
+    if (kept.length === current.length) return 'missing'
+    await hass.socket.sendMessage({ aliases: kept, entity_id: entityId, type: 'config/entity_registry/update' })
+    aliasCache = undefined
+    return 'removed'
+  }
+
+  return { addEntityAlias, callService, getEntityHistory, getEntityState, getRegistry, hasService, loadServiceIndex, removeEntityAlias }
 }

@@ -11,7 +11,7 @@ function fixture () {
   let state = 'on'
   let shouldUpdate = true
   const api: HomeAssistantApi = {
-    addEntityAlias: async () => { /* unused */ },
+    addEntityAlias: async () => { /* unused */ }, removeEntityAlias: async () => 'missing' as const,
     callService: async () => { calls++; if (shouldUpdate) state = 'off' },
     getEntityHistory: async () => [],
     getEntityState: () => ({ attributes: {}, name: 'Свет', state }),
@@ -105,7 +105,7 @@ function homeFixture () {
     'switch.plug_b': { area: 'Спальня', name: 'Розетка', state: 'on' }
   }
   const api: HomeAssistantApi = {
-    addEntityAlias: async () => { /* unused */ },
+    addEntityAlias: async () => { /* unused */ }, removeEntityAlias: async () => 'missing' as const,
     callService: async () => {},
     getEntityHistory: async () => [],
     getEntityState: id => {
@@ -242,6 +242,7 @@ test('dictionary report groups phrases by device and flags what cannot be said',
   const report = dictionaryReport(home)
   assert.equal(report.total, localVoicePhrases(home).length)
   assert.equal(report.truncated, false)
+  assert.deepEqual(report.aliases, [{ alias: 'Люстра', entityId: 'light.room', name: 'Свет в комнате' }])
   assert.ok(report.groups.find(group => group.title === 'Компьютер')?.phrases.includes('включи компьютер'))
   assert.ok(report.groups[0]?.phrases.includes('какая температура'))
   assert.ok(report.warnings.some(text => text.startsWith('Выключатель прихожей: нет устного имени')))
@@ -253,7 +254,8 @@ test('misses keep home commands the speaker sent elsewhere and skip the rest', (
   const { misses } = dictionaryReport(realHome(), [
     event('Включи торшер'), event('включи торшер.', 'llm', '2026-11-04T21:00:00.000Z'),
     event('включи компьютер'), event('включи музыку'), event('какая погода'),
-    event('расскажи анекдот'), event('включи ночник', 'home')
+    event('расскажи анекдот'), event('включи ночник', 'home'), event('сколько будет 2 у 2'),
+    event('сколько горел свет на кухне за прошлую неделю')
   ])
   assert.deepEqual(misses, [{ alias: 'торшер', count: 2, lastAt: '2026-11-04T21:00:00.000Z', phrase: 'включи торшер' }])
 })

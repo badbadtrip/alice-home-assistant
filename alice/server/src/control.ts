@@ -39,8 +39,8 @@ export function resolveLightCommand (text: string, speakerArea: string | undefin
   const match = LIGHT_GRAMMAR.exec(lightCommand)
   const lights = match ? resolveLights(match, speakerArea, devices) : undefined
   const intent = lights ? undefined : localIndex(devices).get(voicePhrase) ?? undefined
-  const needsCalls = (lights?.calls.length ?? 0) > 0 || intent?.state !== undefined
-  if (isQuestion && needsCalls) {
+  const hasCalls = (lights?.calls.length ?? 0) > 0 || intent?.state !== undefined
+  if (isQuestion && hasCalls) {
     return isVoiceOnly ? { answer: 'Скажите команду ещё раз, без вопроса.', calls: [], matched: true } : { calls: [], matched: false }
   }
   if (lights) return lights
@@ -49,11 +49,52 @@ export function resolveLightCommand (text: string, speakerArea: string | undefin
   }
   if (intent?.device.speak) return { answer: intent.device.speak(), calls: [], matched: true }
   // A dictionary phrase has no planner fallback on the speaker, so answer here.
-  if (isVoiceOnly && match) return { answer: 'Не нашла подходящий свет. Назовите комнату или объедините светильники в группу.', calls: [], matched: true }
-  return { calls: [], matched: false }
+  return isVoiceOnly && match ? { answer: 'Не нашла подходящий свет. Назовите комнату или объедините светильники в группу.', calls: [], matched: true } : { calls: [], matched: false }
 }
 
 const LIGHT_GRAMMAR = /^(включи|выключи|отключи|погаси|зажги) (свет|освещение)(?: (?:в|на) ([а-яa-z0-9 -]+)| (здесь|тут)| ([а-яa-z0-9-]+))?$/u
+
+interface LocalIntent { device: DeviceEntry; state?: 0 | 1 }
+
+// The same table serves /voice-phrases and the resolver, so a phrase the speaker
+// keeps locally always has a meaning here. Shared phrases are dropped, not guessed.
+function localIndex (devices: Map<string, DeviceEntry>): Map<string, LocalIntent | undefined> {
+  const index = new Map<string, LocalIntent | undefined>()
+  const add = (phrase: string, intent: LocalIntent): void => {
+    const previous = index.get(phrase)
+    const isSame = previous?.device === intent.device && previous.state === intent.state
+    index.set(phrase, !isSame && index.has(phrase) ? undefined : intent)
+  }
+  for (const device of devices.values()) {
+    if (device.voicePhrases) continue
+    const places = device.areaName ? areaPlaces(device.areaName) : []
+    if (device.speak) {
+      for (const name of spokenNames(device)) {
+        if (name.includes(' ')) add(name, { device })
+        for (const suffix of ['', ...places.map(place => ` ${place}`)]) {
+          if (suffix) add(name + suffix, { device })
+          if (name.startsWith('сколько ')) continue
+          for (const prefix of ['какая', 'какой', 'какое', 'какие', 'скажи']) add(`${prefix} ${name}${suffix}`, { device })
+        }
+      }
+    }
+    if (device.functions.every(f => f.name !== `set_${device.slug}_state`)) continue
+    const isCover = device.entityId.startsWith('cover.')
+    const verbs: [string, 0 | 1][] = isCover
+      ? [['открой', 1], ['закрой', 0]]
+      : [['включи', 1], ['выключи', 0], ['отключи', 0]]
+    for (const name of spokenNames(device)) {
+      const forms = new Set([inflect(name).accusative, name])
+      for (const form of forms) {
+        for (const [verb, state] of verbs) {
+          add(`${verb} ${form}`, { device, state })
+          for (const place of places) add(`${verb} ${form} ${place}`, { device, state })
+        }
+      }
+    }
+  }
+  return index
+}
 
 function resolveLights (match: RegExpExecArray, speakerArea: string | undefined,
   devices: Map<string, DeviceEntry>): ResolvedCommand | undefined {
@@ -83,47 +124,6 @@ function resolveLights (match: RegExpExecArray, speakerArea: string | undefined,
   return { calls, matched: true }
 }
 
-interface LocalIntent { device: DeviceEntry; state?: 0 | 1 }
-
-// The same table serves /voice-phrases and the resolver, so a phrase the speaker
-// keeps locally always has a meaning here. Shared phrases are dropped, not guessed.
-function localIndex (devices: Map<string, DeviceEntry>): Map<string, LocalIntent | undefined> {
-  const index = new Map<string, LocalIntent | undefined>()
-  const add = (phrase: string, intent: LocalIntent): void => {
-    const previous = index.get(phrase)
-    const isSame = previous?.device === intent.device && previous.state === intent.state
-    index.set(phrase, index.has(phrase) && !isSame ? undefined : intent)
-  }
-  for (const device of devices.values()) {
-    if (device.voicePhrases) continue
-    const places = device.areaName ? areaPlaces(device.areaName) : []
-    if (device.speak) {
-      for (const name of spokenNames(device)) {
-        if (name.includes(' ')) add(name, { device })
-        for (const suffix of ['', ...places.map(place => ` ${place}`)]) {
-          if (suffix) add(name + suffix, { device })
-          if (name.startsWith('сколько ')) continue
-          for (const prefix of ['какая', 'какой', 'какое', 'какие', 'скажи']) add(`${prefix} ${name}${suffix}`, { device })
-        }
-      }
-    }
-    if (!device.functions.some(f => f.name === `set_${device.slug}_state`)) continue
-    const isCover = device.entityId.startsWith('cover.')
-    const verbs: [string, 0 | 1][] = isCover
-      ? [['открой', 1], ['закрой', 0]]
-      : [['включи', 1], ['выключи', 0], ['отключи', 0]]
-    for (const name of spokenNames(device)) {
-      for (const form of new Set([name, inflect(name).accusative])) {
-        for (const [verb, state] of verbs) {
-          add(`${verb} ${form}`, { device, state })
-          for (const place of places) add(`${verb} ${form} ${place}`, { device, state })
-        }
-      }
-    }
-  }
-  return index
-}
-
 function spokenNames (device: DeviceEntry): string[] {
   const names = new Set<string>()
   for (const raw of [device.name ?? '', ...(device.aliases ?? [])]) {
@@ -145,10 +145,12 @@ const MAX_LOCAL_BYTES = 150_000
 export function localVoicePhrases (devices: Map<string, DeviceEntry>): string[] {
   const reserved = new Set<string>()
   for (const device of devices.values()) {
-    for (const phrase of device.voicePhrases ?? []) reserved.add(normalizeVoicePhrase(phrase))
+    const owned = device.voicePhrases ?? []
+    for (const phrase of owned) reserved.add(normalizeVoicePhrase(phrase))
   }
   const candidates: string[] = []
-  const lit = [...devices.values()].filter(device => device.isLighting)
+  const lit: DeviceEntry[] = []
+  for (const device of devices.values()) if (device.isLighting) lit.push(device)
   if (lit.length > 0) {
     const places = [...new Set(lit.flatMap(device => device.areaName ? areaPlaces(device.areaName) : []))]
     for (const verb of ['включи', 'выключи', 'отключи', 'погаси', 'зажги']) {
@@ -170,21 +172,21 @@ export function localVoicePhrases (devices: Map<string, DeviceEntry>): string[] 
   return [...phrases]
 }
 
-function areaPlaces (area: string): string[] {
-  const place = inflect(normalize(area)).prepositional
-  return [`в ${place}`, `на ${place}`]
-}
-
 function areaNames (area: string): string[] {
   const name = normalize(area)
   const { accusative, prepositional } = inflect(name)
   return [name, prepositional, accusative]
 }
 
+function areaPlaces (area: string): string[] {
+  const place = inflect(normalize(area)).prepositional
+  return [`в ${place}`, `на ${place}`]
+}
+
 // Regular Russian endings for room and device names. A wrong form is only a
 // phrase nobody says; it can never select a different device.
 function inflect (phrase: string): { accusative: string; prepositional: string } {
-  const words = phrase.split(' ').map(inflectWord)
+  const words = phrase.split(' ').map(word => inflectWord(word))
   return {
     accusative: words.map(word => word.accusative).join(' '),
     prepositional: words.map(word => word.prepositional).join(' ')
@@ -198,10 +200,12 @@ function inflectWord (word: string): { accusative: string; prepositional: string
   ]
   for (const [ending, prepositional, accusative] of rules) {
     if (ending.test(word)) {
-      return { accusative: word.replace(ending, accusative), prepositional: word.replace(ending, prepositional) }
+      const stem = word.replace(ending, '')
+      return { accusative: stem + accusative, prepositional: stem + prepositional }
     }
   }
-  return /[бвгджзклмнпрстфхцчшщ]$/u.test(word) ? { accusative: word, prepositional: `${word}е` } : { accusative: word, prepositional: word }
+  const isConsonant = /[бвгджзклмнпрстфхцчшщ]$/u.test(word)
+  return { accusative: word, prepositional: isConsonant ? `${word}е` : word }
 }
 
 function normalize (text: string): string {

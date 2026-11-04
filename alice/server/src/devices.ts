@@ -20,7 +20,9 @@ export interface DeviceEntry {
   isLighting?: boolean;
   name?: string;
   slug: string;
-  /** Spoken reading of a sensor, built without a model. */
+  /**
+  Spoken reading of a sensor, built without a model.
+  */
   speak?: () => string;
   stateProvider: DeviceStateProvider;
   voicePhrases?: string[];
@@ -47,17 +49,6 @@ const EMPTY_ENTITY_CONFIG: EntityConfig = { modes: {}, names: [] }
 const LIGHT_SWITCH_NAME = /(?:^|[\s/])свет\s+\S/iu
 
 const SPOKEN_UNITS: Record<string, string> = { '%': 'процентов', '°C': 'градусов', '°С': 'градусов' }
-
-function spokenReading (name: string, config: EntityConfig, entity: LooseEntityState | undefined): string {
-  const [state = 'unavailable', detail] = formatEntityState(config, entity).split(', ')
-  if (['not available', 'unavailable', 'unknown'].includes(state)) return `${name}: нет данных.`
-  if (entity?.entityId.startsWith('binary_sensor.')) {
-    const meaning = detail && !detail.startsWith('device_class') ? detail : (state === 'on' ? 'включено' : 'выключено')
-    return `${name}: ${meaning}.`
-  }
-  const unit = detail && !detail.startsWith('device_class') ? ` ${SPOKEN_UNITS[detail] ?? detail}` : ''
-  return `${name}: ${state}${unit}.`
-}
 
 /**
  * Builds the list of exposed devices: every entity carrying one of the configured
@@ -135,10 +126,12 @@ export async function buildDevices (homeAssistant: HomeAssistantApi,
       entityId: item.entityId,
       functions,
       isLighting: domain === 'light' || (domain === 'switch' &&
-        (entityConfig.lighting ?? LIGHT_SWITCH_NAME.test(name ?? ''))),
+        (entityConfig.lighting ?? LIGHT_SWITCH_NAME.test(name))),
       name,
       slug,
-      ...(isReadOnly ? { speak: () => spokenReading(name ?? item.entityId, entityConfig, snapshotEntity(homeAssistant, item.entityId)) } : {}),
+      ...(isReadOnly && {
+        speak: () => spokenReading(name, entityConfig, snapshotEntity(homeAssistant, item.entityId))
+      }),
       stateProvider
     })
   }
@@ -161,4 +154,15 @@ export function snapshotEntity (homeAssistant: HomeAssistantApi,
     entityId,
     features: Number(state.attributes.supported_features ?? 0)
   }
+}
+
+function spokenReading (name: string, config: EntityConfig, entity: LooseEntityState | undefined): string {
+  const [state = 'unavailable', detail] = formatEntityState(config, entity).split(', ', 2)
+  if (['not available', 'unavailable', 'unknown'].includes(state)) return `${name}: нет данных.`
+  if (entity?.entityId.startsWith('binary_sensor.')) {
+    const meaning = detail && !detail.startsWith('device_class') ? detail : (state === 'on' ? 'включено' : 'выключено')
+    return `${name}: ${meaning}.`
+  }
+  const unit = detail && !detail.startsWith('device_class') ? ` ${SPOKEN_UNITS[detail] ?? detail}` : ''
+  return `${name}: ${state}${unit}.`
 }

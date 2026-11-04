@@ -7,7 +7,7 @@ import { HomeAssistantApi } from '../src/home-assistant'
 test('explicit access overrides labels and all-devices mode respects exclusions', async () => {
   let calls = 0
   const api: HomeAssistantApi = {
-    callService: async () => { calls++ },
+    addEntityAlias: async () => { /* unused */ }, callService: async () => { calls++ },
     getEntityHistory: async () => [],
     getEntityState: () => ({ attributes: {}, name: 'Room light', state: 'off' }),
     getRegistry: async () => [

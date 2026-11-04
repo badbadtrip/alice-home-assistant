@@ -25,6 +25,7 @@ function fixture () {
   const states = new Map([[automation, 'on'], [helper, 'off'], [light, 'on']])
   const calls: unknown[] = []
   const api: HomeAssistantApi = {
+    addEntityAlias: async () => { /* unused */ },
     callService: async (domain, service, data) => {
       calls.push({ domain, service, data })
       states.set(helper, 'on'); states.set(light, 'off')

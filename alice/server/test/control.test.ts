@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { dictionaryReport, localVoicePhrases, normalizeVoicePhrase, resolveLightCommand } from '../src/control'
+import { aliasConflict, dictionaryReport, localVoicePhrases, normalizeVoicePhrase, resolveLightCommand } from '../src/control'
 import { buildDevices, DeviceEntry } from '../src/devices'
 import { executeFunction } from '../src/execution'
 import { HomeAssistantApi } from '../src/home-assistant'
@@ -11,6 +11,7 @@ function fixture () {
   let state = 'on'
   let shouldUpdate = true
   const api: HomeAssistantApi = {
+    addEntityAlias: async () => { /* unused */ },
     callService: async () => { calls++; if (shouldUpdate) state = 'off' },
     getEntityHistory: async () => [],
     getEntityState: () => ({ attributes: {}, name: 'Свет', state }),
@@ -104,6 +105,7 @@ function homeFixture () {
     'switch.plug_b': { area: 'Спальня', name: 'Розетка', state: 'on' }
   }
   const api: HomeAssistantApi = {
+    addEntityAlias: async () => { /* unused */ },
     callService: async () => {},
     getEntityHistory: async () => [],
     getEntityState: id => {
@@ -244,4 +246,20 @@ test('dictionary report groups phrases by device and flags what cannot be said',
   assert.ok(report.groups[0]?.phrases.includes('какая температура'))
   assert.ok(report.warnings.some(text => text.startsWith('Выключатель прихожей: нет устного имени')))
   assert.ok(report.warnings.some(text => text.includes('свет не привязан к комнате')))
+})
+
+test('misses keep home commands the speaker sent elsewhere and skip the rest', () => {
+  const event = (text: string, route = 'yandex', at = '2026-11-04T20:00:00.000Z') => ({ at, route, text })
+  const { misses } = dictionaryReport(realHome(), [
+    event('Включи торшер'), event('включи торшер.', 'llm', '2026-11-04T21:00:00.000Z'),
+    event('включи компьютер'), event('включи музыку'), event('какая погода'),
+    event('расскажи анекдот'), event('включи ночник', 'home')
+  ])
+  assert.deepEqual(misses, [{ alias: 'торшер', count: 2, lastAt: '2026-11-04T21:00:00.000Z', phrase: 'включи торшер' }])
+})
+
+test('an alias cannot take a name another device answers to', () => {
+  assert.equal(aliasConflict('Компьютер', 'light.room', realHome()), 'Компьютер')
+  assert.equal(aliasConflict('Компьютер', 'switch.pc', realHome()), undefined)
+  assert.equal(aliasConflict('торшер', 'light.room', realHome()), undefined)
 })

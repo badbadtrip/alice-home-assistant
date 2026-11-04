@@ -9,9 +9,9 @@ import express from 'express'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import z from 'zod'
 
-import { ActivityEvent, ActivityJournal } from './activity'
+import { ActivityEvent, ActivityJournal, ActivityRecord } from './activity'
 import { loadConfig } from './config'
-import { dictionaryReport, localVoicePhrases, resolveLightCommand } from './control'
+import { aliasConflict, dictionaryReport, localVoicePhrases, resolveLightCommand } from './control'
 import { buildDevices, DeviceEntry, snapshotEntity } from './devices'
 import { executeFunction } from './execution'
 import { createHomeAssistantApi, HomeAssistantApi } from './home-assistant'
@@ -184,8 +184,31 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     response.json(previewCommand(body.data.text, body.data.area, speaker, await getDevices()))
   })
   app.get('/dictionary', async (request, response) => {
-    const devices = speakerDevices(await getDevices(), request.get('x-alice-speaker'))
-    response.json(dictionaryReport(devices))
+    const speaker = request.get('x-alice-speaker')
+    const devices = speakerDevices(await getDevices(), speaker)
+    let events: ActivityRecord[] = []
+    try { events = await activity.list() } catch { /* the page still shows the table */ }
+    response.json(dictionaryReport(devices, events.filter(event => event.speaker_id === speaker)))
+  })
+
+  // Written only by an explicit button in settings; the answer is always 200 so
+  // the settings page can show the reason.
+  app.post('/dictionary/alias', async (request, response) => {
+    const aliasBody = z.object({ alias: z.string().trim().min(2).max(60), entity_id: z.string().max(200) }).strict()
+    const body = aliasBody.safeParse(request.body)
+    const devices = await getDevices()
+    const device = body.success ? devices.get(body.data.entity_id) : undefined
+    if (!device || !body.success || device.voicePhrases) {
+      response.json({ error: 'Устройство недоступно Алисе.', saved: false })
+      return
+    }
+    const owner = aliasConflict(body.data.alias, device.entityId, devices)
+    if (owner) {
+      response.json({ error: `Так уже называется «${owner}».`, saved: false })
+      return
+    }
+    await homeAssistant.addEntityAlias(device.entityId, body.data.alias)
+    response.json({ saved: true })
   })
 
   app.get('/voice-phrases', async (request, response) => {

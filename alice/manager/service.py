@@ -302,7 +302,7 @@ class Manager:
             self.connections[speaker['id']] = {'identity': identity, 'value': value}
 
     def _hf_request(self, path, speaker=None, payload=None):
-        if path not in ('/voice-phrases', '/preview', '/events', '/inventory', '/dictionary'):
+        if path not in ('/voice-phrases', '/preview', '/events', '/inventory', '/dictionary', '/dictionary/alias'):
             raise Error('Неизвестный внутренний маршрут.', 500)
         parsed = urlsplit(self.config.get('home_functions_url', ''))
         if parsed.scheme not in ('http', 'https') or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ('', '/'):
@@ -1049,6 +1049,10 @@ class Handler(BaseHTTPRequestHandler):
             return 200, manager.setup()
         if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] == 'dictionary' and method == 'GET':
             return 200, manager._hf_request('/dictionary', manager.store.speaker(path[2]))
+        if path == ['api', 'dictionary', 'alias'] and method == 'POST':
+            if set(payload) != {'alias', 'entity_id'}:
+                raise Error('Ожидаются alias и entity_id.')
+            return 200, manager._hf_request('/dictionary/alias', None, {'alias': text(payload['alias'], 'alias', 60), 'entity_id': text(payload['entity_id'], 'entity_id', 200)})
         if path == ['api', 'phrase-check'] and method == 'POST':
             return 200, manager.phrase_check(payload)
         if path == ['api', 'activity'] and method == 'GET':

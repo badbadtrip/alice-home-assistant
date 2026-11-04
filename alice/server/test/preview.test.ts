@@ -13,6 +13,7 @@ test('preview resolves exact phrases and speaker restrictions without invoking H
   const entity = 'automation.kitchen'
   let executions = 0
   const api: HomeAssistantApi = {
+    addEntityAlias: async () => { /* unused */ },
     callService: async () => { executions++ }, getEntityHistory: async () => [],
     getEntityState: () => ({ attributes: {}, name: 'Кухня', state: 'on' }),
     getRegistry: async () => [{ entityId: entity, labels: ['voice'], aliases: ['Не включай свет на кухне'] }],

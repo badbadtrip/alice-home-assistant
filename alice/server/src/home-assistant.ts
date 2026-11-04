@@ -17,6 +17,7 @@ export interface HassServiceDTO {
 }
 
 export interface HomeAssistantApi {
+  addEntityAlias (entityId: string, alias: string): Promise<void>;
   callService (domain: string, service: string, data: Record<string, unknown>): Promise<void>;
   getEntityHistory (entityId: string, days: number, end?: Date): Promise<EntityHistoryEntry[]>;
   getEntityState (entityId: string): EntityState | undefined;
@@ -176,5 +177,16 @@ export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>)
     })
   }
 
-  return { callService, getEntityHistory, getEntityState, getRegistry, hasService, loadServiceIndex }
+  async function addEntityAlias (entityId: string, alias: string): Promise<void> {
+    const entry = await hass.socket.sendMessage({
+      entity_id: entityId, type: 'config/entity_registry/get'
+    }) as RawRegistryEntry
+    const aliases = entry.aliases ?? []
+    if (aliases.includes(alias)) return
+    await hass.socket.sendMessage({
+      aliases: [...aliases, alias], entity_id: entityId, type: 'config/entity_registry/update'
+    })
+  }
+
+  return { addEntityAlias, callService, getEntityHistory, getEntityState, getRegistry, hasService, loadServiceIndex }
 }

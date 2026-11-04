@@ -194,18 +194,30 @@ function spokenNames (device: DeviceEntry): string[] {
 const MAX_LOCAL_PHRASES = 3500
 const MAX_LOCAL_BYTES = 150_000
 
+export interface DictionaryMiss {
+  alias: string;
+  count: number;
+  lastAt: string;
+  phrase: string;
+}
+
 export interface DictionaryReport {
   bytes: number;
   groups: { phrases: string[]; title: string }[];
   maxBytes: number;
   maxPhrases: number;
+  misses: DictionaryMiss[];
+  targets: { entityId: string; name: string }[];
   total: number;
   truncated: boolean;
   warnings: string[];
 }
 
+interface MissEvent { at: string; route: string; text: string }
+
 // Read-only view of what a speaker keeps locally, for the settings page.
-export function dictionaryReport (devices: Map<string, DeviceEntry>): DictionaryReport {
+export function dictionaryReport (devices: Map<string, DeviceEntry>,
+  events: MissEvent[] = []): DictionaryReport {
   const { candidates, phrases } = selectPhrases(devices)
   const index = localIndex(devices)
   const kept = new Set(phrases)
@@ -236,14 +248,37 @@ export function dictionaryReport (devices: Map<string, DeviceEntry>): Dictionary
     groups,
     maxBytes: MAX_LOCAL_BYTES,
     maxPhrases: MAX_LOCAL_PHRASES,
+    misses: dictionaryMisses(events, kept),
+    targets: aliasTargets(devices),
     total: phrases.length,
     truncated: candidates.some(phrase => !kept.has(phrase) && !isReserved(devices, phrase)),
     warnings
   }
 }
 
+const HOME_QUESTION = /^(?:включи|выключи|отключи|погаси|зажги|открой|закрой|какая|какой|какое|какие|сколько) (.+)$/u
+const NOT_HOME = /музык|песн|радио|подкаст|фильм|мультик|сказк|погод|новост|время|будильник|таймер/u
+const MAX_MISSES = 20
+
+// A new alias must not silently take a name that another device answers to.
+export function aliasConflict (alias: string, entityId: string, devices: Map<string, DeviceEntry>): string | undefined {
+  const name = normalizeVoicePhrase(alias)
+  for (const device of devices.values()) {
+    if (device.entityId !== entityId && !device.voicePhrases && spokenNames(device).includes(name)) return device.name
+  }
+  return undefined
+}
+
 export function localVoicePhrases (devices: Map<string, DeviceEntry>): string[] {
   return selectPhrases(devices).phrases
+}
+
+function aliasTargets (devices: Map<string, DeviceEntry>): { entityId: string; name: string }[] {
+  const targets: { entityId: string; name: string }[] = []
+  for (const device of devices.values()) {
+    if (!device.voicePhrases) targets.push({ entityId: device.entityId, name: device.name ?? device.entityId })
+  }
+  return targets
 }
 
 function areaNames (area: string, aliases: string[] = []): string[] {
@@ -251,6 +286,28 @@ function areaNames (area: string, aliases: string[] = []): string[] {
   const { accusative, prepositional } = inflect(name)
   const spoken = aliases.map(alias => normalizeVoicePhrase(alias).replace(PLACE_PREPOSITION, ''))
   return [name, prepositional, accusative, ...spoken]
+}
+
+// Commands the speaker sent to a model or Yandex although they look meant for the home.
+function dictionaryMisses (events: MissEvent[], known: Set<string>): DictionaryMiss[] {
+  const misses = new Map<string, DictionaryMiss>()
+  const sorted: DictionaryMiss[] = []
+  for (const event of events) {
+    const phrase = normalizeVoicePhrase(event.text)
+    const alias = HOME_QUESTION.exec(phrase)?.[1]
+    if (!alias || !['llm', 'yandex'].includes(event.route) || known.has(phrase) || NOT_HOME.test(phrase)) continue
+    const miss = misses.get(phrase)
+    if (miss) {
+      miss.count++
+      if (event.at > miss.lastAt) miss.lastAt = event.at
+    } else {
+      const created = { alias, count: 1, lastAt: event.at, phrase }
+      misses.set(phrase, created)
+      sorted.push(created)
+    }
+  }
+  sorted.sort((a, b) => b.count - a.count || b.lastAt.localeCompare(a.lastAt))
+  return sorted.slice(0, MAX_MISSES)
 }
 
 function isReserved (devices: Map<string, DeviceEntry>, phrase: string): boolean {

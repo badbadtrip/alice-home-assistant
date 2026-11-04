@@ -2,8 +2,13 @@
   ".dockerignore": "f5637e2b8658d025aaec96fc50343505ff3062c8501bddc101a0103376d642e7",
   "bridge-config.json": "9cc33361dd1c89488aa0d904c72f05ca91b2bab9edf854e05618110b785e35bb",
   "BRIDGE-SOURCE.json": "91ab3beccb0307ab1134fce34421728f4291d16dfdca79287ee1fd3e9c6bb0da",
+<<<<<<< HEAD
   "CHANGELOG.md": "0afd29865c1aabbdb39df19905790e1b3ba7ce974310a3b215a7b0f9cdace43f",
   "config.yaml": "0955e05c00feff337d3953423ef882160dd5f35638922ade56ec05aec693b6f9",
+=======
+  "CHANGELOG.md": "173d53c971bad741c32298ac05609064675b2aae9e7784466e00073b9e28be73",
+  "config.yaml": "8af0d1a2bfe5a49a6f83f0a8d8e4ff59c7414c86feac55a3271fb7d46e4d4377",
+>>>>>>> origin/main
   "Dockerfile": "9ba980871643eb93d3bafa1974b8404a6728d6bf09716343d370ddfe5f6026d1",
   "DOCS.md": "c27e97ee868c4823e4bf8acaf43a40cacc20b4233964bc3f3129352cb9710e4c",
   "LICENSE": "6d751d46c8061b82dfeef2a722e08c8cab6bb9d2353844d3529a69eecff63c74",
@@ -37,7 +42,7 @@
   "server/pnpm-lock.yaml": "5adf3d0bd202302823f10ee712080f88b0f23f80f304c6ee4f17da624ef7ee05",
   "server/pnpm-workspace.yaml": "d6d0c24446d91ef762d37c6ba801bb516e65d7055aa9f8027fcd457409a97ce1",
   "server/tsconfig.json": "ad31b28b95c97ed59e5a56701aba8bf2fe1ff1ebd2bfc7e5587d9e443b27ab7f",
-  "ui/alice-voice-card.js": "04079c18a9bec1c6e21d5f6c04eb0c072a7e504e7059bfa6a031657f03ecd690",
+  "ui/alice-voice-card.js": "18a85952149b19b6e5b7d4a141943ccc6fada13ba3bd425f94b6c70e97473947",
   "ui/IMAGE_SOURCES.md": "33b7f29ba42d9e0086ca09ab0304837248d2faee3fcc84921ba10ef0e17d2992",
   "wiki/Bridge.md": "db623d124f1af961b5ccde94d3dfe40e2e0e613a51a4eb1f27b6c3ff6b7e94a5",
   "wiki/Commands.md": "2fdc4966dfa9f56fb66fe93110a88e4b5fea17644734c9b03659a598093c5280",

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { localVoicePhrases, normalizeVoicePhrase, resolveLightCommand } from '../src/control'
-import { buildDevices } from '../src/devices'
+import { buildDevices, DeviceEntry } from '../src/devices'
 import { executeFunction } from '../src/execution'
 import { HomeAssistantApi } from '../src/home-assistant'
 
@@ -181,4 +181,55 @@ test('dictionary stays inside the bridge limits and leaves user phrases alone', 
   assert.ok(phrases.length <= 3500)
   assert.ok(Buffer.byteLength(JSON.stringify(phrases)) < 200_000)
   assert.ok(!phrases.includes('выключи компьютер'))
+})
+
+function realHome (): Map<string, DeviceEntry> {
+  const entry = (entityId: string, name: string, extra: Partial<DeviceEntry> = {}): [string, DeviceEntry] => {
+    const slug = entityId.replace('.', '_')
+    const isSensor = entityId.startsWith('sensor.')
+    return [entityId, {
+      entityId,
+      functions: isSensor ? [] : [{ expectedState: true, name: `set_${slug}_state` } as never],
+      isLighting: !isSensor && /свет\s+\S/iu.test(name),
+      name,
+      slug,
+      stateProvider: {} as never,
+      ...(isSensor && { speak: () => `${name}: 1.` }),
+      ...extra
+    }]
+  }
+  return new Map([
+    entry('switch.kitchen', 'Выключатель кухня/балкон свет на кухне'),
+    entry('switch.pc', 'Компьютер'),
+    entry('light.room', 'Свет в комнате', { aliases: ['Люстра'] }),
+    entry('light.hall', 'Свет в прихожей', { areaId: 'hall', areaName: 'Прихожая' }),
+    entry('sensor.room_t', 'Температура в комнате', { areaId: 'room', areaName: 'Комната', sensorClass: 'temperature' }),
+    entry('sensor.out_t', 'Температура на улице', { sensorClass: 'temperature' }),
+    entry('sensor.food', 'Кормушка сколько кот скушал')
+  ])
+}
+
+test('dictionary holds only phrases a person says', () => {
+  const junk = /выключатель| ну |прихожой|на комнате|в комнате в комнате|кормушка|скажи/u
+  assert.deepEqual(localVoicePhrases(realHome()).filter(phrase => junk.test(phrase)), [])
+})
+
+test('dictionary covers light verbs, aliases and sensor questions', () => {
+  const phrases = localVoicePhrases(realHome())
+  for (const phrase of ['погаси свет на кухне', 'зажги свет в комнате', 'включи люстру', 'включи свет в прихожей',
+    'сколько градусов на улице', 'какая температура', 'сколько кот скушал']) assert.ok(phrases.includes(phrase), phrase)
+  assert.ok(!phrases.includes('погаси компьютер'))
+})
+
+test('a bare reading uses the speaker room, then the only indoor sensor', () => {
+  for (const area of ['Кухня', 'Комната']) {
+    assert.equal(resolveLightCommand('какая температура', area, realHome(), true).answer, 'Температура в комнате: 1.')
+  }
+})
+
+test('a bare light command follows the room named by a switch', () => {
+  assert.deepEqual(resolveLightCommand('включи свет', 'Кухня', realHome(), true).calls,
+    [{ arguments: { state: 1 }, name: 'set_switch_kitchen_state' }])
+  assert.deepEqual(resolveLightCommand('погаси свет', 'Комната', realHome(), true).calls,
+    [{ arguments: { state: 0 }, name: 'set_light_room_state' }])
 })

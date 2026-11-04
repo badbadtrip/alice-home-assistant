@@ -27,6 +27,7 @@ export interface HomeAssistantApi {
 
 export interface RegistryEntry {
   aliases?: string[];
+  areaAliases?: string[] | undefined;
   areaId?: string | undefined;
   areaName?: string | undefined;
   entityId: string;
@@ -69,7 +70,9 @@ interface RawRegistryEntry {
  */
 export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>): HomeAssistantApi {
   const serviceIndex = new Set<string>()
-  let locationCache: undefined | { areas: Map<string, string>; devices: Map<string, string>; until: number; }
+  let locationCache: undefined | {
+    areaAliases: Map<string, string[]>; areas: Map<string, string>; devices: Map<string, string>; until: number;
+  }
 
   async function loadServiceIndex (): Promise<void> {
     const services = await hass.fetch.listServices()
@@ -116,6 +119,8 @@ export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>)
       ])
       if (!Array.isArray(areas) || !Array.isArray(devices)) throw new TypeError('Invalid HA location registry')
       locationCache = {
+        areaAliases: new Map((areas as { aliases?: string[]; area_id: string }[])
+          .map(a => [a.area_id, a.aliases ?? []])),
         areas: new Map((areas as { area_id: string; name: string }[]).map(a => [a.area_id, a.name])),
         devices: new Map((devices as { area_id?: string; id: string }[])
           .filter(d => d.area_id).map(d => [d.id, d.area_id as string])),
@@ -134,6 +139,7 @@ export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>)
       const areaId = item.area_id ?? (item.device_id ? locationCache?.devices.get(item.device_id) : undefined)
       return {
         aliases: (item.aliases ?? []).filter((alias): alias is string => typeof alias === 'string'),
+        areaAliases: areaId ? locationCache?.areaAliases.get(areaId) : undefined,
         areaId,
         areaName: areaId ? locationCache?.areas.get(areaId) : undefined,
         entityId: item.entity_id,

@@ -13,12 +13,17 @@ import { addVoiceCommands } from './voice-commands'
 
 export interface DeviceEntry {
   aliases?: string[] | undefined;
+  areaAliases?: string[] | undefined;
   areaId?: string | undefined;
   areaName?: string | undefined;
   entityId: string;
   functions: DeviceFunction[];
   isLighting?: boolean;
   name?: string;
+  /**
+  HA device class of a sensor, used to answer "какая температура" by room.
+  */
+  sensorClass?: string;
   slug: string;
   /**
   Spoken reading of a sensor, built without a model.
@@ -121,6 +126,7 @@ export async function buildDevices (homeAssistant: HomeAssistantApi,
 
     devices.set(item.entityId, {
       aliases: [...entityConfig.names, ...(item.aliases ?? [])],
+      areaAliases: entityConfig.area ? [] : item.areaAliases,
       areaId,
       areaName,
       entityId: item.entityId,
@@ -129,6 +135,7 @@ export async function buildDevices (homeAssistant: HomeAssistantApi,
         (entityConfig.lighting ?? LIGHT_SWITCH_NAME.test(name))),
       name,
       slug,
+      ...(typeof state.attributes.device_class === 'string' && { sensorClass: state.attributes.device_class }),
       ...(isReadOnly && {
         speak: () => spokenReading(name, entityConfig, snapshotEntity(homeAssistant, item.entityId))
       }),

@@ -13,3 +13,7 @@ Lite 2: https://cdn-viewer.diplodoc.com/docs-assets/alice/rev/r21933224/ru/_asse
 Both original PNGs are embedded unchanged. Model names remain distinct; Mini 2 is not substituted for Lite 2.
 
 Lite 2 is presented in green using a CSS hue rotation of the original photograph; the embedded PNG bytes remain unchanged. The dark neutralization mask is used only for MIDI's LED strip, not for compact speakers' buttons.
+
+2026-11-04: Lite 2 now uses an original green YNDX-00026GRN photograph, not a hue-rotated purple model. Source: https://tystore.yandex.ru/card/yandeks-stantsiya-layt-2-s-alisoy-na-yagpt-zelenyy/103788645523 ; image: https://avatars.mds.yandex.net/get-mpic/20992722/picf5c6fe588ad553e874f774049d68d395/orig . The unchanged source photograph is displayed through an SVG crop/clip around the physical device; marketing text and white background are outside that crop. The live LED layer follows the photographed top logo.
+
+The bundled display asset uses the source CDN’s 600x800 size variant to reduce loading size; no local raster edits are applied.

@@ -19,6 +19,9 @@ import (
 //go:embed ring.sh
 var script string
 
+//go:embed plum.sh
+var plumScript string
+
 type Config struct {
 	Enabled    bool   `json:"enabled"`
 	Color      string `json:"color"`
@@ -107,7 +110,9 @@ type Controller struct {
 }
 
 func New(configPath string) *Controller {
-	if _, err := os.Stat("/sys/class/leds/cucumber:red:ring23"); err == nil {
+	_, midiErr := os.Stat("/sys/class/leds/cucumber:red:ring23")
+	_, plumErr := os.Stat("/sys/class/leds/plum:red:ring3")
+	if midiErr == nil || plumErr == nil {
 		_ = os.WriteFile(filepath.Join(filepath.Dir(configPath), "indicator-ready"), []byte("1\n"), 0600)
 	}
 	return &Controller{Path: filepath.Join(filepath.Dir(configPath), "indicator.json")}
@@ -146,7 +151,11 @@ func (c *Controller) Begin() func() {
 func (c *Controller) run(ctx context.Context, cfg Config, done chan struct{}) {
 	defer close(done)
 	// Do not use CommandContext: the helper must process EOF and restore triggers.
-	cmd := exec.Command("/bin/sh", "-c", script, "alice-ring", cfg.Color[1:])
+	helper := script
+	if _, err := os.Stat("/sys/class/leds/plum:red:ring3"); err == nil {
+		helper = plumScript
+	}
+	cmd := exec.Command("/bin/sh", "-c", helper, "alice-ring", cfg.Color[1:])
 	input, err := cmd.StdinPipe()
 	if err != nil {
 		return

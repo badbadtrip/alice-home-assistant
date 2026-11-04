@@ -14,6 +14,7 @@ import re
 import secrets
 import shlex
 import subprocess
+import sys
 import tarfile
 import threading
 import time
@@ -33,6 +34,10 @@ class Error(Exception):
         super().__init__(message)
         self.status = status
 
+
+# Admin helpers import the same Error class when this file is the entry point.
+if __name__ == '__main__':
+    sys.modules.setdefault('service', sys.modules[__name__])
 
 def lan_ip(value):
     try:

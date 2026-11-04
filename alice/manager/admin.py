@@ -133,9 +133,9 @@ def station(manager, speaker_id, operation, payload):
             return {'output': output[:match.start()] if match else output, 'exit_code': int(match[1]) if match else None, 'truncated': match is None}
         if operation == 'indicator':
             root = '/data/opt/quasar-bridge/'
-            status = manager.ssh(speaker, 'if test -f ' + root + 'indicator-ready && test -d /sys/class/leds/cucumber:red:ring23; then echo ready; else echo unsupported; fi', timeout=12).decode().strip()
+            status = manager.ssh(speaker, 'if test -f ' + root + 'indicator-ready && { test -d /sys/class/leds/cucumber:red:ring23 || test -d /sys/class/leds/plum:red:ring3; }; then echo ready; else echo unsupported; fi', timeout=12).decode().strip()
             if status != 'ready':
-                raise Error('Подсветка доступна на Миди после обновления моста.', 409)
+                raise Error('Подсветка доступна на Миди и Лайт 2 после обновления моста.', 409)
             path = root + 'indicator.json'
             current = manager.ssh(speaker, 'if test -L ' + path + '; then exit 1; elif test -f ' + path + '; then head -c 1024 ' + path + '; else printf \'{"enabled":false,"color":"#00bfff"}\\n\'; fi', timeout=12)
             config = json.loads(current)

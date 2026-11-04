@@ -11,3 +11,5 @@ Retrieved 2026-11-04. The photograph is a product reference; its printed clock d
 Mini 2: https://cdn-viewer.diplodoc.com/docs-assets/alice/rev/r21933224/ru/_assets/device-card/station/station-mini2.png
 Lite 2: https://cdn-viewer.diplodoc.com/docs-assets/alice/rev/r21933224/ru/_assets/device-card/station/station-lite2.png
 Both original PNGs are embedded unchanged. Model names remain distinct; Mini 2 is not substituted for Lite 2.
+
+Lite 2 is presented in green using a CSS hue rotation of the original photograph; the embedded PNG bytes remain unchanged. The dark neutralization mask is used only for MIDI's LED strip, not for compact speakers' buttons.

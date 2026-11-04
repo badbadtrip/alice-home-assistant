@@ -33,7 +33,8 @@ export function resolveLightCommand (text: string, speakerArea: string | undefin
     return { calls: [{ arguments: {}, name: function_.name }], matched: true }
   }
   if (isVoiceOnly) return { calls: [], matched: false }
-  const match = /^(включи|выключи|погаси|зажги) (свет|освещение)(?: (?:в|на) ([а-яa-z0-9 -]+)| (здесь|тут))?$/u.exec(command)
+  const lightCommand = command.replace(/^(включи|выключи|погаси|зажги) (здесь|тут) (свет|освещение)$/u, '$1 $3 $2')
+  const match = /^(включи|выключи|погаси|зажги) (свет|освещение)(?: (?:в|на) ([а-яa-z0-9 -]+)| (здесь|тут))?$/u.exec(lightCommand)
   if (!match) return { calls: [], matched: false }
   const area = match[3] ?? speakerArea
   if (!area) return { answer: 'В какой комнате?', calls: [], matched: true }

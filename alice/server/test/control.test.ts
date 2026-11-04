@@ -31,6 +31,20 @@ test('two speakers resolve here to their own room, explicit area overrides and p
   const devices = await buildDevices(api, { entities: {}, labels: ['alice'] })
   const room = resolveLightCommand('выключи свет здесь', 'Комната', devices)
   const kitchen = resolveLightCommand('выключи свет здесь', 'Кухня', devices)
+  for (const area of ['Комната', 'Кухня']) {
+    for (const place of ['здесь', 'тут']) {
+      for (const noun of ['свет', 'освещение']) {
+        for (const verb of ['выключи', 'включи', 'погаси', 'зажги']) {
+          assert.deepEqual(resolveLightCommand(`${verb} ${place} ${noun}`, area, devices),
+            resolveLightCommand(`${verb} ${noun} ${place}`, area, devices))
+        }
+      }
+    }
+  }
+  for (const text of ['не выключи здесь свет', 'выключи здесь свет?',
+    'выключи здесь свет через час', 'выключи тут свет и компьютер']) {
+    assert.equal(resolveLightCommand(text, 'Комната', devices).matched, false, text)
+  }
   assert.equal(room.calls.length, 1)
   assert.equal(kitchen.calls.length, 1)
   assert.notEqual(room.calls[0]?.name, kitchen.calls[0]?.name)

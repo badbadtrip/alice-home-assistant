@@ -121,8 +121,13 @@ def station(manager, speaker_id, operation, payload):
             if not isinstance(command, str) or not command.strip() or len(command) > 8000 or '\x00' in command:
                 raise Error('Введите команду длиной до 8000 символов.')
             # The user explicitly runs commands as root; never execute on page load.
-            # timeout bounds the remote process, head bounds its captured output.
-            script = 'timeout 10 sh -c ' + shlex.quote(command) + ' 2>&1; code=$?; printf "\\nALICE_EXIT_CODE=%s\\n" "$code"'
+            # MIDI's BusyBox omits timeout. A separate process group and watchdog
+            # bound the command including children without depending on that applet.
+            script = ('/bin/busybox setsid sh -c ' + shlex.quote(command) + ' 2>&1 & pid=$!; '
+                      '(sleep 10; /bin/busybox kill -TERM -- -"$pid" 2>/dev/null; '
+                      'sleep 1; /bin/busybox kill -KILL -- -"$pid" 2>/dev/null) >/dev/null 2>&1 & watcher=$!; '
+                      'wait "$pid"; code=$?; kill "$watcher" 2>/dev/null; '
+                      'printf "\\nALICE_EXIT_CODE=%s\\n" "$code"')
             output = manager.ssh(speaker, 'sh -c ' + shlex.quote(script) + ' | head -c 48000', timeout=14).decode('utf-8', errors='replace')
             match = re.search(r'\nALICE_EXIT_CODE=(\d+)\n$', output)
             return {'output': output[:match.start()] if match else output, 'exit_code': int(match[1]) if match else None, 'truncated': match is None}

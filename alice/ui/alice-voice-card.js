@@ -15,6 +15,7 @@
       this._registry = []; this._draftTarget = ''; this._draftPhrases = ''; this._message = '';
       this._expandedSpeakers=new Set();
       this._adminKeyHandler=event=>{if(event.key==='Escape'&&this._admin){event.preventDefault();event.stopPropagation();this._adminAction('admin-close');}};
+      this._resumeHandler=()=>{if(this.ownerDocument.visibilityState!=='hidden')this._recoverManager();};
       this._stationBusy=new Set();this._stationMessages={};this._mediaPlatforms={};this._utility=null;this._events=[];this._activityPage=0;
       this.shadowRoot.addEventListener('toggle',e=>{if(e.target.matches('details.admin-entity-details')&&this._admin){if(e.target.open)this._admin.expanded.add(e.target.dataset.entity);else this._admin.expanded.delete(e.target.dataset.entity);}if(e.target.id==='home-journal'&&e.target.isConnected){this._journalOpen=e.target.open;if(e.target.open)this._loadActivity();}if(e.target.matches('details[data-speaker]')){const id=e.target.dataset.speaker;if(e.target.open)this._expandedSpeakers.add(id);else this._expandedSpeakers.delete(id);}},true);
       this._tab='commands'; this._speakers=[]; this._assignments={}; this._chosen=[]; this._all=true;
@@ -98,12 +99,15 @@
     }
     connectedCallback() {
       this.ownerDocument.addEventListener('keydown',this._adminKeyHandler,true);
+      this.ownerDocument.addEventListener('visibilitychange',this._resumeHandler);
+      for(const event of ['focus','online','pageshow'])window.addEventListener(event,this._resumeHandler);
       this._applyEmbeddedLayout();
       if (this._hass) {this._load(); this._subscribe();}
       clearInterval(this._connectionTimer);
       this._connectionTimer=setInterval(async()=>{
         if(this._busy||!this._hass)return;
         await this._loadManager();this._renderEditorStatus();
+        this._repairSpeakerView();
         if(['home','speakers'].includes(this._tab)&&!this._speakerDialog){
           for(const speaker of this._speakers){const region=this.shadowRoot.querySelector('[data-connection="'+speaker.id+'"]');if(region)region.innerHTML=this._connectionDetails(speaker)+this._delivery(speaker);}
           const summary=this.shadowRoot.getElementById('speaker-summary');if(summary)summary.textContent=this._speakerSummary();const setup=this.shadowRoot.getElementById('setup-notice-region');if(setup){const markup=this._setupNotice();if(setup.innerHTML!==markup)setup.innerHTML=markup;}
@@ -112,11 +116,24 @@
     }
     disconnectedCallback() {
       this.ownerDocument.removeEventListener('keydown',this._adminKeyHandler,true);
+      this.ownerDocument.removeEventListener('visibilitychange',this._resumeHandler);
+      for(const event of ['focus','online','pageshow'])window.removeEventListener(event,this._resumeHandler);
       this._stopAdminHA();
       this._embeddedStyle?.remove();this._embeddedStyle=undefined;
       this._embeddedDrawerStyle?.remove();this._embeddedDrawerStyle=undefined;
       this._unsubscribe?.(); this._unsubscribe = undefined;
       clearTimeout(this._refreshTimer);clearInterval(this._connectionTimer);
+    }
+    async _recoverManager(){
+      if(!this.isConnected||!this._hass||this._recoveringManager)return;
+      this._recoveringManager=true;this._ingress=undefined;
+      try{await this._loadManager();this._repairSpeakerView();this._refreshMedia();}
+      finally{this._recoveringManager=false;}
+    }
+    _repairSpeakerView(){
+      if(!['home','speakers'].includes(this._tab)||this._dialog||this._speakerDialog||this._utility||this._admin||this._volumeDragging)return;
+      const rendered=[...this.shadowRoot.querySelectorAll('[data-connection]')].map(el=>el.dataset.connection);
+      if(rendered.length!==this._speakers.length||this._speakers.some(s=>!rendered.includes(s.id))||!!this._managerError!==!!this.shadowRoot.querySelector('[data-manager-error]'))this._render();
     }
     getCardSize() { return 9; }
     async _subscribe() {
@@ -206,12 +223,17 @@
       try{
         const base=await this._managerBase();
         const response=await fetch(base+path,{method,credentials:'same-origin',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
-        if(retry&&this._config.manager_app&&(response.status===401||response.status===403)){this._ingress=undefined;return this._api(path,method,body,false);}
+        if(retry&&this._config.manager_app&&(response.status===401||response.status===403||(method==='GET'&&[404,502,503].includes(response.status)))){this._ingress=undefined;return this._api(path,method,body,false);}
         const data=await response.json();if(!response.ok)throw Error(data.message??data.error??'Не удалось выполнить операцию.');return data;
       }catch(error){if(error instanceof TypeError||error.name==='TimeoutError'||error.name==='AbortError')throw Error('Нет связи с сервисом колонок. Повторите подключение.');throw error;}
     }
-    async _loadManager() {
-      if(!this._config.manager_url) return;
+    async _loadManager(){
+      if(this._managerLoading)return this._managerLoading;
+      this._managerLoading=this._readManager().finally(()=>{this._managerLoading=undefined;});
+      return this._managerLoading;
+    }
+    async _readManager() {
+      if(!this._config.manager_url&&!this._config.manager_app)return;
       try {const [data,assign]=await Promise.all([this._api('/api/speakers'),this._api('/api/assignments')]);this._speakers=data.speakers??[];this._key=data.public_key;this._installationReady=data.installation_ready;this._advertisedUrl=data.advertised_url;this._adoptionEnabled=data.adoption_enabled===true;this._assignments=assign.assignments??{};this._managerError='';await Promise.all(this._speakers.filter(s=>s.media_entity).map(async speaker=>{try{const entry=await this._hass.callWS({type:'config/entity_registry/get',entity_id:speaker.media_entity});this._mediaPlatforms[speaker.media_entity]=entry?.platform??null;}catch{this._mediaPlatforms[speaker.media_entity]=null;}}));await this._loadSpeakerPreviews();}
       catch(error){this._managerError=error.message;}
       this._resumeAddressSetup();
@@ -526,7 +548,7 @@
     _refreshMedia(){if(!this.shadowRoot)return;for(const speaker of this._speakers??[]){const region=this.shadowRoot.querySelector('[data-media="'+speaker.id+'"]');if(region&&this._volumeDragging!==speaker.id&&!this._stationBusy.has(speaker.id)){const pending=this._pendingVolumes?.get(speaker.id),actual=this._media(speaker).state?.attributes.volume_level;if(pending&&typeof actual==='number'&&Math.abs(actual*100-pending.value)<.51)this._pendingVolumes.delete(speaker.id);region.innerHTML=this._mediaControls(speaker);}}}
     async _mediaAction(id,service,data={}){const speaker=this._speakers.find(s=>s.id===id);if(!speaker||this._stationBusy.has(id))return;const media=this._media(speaker);const bits={volume_set:4,media_stop:4096,media_pause:1,media_play:16384,play_media:512};if(!bits[service]||!media.can(bits[service])||(service==='play_media'&&!media.yandex)){this._stationMessages[id]='Это действие недоступно для выбранного медиаплеера.';this._refreshMedia();return false;}
       this._stationBusy.add(id);const utility=this._utility;const relatedButtons=[...this.shadowRoot.querySelectorAll('.utility-dialog button[data-id="'+id+'"]')].filter(el=>['tts','test-sound','media'].includes(el.dataset.action)).map(el=>({el,disabled:el.disabled}));for(const item of relatedButtons)item.el.disabled=true;if(utility?.type==='control'&&utility.speakerId===id){utility.message='Отправка запроса…';this._utilityMessage();}for(const control of this.shadowRoot.querySelectorAll('[data-media="'+id+'"] input,[data-media="'+id+'"] button[data-service]'))control.disabled=true;try{await this._hass.callService('media_player',service,data,{entity_id:speaker.media_entity});this._stationMessages[id]=service==='volume_set'?'':'Запрос отправлен в Home Assistant.';return true;}catch(error){this._stationMessages[id]='Не удалось отправить запрос. Повторите ещё раз.';return false;}finally{this._stationBusy.delete(id);for(const item of relatedButtons)if(item.el.isConnected)item.el.disabled=item.disabled;if(this._utility===utility&&utility?.type==='control'&&utility.speakerId===id){utility.message=this._stationMessages[id];this._utilityMessage();}this._refreshMedia();}}
-    _speakerPanel(disabled){return `${this._managerError?'<div class="notice" role="status">Нет связи с сервисом колонок. Последние данные могут быть неактуальны.<button data-action="refresh">Повторить подключение</button></div>':''}${this._tab==='home'?'':`<div class="toolbar"><span id="speaker-summary" class="count">${this._speakerSummary()}</span><button data-action="refresh" ${disabled}>Обновить</button></div>`}<div class="speaker-grid">${this._speakers.map(s=>`<article class="box"><div class="speaker-heading"><ha-icon icon="mdi:speaker-wireless"></ha-icon><div><h2>${escape(s.name)}</h2><p>${escape(s.area||'Комната не указана')}</p></div></div><div data-connection="${escape(s.id)}">${this._connectionDetails(s)}${this._delivery(s)}</div>${this._speakerIllustration(s)}<div data-media="${escape(s.id)}">${this._mediaControls(s)}</div>${`<div class="quick-actions"><button data-action="tts" data-id="${escape(s.id)}" ${this._media(s).can(512)&&this._media(s).yandex?'':'disabled'}><ha-icon icon="mdi:message-text-outline"></ha-icon>Сказать</button><button data-action="test-sound" data-id="${escape(s.id)}" ${this._media(s).can(512)&&this._media(s).yandex?'':'disabled'}><ha-icon icon="mdi:volume-high"></ha-icon>Проверить звук</button><button data-action="settings" data-id="${escape(s.id)}" ${this._managerError||this._stationBusy.has(s.id)?'disabled':''}><ha-icon icon="mdi:cog-outline"></ha-icon>Настройки</button><button data-action="activity" data-id="${escape(s.id)}" ${this._managerError?'disabled':''}><ha-icon icon="mdi:history"></ha-icon>Последние команды</button></div>`}</article>`).join('')}</div>${!this._speakers.length&&!this._managerError?'<div class="empty"><h2>Подключите первую колонку</h2><p>Добавьте станцию, чтобы видеть её состояние и назначать голосовые команды.</p></div>':''}`;}
+    _speakerPanel(disabled){return `${this._managerError?'<div class="notice" data-manager-error role="status">Нет связи с сервисом колонок. Последние данные могут быть неактуальны.<button data-action="refresh">Повторить подключение</button></div>':''}${this._tab==='home'?'':`<div class="toolbar"><span id="speaker-summary" class="count">${this._speakerSummary()}</span><button data-action="refresh" ${disabled}>Обновить</button></div>`}<div class="speaker-grid">${this._speakers.map(s=>`<article class="box"><div class="speaker-heading"><ha-icon icon="mdi:speaker-wireless"></ha-icon><div><h2>${escape(s.name)}</h2><p>${escape(s.area||'Комната не указана')}</p></div></div><div data-connection="${escape(s.id)}">${this._connectionDetails(s)}${this._delivery(s)}</div>${this._speakerIllustration(s)}<div data-media="${escape(s.id)}">${this._mediaControls(s)}</div>${`<div class="quick-actions"><button data-action="tts" data-id="${escape(s.id)}" ${this._media(s).can(512)&&this._media(s).yandex?'':'disabled'}><ha-icon icon="mdi:message-text-outline"></ha-icon>Сказать</button><button data-action="test-sound" data-id="${escape(s.id)}" ${this._media(s).can(512)&&this._media(s).yandex?'':'disabled'}><ha-icon icon="mdi:volume-high"></ha-icon>Проверить звук</button><button data-action="settings" data-id="${escape(s.id)}" ${this._managerError||this._stationBusy.has(s.id)?'disabled':''}><ha-icon icon="mdi:cog-outline"></ha-icon>Настройки</button><button data-action="activity" data-id="${escape(s.id)}" ${this._managerError?'disabled':''}><ha-icon icon="mdi:history"></ha-icon>Последние команды</button></div>`}</article>`).join('')}</div>${!this._speakers.length&&!this._managerError?'<div class="empty"><h2>Подключите первую колонку</h2><p>Добавьте станцию, чтобы видеть её состояние и назначать голосовые команды.</p></div>':''}`;}
     _diagnostics(){return `<section class="box"><div class="toolbar"><div><h2>Последние команды</h2><p class="help">События обработки; проверка фразы не запускает действия.</p></div><button data-action="activity-refresh">Обновить журнал</button></div><div id="activity-region">${this._activityMarkup()}</div></section>`;}
     _statusLabel(status){return ({handled:'Обработано',forwarded:'Передано Алисе',answered:'Ответ дан',accepted:'Запрос принят',confirmed:'Состояние подтверждено',already:'Уже в нужном состоянии',clarification:'Нужно уточнение',unavailable:'Недоступно',error:'Ошибка',cancelled:'Отменено',success:'Выполнено',completed:'Выполнено',failed:'Ошибка',pending:'В обработке'})[status]??'Статус не указан';}
     _routeLabel(route){return ({home:'Управление домом',yandex:'Штатная Алиса',llm:'Нейросеть',playback:'Воспроизведение'})[route]??'Маршрут не определён';}

@@ -18,13 +18,13 @@ export const READ_TOOLS = [
   },
   {
     annotations,
-    description: 'Read recorded Home Assistant history. Numeric sensors: min/max and time-weighted mean. Lights/switches/binary sensors: active hours, activations and recent transitions. Ask for period if missing. Calendar today/yesterday use the home timezone. Missing data is not zero. No device commands.',
+    description: 'Read recorded Home Assistant history. Numeric sensors: min/max and time-weighted mean. Lights/switches/binary sensors: active hours, activations and recent transitions. Ask for period if missing. last_week means the previous complete Monday-to-Monday calendar week, not the last seven days. Calendar periods use the home timezone. Missing data is not zero. No device commands.',
     inputSchema: {
       additionalProperties: false,
       properties: {
         days: { description: 'Required for last_days only', maximum: 31, minimum: 1, type: 'integer' },
         entity_id: { type: 'string' },
-        period: { enum: ['last_days', 'today', 'yesterday'], type: 'string' }
+        period: { enum: ['last_days', 'today', 'yesterday', 'last_week'], type: 'string' }
       },
       required: ['entity_id', 'period'],
       type: 'object'
@@ -84,7 +84,9 @@ export function historyWindow (period: unknown, days: unknown, now = new Date(),
     if (!Number.isSafeInteger(days) || Number(days) < 1 || Number(days) > 31) throw new Error('days must be an integer from 1 to 31')
     return { end: now, start: new Date(now.getTime() - Number(days) * 86_400_000) }
   }
-  if (period !== 'today' && period !== 'yesterday') throw new Error('Choose last_days, today or yesterday')
+  if (period !== 'today' && period !== 'yesterday' && period !== 'last_week') {
+    throw new Error('Choose last_days, today, yesterday or last_week')
+  }
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
     day: '2-digit',
     month: '2-digit',
@@ -92,6 +94,11 @@ export function historyWindow (period: unknown, days: unknown, now = new Date(),
     year: 'numeric'
   }).formatToParts(now).map(v => [v.type, v.value]))
   const year = Number(parts.year); const month = Number(parts.month); const day = Number(parts.day)
+  if (period === 'last_week') {
+    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+    const monday = day - (weekday + 6) % 7
+    return { end: midnight(year, month, monday, timezone), start: midnight(year, month, monday - 7, timezone) }
+  }
   const today = midnight(year, month, day, timezone)
   return period === 'today' ? { end: now, start: today } : { end: today, start: midnight(year, month, day - 1, timezone) }
 }

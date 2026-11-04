@@ -42,3 +42,15 @@ test('read tools reject non-exposed IDs before accessing history', async () => {
   await assert.rejects(callReadTool('home_history', { entity_id: 'switch.private', period: 'today' }, api, new Map()))
   assert.equal(calls, 0)
 })
+
+test('last week is the previous full local calendar week across month and DST boundaries', () => {
+  const minsk = historyWindow('last_week', undefined, new Date('2026-11-04T08:00:00Z'))
+  assert.equal(minsk.start.toISOString(), '2026-10-25T21:00:00.000Z')
+  assert.equal(minsk.end.toISOString(), '2026-11-01T21:00:00.000Z')
+  const monday = historyWindow('last_week', undefined, new Date('2027-01-04T08:00:00Z'))
+  assert.equal(monday.start.toISOString(), '2026-12-27T21:00:00.000Z')
+  assert.equal(monday.end.toISOString(), '2027-01-03T21:00:00.000Z')
+  const dst = historyWindow('last_week', undefined, new Date('2026-03-30T12:00:00Z'), 'Europe/Berlin')
+  assert.equal(dst.start.toISOString(), '2026-03-22T23:00:00.000Z')
+  assert.equal(dst.end.toISOString(), '2026-03-29T22:00:00.000Z')
+})

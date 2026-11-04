@@ -20,6 +20,21 @@ func TestRemovedListeningLimitIsRejected(t *testing.T) {
 	}
 }
 
+func TestManagedHomeMCPFollowsAdoptedFunctionsBackend(t *testing.T) {
+	t.Setenv("QUASAR_HOME_FUNCTIONS_URL", "http://192.168.10.10:18081/")
+	cfg, err := readConfig(configFile(t, `{"assistant_tools":{"enabled":true,"mcp_servers":[{"name":"home","url":"http://192.168.10.11:18080/mcp","bearer_token_env":"QUASAR_HOME_FUNCTIONS_TOKEN"},{"name":"search","url":"http://192.168.10.11:20129/mcp"}]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := cfg.AssistantTools.MCPServers[0]
+	if home.URL != "http://192.168.10.10:18081/mcp" || home.HeadersEnv["X-Alice-Speaker"] != "QUASAR_HOME_SPEAKER_ID" {
+		t.Fatal("managed home MCP did not follow adopted backend")
+	}
+	if cfg.AssistantTools.MCPServers[1].URL != "http://192.168.10.11:20129/mcp" {
+		t.Fatal("independent MCP was changed")
+	}
+}
+
 func TestReadConfigLLMAPISettings(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

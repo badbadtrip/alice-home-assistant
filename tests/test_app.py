@@ -77,6 +77,13 @@ class AppTests(unittest.TestCase):
             self.assertFalse(json.loads((data/'manager.json').read_text())['installation_ready'])
             self.assertNotIn('SUPERVISOR_TOKEN',(data/'artifacts/runtime.env').read_text())
             self.assertIn("QUASAR_LLM_DISABLED=1",(data/'artifacts/runtime.env').read_text())
+            configure(data,root,{'advertised_url':'http://192.168.10.10:18081',
+                                 'llm_base_url':'https://provider.example.invalid/v1','llm_model':'test-model','llm_api_key':'test-key'})
+            tools=json.loads((data/'artifacts/config.json').read_text())['assistant_tools']
+            self.assertTrue(tools['enabled'])
+            self.assertEqual(tools['mcp_servers'][0]['url'],'http://192.168.10.10:18081/mcp')
+            self.assertEqual(tools['mcp_servers'][0]['headers_env'],{'X-Alice-Speaker':'QUASAR_HOME_SPEAKER_ID'})
+            self.assertEqual(tools['mcp_servers'][0]['allowed_tools'],['home_catalog','home_state','home_history'])
 
     def test_wiki_links_and_safe_renderer(self):
         for page in (ROOT/'wiki').glob('*.md'):

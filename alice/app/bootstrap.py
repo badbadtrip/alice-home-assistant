@@ -104,6 +104,13 @@ def configure(data, root, raw, overrides=Path('/config/functions-overrides.json'
     else:
         config['llm_base_url']=value['llm_base_url']
         config['llm_model']=value['llm_model']
+        if value['advertised_url']:
+            tools=config.setdefault('assistant_tools', {})
+            tools['enabled']=True
+            tools['mcp_servers']=[server for server in tools.get('mcp_servers', []) if server.get('name')!='home']+[
+                {'name':'home','url':value['advertised_url']+'/mcp','bearer_token_env':'QUASAR_HOME_FUNCTIONS_TOKEN',
+                 'headers_env':{'X-Alice-Speaker':'QUASAR_HOME_SPEAKER_ID'},
+                 'allowed_tools':['home_catalog','home_state','home_history']}]
     write_private(artifacts/'config.json',json.dumps(config,ensure_ascii=False))
     runtime={'QUASAR_HOME_FUNCTIONS_URL':value['advertised_url'],'QUASAR_HOME_FUNCTIONS_TOKEN':token}
     if not value.get('llm_base_url'):

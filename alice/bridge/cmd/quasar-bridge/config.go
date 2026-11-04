@@ -176,6 +176,24 @@ func readConfig(path string) (config, error) {
 	if err := cfg.DialogueContext.Validate(); err != nil {
 		return cfg, err
 	}
+	// Built-in Home Functions reads must follow the same backend and token as
+	// device control after adoption. Independent/custom MCP servers stay intact.
+	if endpoint := os.Getenv("QUASAR_HOME_FUNCTIONS_URL"); endpoint != "" {
+		for i := range cfg.AssistantTools.MCPServers {
+			server := &cfg.AssistantTools.MCPServers[i]
+			if server.Name != "home" || server.BearerTokenEnv != "QUASAR_HOME_FUNCTIONS_TOKEN" || server.URLEnv != "" || (server.Transport != "" && server.Transport != "streamable_http") {
+				continue
+			}
+			if !validEndpoint(endpoint, "http", "https") {
+				return cfg, errors.New("invalid QUASAR_HOME_FUNCTIONS_URL")
+			}
+			server.URL = strings.TrimRight(endpoint, "/") + "/mcp"
+			if server.HeadersEnv == nil {
+				server.HeadersEnv = map[string]string{}
+			}
+			server.HeadersEnv["X-Alice-Speaker"] = "QUASAR_HOME_SPEAKER_ID"
+		}
+	}
 	if err := cfg.AssistantTools.Validate(); err != nil {
 		return cfg, err
 	}

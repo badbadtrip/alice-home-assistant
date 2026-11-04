@@ -297,7 +297,7 @@ class Manager:
             self.connections[speaker['id']] = {'identity': identity, 'value': value}
 
     def _hf_request(self, path, speaker=None, payload=None):
-        if path not in ('/voice-phrases', '/preview', '/events'):
+        if path not in ('/voice-phrases', '/preview', '/events', '/inventory'):
             raise Error('Неизвестный внутренний маршрут.', 500)
         parsed = urlsplit(self.config.get('home_functions_url', ''))
         if parsed.scheme not in ('http', 'https') or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ('', '/'):
@@ -1032,6 +1032,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def route(self, manager, path, payload):
         method = self.command
+        if path == ['api', 'inventory'] and method == 'GET':
+            return 200, manager._hf_request('/inventory')
         if path == ['api', 'access'] and method in ('GET', 'PUT'):
             from admin import access
             return 200, access(manager, payload if method == 'PUT' else None)

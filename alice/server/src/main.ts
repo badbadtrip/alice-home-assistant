@@ -140,6 +140,33 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     next()
   })
   app.use(express.json())
+  // Only the authenticated local manager can enumerate unexposed HA entities.
+  app.get('/inventory', async (request, response) => {
+    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.ip ?? '')) {
+      response.sendStatus(403); return
+    }
+    try {
+      await homeAssistant.loadServiceIndex()
+      const config = loadConfig(CONFIG_PATH)
+      const all = await buildDevices(homeAssistant, { ...config, entities: {}, expose_all: true })
+      const registryItems = await homeAssistant.getRegistry()
+      const registry = new Map(registryItems.map(item => [item.entityId, item]))
+      const entities = []
+      for (const item of all.values()) {
+        if (!item.voicePhrases) {
+          entities.push({
+            controllable: item.functions.some(action => !action.hasResponse),
+            entity_id: item.entityId,
+            labels: registry.get(item.entityId)?.labels ?? [],
+            name: item.name
+          })
+        }
+      }
+      response.json({ entities })
+    } catch {
+      response.status(503).json({ error: 'Не удалось обновить устройства Home Assistant. Попробуйте ещё раз.' })
+    }
+  })
   app.get('/events', async (_, response) => {
     try { response.json({ events: await activity.list() }) } catch { response.status(503).json({ error: 'Журнал временно недоступен.' }) }
   })

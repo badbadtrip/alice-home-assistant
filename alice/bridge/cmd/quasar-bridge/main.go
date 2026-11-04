@@ -148,7 +148,7 @@ func main() {
 	}
 	var planner home.Planner = lc
 	if diagnostics == 0 {
-		lc.OnRequest = indicator.New(*path).Begin
+		lc.OnRequest = indicator.New(*path).Request
 	}
 	llmDisabled := os.Getenv("QUASAR_LLM_DISABLED") == "1"
 	if llmDisabled { planner = noLLMPlanner{} }

@@ -24,6 +24,46 @@ type Config struct {
 
 var hex = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
+type turnKey struct{}
+type turn struct {
+	mu     sync.Mutex
+	finish func()
+	closed bool
+}
+
+// WithTurn keeps lazy LED ownership across model/tool/model steps. Purely local
+// turns never acquire the ring. Cancellation and completion both release it.
+func WithTurn(ctx context.Context) (context.Context, func()) {
+	if _, ok := ctx.Value(turnKey{}).(*turn); ok {
+		return ctx, func() {}
+	}
+	state := &turn{}
+	finish := func() {
+		state.mu.Lock()
+		defer state.mu.Unlock()
+		if !state.closed {
+			state.closed = true
+			if state.finish != nil {
+				state.finish()
+			}
+		}
+	}
+	stop := context.AfterFunc(ctx, finish)
+	return context.WithValue(ctx, turnKey{}, state), func() { stop(); finish() }
+}
+
+func (c *Controller) Request(ctx context.Context) func() {
+	if state, ok := ctx.Value(turnKey{}).(*turn); ok {
+		state.mu.Lock()
+		defer state.mu.Unlock()
+		if !state.closed && state.finish == nil {
+			state.finish = c.Begin()
+		}
+		return func() {}
+	}
+	return c.Begin()
+}
+
 type Controller struct {
 	Path   string
 	mu     sync.Mutex

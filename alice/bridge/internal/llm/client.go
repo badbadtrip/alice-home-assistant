@@ -50,7 +50,7 @@ type Client struct {
 	HostedTools     []string
 	ChatParameters  map[string]any
 	HTTP            *http.Client
-	OnRequest       func() func()
+	OnRequest       func(context.Context) func()
 }
 
 // ValidateChatParameters protects the request fields controlled by the bridge.
@@ -161,7 +161,7 @@ func (c *Client) post(ctx context.Context, path string, request any) ([]byte, er
 		req.Header.Set("Authorization", "Bearer "+c.APIKey)
 	}
 	if c.OnRequest != nil {
-		finish := c.OnRequest()
+		finish := c.OnRequest(ctx)
 		defer finish()
 	}
 	hc := c.HTTP

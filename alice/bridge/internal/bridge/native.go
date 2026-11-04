@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"quasarbridge/internal/dialogue"
+	"quasarbridge/internal/indicator"
 	"quasarbridge/internal/sound"
 	"quasarbridge/internal/wire"
 )
@@ -492,7 +493,9 @@ func (n *Native) Server(ctx context.Context, k websocket.MessageType, data []byt
 			query := p.text
 			n.mu.Unlock()
 			n.wg.Go(func() {
-				result, err := resolver.Fallback(p.ctx, query)
+				turnCtx, finish := indicator.WithTurn(p.ctx)
+				defer finish()
+				result, err := resolver.Fallback(turnCtx, query)
 				if p.ctx.Err() != nil {
 					return
 				}
@@ -563,6 +566,8 @@ func (n *Native) maybeResolve(p *nativeRequest) {
 	text := p.text
 	n.mu.Unlock()
 	n.wg.Go(func() {
+		turnCtx, finish := indicator.WithTurn(p.ctx)
+		defer finish()
 		if n.DecisionDelay > 0 {
 			select {
 			case <-time.After(n.DecisionDelay):
@@ -574,7 +579,7 @@ func (n *Native) maybeResolve(p *nativeRequest) {
 		var err error
 		if n.resolver != nil && strings.TrimSpace(text) != "" {
 			if routed, ok := n.resolver.(RoutedResolver); ok {
-				decision := routed.Decide(p.ctx, text)
+				decision := routed.Decide(turnCtx, text)
 				n.mu.Lock()
 				p.listenOnStreamStart = decision.Source == "dialogue_retry" || decision.Route == "home"
 				if listening, ok := n.resolver.(interface{ ListenAfterRoute(RouteDecision) bool }); ok {
@@ -586,10 +591,10 @@ func (n *Native) maybeResolve(p *nativeRequest) {
 				if decision.Route != "yandex" && decision.Route != "home" && (n.ProgressAfter > 0 || n.VoiceCues != nil) && decision.Source != "dialogue_reset" {
 					if decision.Route == "home" { stop = n.progressAfter(p, 900*time.Millisecond) } else { stop = n.progress(p) }
 				}
-				result, err = routed.ResolveDecision(p.ctx, text, decision)
+				result, err = routed.ResolveDecision(turnCtx, text, decision)
 				stop()
 			} else {
-				result, err = n.resolver.Resolve(p.ctx, text)
+				result, err = n.resolver.Resolve(turnCtx, text)
 			}
 		}
 		if p.ctx.Err() != nil {

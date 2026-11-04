@@ -37,7 +37,7 @@
   "server/pnpm-lock.yaml": "5adf3d0bd202302823f10ee712080f88b0f23f80f304c6ee4f17da624ef7ee05",
   "server/pnpm-workspace.yaml": "d6d0c24446d91ef762d37c6ba801bb516e65d7055aa9f8027fcd457409a97ce1",
   "server/tsconfig.json": "ad31b28b95c97ed59e5a56701aba8bf2fe1ff1ebd2bfc7e5587d9e443b27ab7f",
-  "ui/alice-voice-card.js": "32a6336b373fb63822e639f36c280867c4d4c87bb67d2191454c5dce48e2afb2",
+  "ui/alice-voice-card.js": "ec5f9ee03d4aef5d098e32654f2a2229cd065ed7aa210adcf5703e97b837f3b9",
   "ui/IMAGE_SOURCES.md": "33b7f29ba42d9e0086ca09ab0304837248d2faee3fcc84921ba10ef0e17d2992",
   "wiki/Bridge.md": "0a4e77c262a5d7b9dc500a92fae08c16cb6e141bb1240406566dbb12ad11538b",
   "wiki/Commands.md": "fa953fcebff92745c708799a2e73c1e5893f85dbe52287cfa36489559218882d",

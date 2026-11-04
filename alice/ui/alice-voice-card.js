@@ -101,6 +101,7 @@
       this.ownerDocument.addEventListener('keydown',this._adminKeyHandler,true);
       this.ownerDocument.addEventListener('visibilitychange',this._resumeHandler);
       for(const event of ['focus','online','pageshow'])window.addEventListener(event,this._resumeHandler);
+      try{if(window.top!==window){this._resumeTop=window.top;this._resumeTop.addEventListener('focus',this._resumeHandler);}}catch{}
       this._applyEmbeddedLayout();
       if (this._hass) {this._load(); this._subscribe();}
       clearInterval(this._connectionTimer);
@@ -118,6 +119,7 @@
       this.ownerDocument.removeEventListener('keydown',this._adminKeyHandler,true);
       this.ownerDocument.removeEventListener('visibilitychange',this._resumeHandler);
       for(const event of ['focus','online','pageshow'])window.removeEventListener(event,this._resumeHandler);
+      try{this._resumeTop?.removeEventListener('focus',this._resumeHandler);}catch{}this._resumeTop=undefined;
       this._stopAdminHA();
       this._embeddedStyle?.remove();this._embeddedStyle=undefined;
       this._embeddedDrawerStyle?.remove();this._embeddedDrawerStyle=undefined;

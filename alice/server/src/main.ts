@@ -11,7 +11,7 @@ import z from 'zod'
 
 import { ActivityEvent, ActivityJournal } from './activity'
 import { loadConfig } from './config'
-import { resolveLightCommand } from './control'
+import { localVoicePhrases, resolveLightCommand } from './control'
 import { buildDevices, DeviceEntry, snapshotEntity } from './devices'
 import { executeFunction } from './execution'
 import { createHomeAssistantApi, HomeAssistantApi } from './home-assistant'
@@ -189,6 +189,10 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     for (const device of devices.values()) {
       if (device.voicePhrases) commands.push({ enabled: isSpeakerAllowed(device.entityId, request.get('x-alice-speaker')), phrases: device.voicePhrases, target: device.entityId })
     }
+    // Not a real script: the speaker keeps only these targets, and resolves every
+    // match through /resolve, so this entry just carries the local dictionary.
+    const local = localVoicePhrases(speakerDevices(devices, request.get('x-alice-speaker')))
+    if (local.length > 0) commands.push({ enabled: true, phrases: local, target: 'script.alice_local_dictionary' })
     const revision = createHash('sha256').update(JSON.stringify(commands)).digest('hex').slice(0, 16)
     response.json({ commands, revision })
   })
@@ -257,7 +261,7 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     }).safeParse(request.body)
     if (!body.success) { response.status(400).json({ error: 'Invalid command' }); return }
     const result = resolveLightCommand(body.data.text, body.data.area, speakerDevices(await getDevices(), request.get('x-alice-speaker')), body.data.voice_only)
-    response.json({ ...result, voice_match: body.data.voice_only === true && result.matched })
+    response.json({ ...result, clarify: result.calls.length === 0 && (result.answer?.endsWith('?') ?? false), voice_match: body.data.voice_only === true && result.matched })
   })
 
   app.get('/state', async (_, response) => {

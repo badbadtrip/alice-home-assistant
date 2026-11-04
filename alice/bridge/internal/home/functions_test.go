@@ -3,6 +3,7 @@ package home
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"quasarbridge/internal/dialogue"
@@ -149,5 +150,64 @@ func TestFunctionsHTTPFailure(t *testing.T) {
 	f := Functions{URL: server.URL}
 	if _, err := f.Catalog(context.Background()); err == nil || !strings.Contains(err.Error(), "500") {
 		t.Fatal("HTTP failure accepted", err)
+	}
+}
+
+type disabledPlanner struct{ calls int }
+
+func (p *disabledPlanner) Complete(context.Context, []llm.Message, bool) (string, error) {
+	p.calls++
+	return "", llm.ErrDisabled
+}
+
+func TestClarificationReplyStaysLocal(t *testing.T) {
+	var texts []string
+	var invoked int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/resolve":
+			raw, _ := io.ReadAll(r.Body)
+			if strings.Contains(string(raw), "на кухне") {
+				texts = append(texts, string(raw))
+				w.Write([]byte(`{"matched":true,"calls":[{"name":"set_k_state","arguments":{"state":0}}]}`))
+				return
+			}
+			w.Write([]byte(`{"matched":true,"calls":[],"answer":"В какой комнате?","clarify":true}`))
+		case r.Method == http.MethodPost:
+			invoked++
+			w.Write([]byte(`{"execution":{"name":"Кухня","status":"confirmed","target_state":"off"}}`))
+		default:
+			w.Write([]byte(`{"set_k_state":{"arguments":{"type":"object","properties":{"state":{"type":"number"}}}}}`))
+		}
+	}))
+	defer server.Close()
+	planner := &disabledPlanner{}
+	f := &Functions{URL: server.URL, Token: "t", Planner: planner}
+	if answer, err := f.Handle(context.Background(), "выключи свет"); err != nil || answer != "В какой комнате?" {
+		t.Fatal(answer, err)
+	}
+	if _, err := f.Handle(context.Background(), "на кухне"); err != nil {
+		t.Fatal(err)
+	}
+	if planner.calls != 0 || invoked != 1 || len(texts) != 1 || !strings.Contains(texts[0], "выключи свет на кухне") {
+		t.Fatal(planner.calls, invoked, texts)
+	}
+}
+
+func TestLocalReadingDoesNotOpenClarification(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/resolve" {
+			w.Write([]byte(`{"matched":true,"voice_match":true,"calls":[],"answer":"Температура: 7 градусов.","clarify":false}`))
+			return
+		}
+		w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+	f := &Functions{URL: server.URL, Token: "t", Planner: &disabledPlanner{}}
+	if _, err := f.HandleVoice(context.Background(), "какая температура"); err != nil {
+		t.Fatal(err)
+	}
+	if f.HasPending(context.Background()) {
+		t.Fatal("reading left a pending clarification")
 	}
 }

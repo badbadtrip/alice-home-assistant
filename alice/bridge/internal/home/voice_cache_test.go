@@ -60,3 +60,20 @@ func TestDisabledSpeakerStillInterceptsPhraseWithoutFallback(t *testing.T) {
  if err:=f.RefreshVoiceCache(t.Context());err!=nil {t.Fatal(err)}
  if !f.MatchVoice(t.Context(),"не включай свет на кухне") || f.VoicePhraseCount()!=0 {t.Fatal("disabled phrase must intercept, but not count as enabled")}
 }
+
+func TestLocalDictionaryEntryIsAcceptedByCache(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`{"revision":"r","commands":[{"enabled":true,"target":"script.alice_local_dictionary","phrases":["выключи компьютер","какая температура на улице"]}]}`))
+	}))
+	defer server.Close()
+	f := &Functions{URL: server.URL, Token: "t"}
+	if err := f.RefreshVoiceCache(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !f.MatchVoice(context.Background(), "Алиса, выключи компьютер!") || !f.MatchVoice(context.Background(), "какая температура на улице?") {
+		t.Fatal("dictionary phrase not matched")
+	}
+	if f.MatchVoice(context.Background(), "не выключай компьютер") {
+		t.Fatal("unknown phrase matched")
+	}
+}

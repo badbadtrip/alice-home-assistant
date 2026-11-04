@@ -166,19 +166,27 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 		Matched bool           `json:"matched"`
 		Calls   []FunctionCall `json:"calls"`
 		Answer  string         `json:"answer"`
+		Clarify *bool          `json:"clarify"`
 	}
-	// Older servers can lack this endpoint; the validated planner remains a fallback.
-	if previous.Request == "" {
-		if err := f.request(ctx, http.MethodPost, "/resolve", map[string]any{"text": text, "area": f.Area, "voice_only": voiceOnly}, &fast); err != nil {
-			if voiceOnly { return "", err }
-			fast.Matched = false
-		}
+	// A reply to a question completes the original command, so "выключи свет" plus
+	// "на кухне" stays local. Older servers can lack this endpoint; the validated
+	// planner remains a fallback.
+	query := text
+	if previous.Request != "" {
+		query = previous.Request + " " + text
+	}
+	if err := f.request(ctx, http.MethodPost, "/resolve", map[string]any{"text": query, "area": f.Area, "voice_only": voiceOnly}, &fast); err != nil {
+		if voiceOnly { return "", err }
+		fast.Matched = false
 	}
 	if voiceOnly && (!fast.Matched || !fast.VoiceMatch) { telemetry.Status(ctx,"unavailable");return "Эта голосовая команда отключена или изменена в Home Assistant.", nil }
 	var plan FunctionPlan
 	if fast.Matched {
 		plan.Calls, plan.Answer = fast.Calls, fast.Answer
 		plan.Clarify = len(fast.Calls) == 0
+		if fast.Clarify != nil {
+			plan.Clarify = *fast.Clarify
+		}
 		slog.Info("home_plan", "source", "exact", "calls", len(plan.Calls))
 	} else {
 		var state map[string]any

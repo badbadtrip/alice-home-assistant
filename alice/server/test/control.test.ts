@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { resolveLightCommand } from '../src/control'
+import { localVoicePhrases, normalizeVoicePhrase, resolveLightCommand } from '../src/control'
 import { buildDevices } from '../src/devices'
 import { executeFunction } from '../src/execution'
 import { HomeAssistantApi } from '../src/home-assistant'
@@ -87,4 +87,98 @@ test('service errors are never retried', async () => {
   const fn = device.functions.find(f => f.expectedState)!
   await assert.rejects(executeFunction(f.api, device, fn, { state: 0 }))
   assert.equal(attempts, 1)
+})
+
+function homeFixture () {
+  const items: Record<string, { area?: string; attributes?: Record<string, unknown>; name: string; state?: string }> = {
+    'binary_sensor.door': { attributes: { device_class: 'door' }, name: 'Входная дверь', state: 'off' },
+    'cover.blind': { area: 'Спальня', name: 'Штора' },
+    'light.bath': { area: 'Ванная', name: 'Лампа' },
+    'light.hall': { area: 'Второй этаж', name: 'Люстра' },
+    'sensor.feeder': { attributes: { unit_of_measurement: 'г' }, name: 'Кормушка сколько кот скушал', state: '40' },
+    'sensor.humidity': { attributes: { unit_of_measurement: '%' }, name: 'Влажность на улице', state: 'unavailable' },
+    'sensor.outdoor': { attributes: { unit_of_measurement: '°C' }, name: 'Температура на улице', state: '7' },
+    'switch.balcony': { area: 'Балкон', name: 'Выключатель кухня/балкон свет на балконе', state: 'on' },
+    'switch.pc': { name: 'Компьютер', state: 'on' },
+    'switch.plug_a': { area: 'Кухня', name: 'Розетка', state: 'on' },
+    'switch.plug_b': { area: 'Спальня', name: 'Розетка', state: 'on' }
+  }
+  const api: HomeAssistantApi = {
+    callService: async () => {},
+    getEntityHistory: async () => [],
+    getEntityState: id => {
+      const item = items[id]
+      return item ? { attributes: item.attributes ?? {}, name: item.name, state: item.state ?? 'on' } : undefined
+    },
+    getRegistry: async () => Object.entries(items).map(([entityId, item]) => ({
+      areaId: item.area, areaName: item.area, entityId, labels: ['alice'], name: item.name
+    })),
+    hasService: () => true,
+    loadServiceIndex: async () => {}
+  }
+  return buildDevices(api, { entities: {}, labels: ['alice'] })
+}
+
+test('every dictionary phrase has a meaning, so the speaker never hears a disabled command', async () => {
+  const devices = await homeFixture()
+  const phrases = localVoicePhrases(devices)
+  assert.ok(phrases.length > 100)
+  for (const phrase of phrases) {
+    assert.equal(normalizeVoicePhrase(phrase), phrase)
+    assert.equal(resolveLightCommand(phrase, 'Кухня', devices, true).matched, true, phrase)
+  }
+})
+
+test('dictionary covers names, rooms and word order from the entities themselves', async () => {
+  const devices = await homeFixture()
+  const target = (text: string, area?: string) => resolveLightCommand(text, area, devices, true).calls
+  assert.deepEqual(target('выключи свет на балконе'), [{ arguments: { state: 0 }, name: 'set_switch_balcony_state' }])
+  assert.deepEqual(target('включи свет в ванной'), [{ arguments: { state: 1 }, name: 'set_light_bath_state' }])
+  assert.deepEqual(target('выключи свет на втором этаже'), [{ arguments: { state: 0 }, name: 'set_light_hall_state' }])
+  assert.deepEqual(target('выключи здесь свет', 'Ванная'), [{ arguments: { state: 0 }, name: 'set_light_bath_state' }])
+  assert.deepEqual(target('выключи компьютер'), [{ arguments: { state: 0 }, name: 'set_switch_pc_state' }])
+  assert.deepEqual(target('открой штору'), [{ arguments: { state: 1 }, name: 'set_cover_blind_state' }])
+  assert.deepEqual(target('выключи розетку на кухне'), [{ arguments: { state: 0 }, name: 'set_switch_plug_a_state' }])
+})
+
+test('sensors answer without a model and report missing data honestly', async () => {
+  const devices = await homeFixture()
+  const answer = (text: string) => resolveLightCommand(text, undefined, devices, true).answer
+  assert.equal(answer('какая температура на улице'), 'Температура на улице: 7 градусов.')
+  assert.equal(answer('Какая температура на улице?'), 'Температура на улице: 7 градусов.')
+  assert.equal(answer('сколько кот скушал'), 'Кормушка сколько кот скушал: 40 г.')
+  assert.equal(answer('какая влажность на улице'), 'Влажность на улице: нет данных.')
+  assert.equal(answer('входная дверь'), 'Входная дверь: закрыто.')
+})
+
+test('dictionary refuses to guess', async () => {
+  const devices = await homeFixture()
+  const phrases = localVoicePhrases(devices)
+  assert.ok(!phrases.includes('выключи розетку'), 'two sockets share the name')
+  assert.equal(resolveLightCommand('выключи розетку', 'Кухня', devices).matched, false)
+  for (const text of ['не выключай компьютер', 'выключи компьютер через час', 'выключи компьютер и свет']) {
+    assert.equal(resolveLightCommand(text, 'Кухня', devices, true).matched, false, text)
+  }
+  const question = resolveLightCommand('выключи компьютер?', undefined, devices, true)
+  assert.equal(question.calls.length, 0)
+  assert.equal(resolveLightCommand('выключи компьютер?', undefined, devices).matched, false)
+  assert.equal(resolveLightCommand('выключи свет?', 'Ванная', devices, true).calls.length, 0)
+  assert.equal(devices.get('switch.pc')?.isLighting, false)
+  assert.equal(devices.get('switch.balcony')?.isLighting, true)
+})
+
+test('dictionary stays inside the bridge limits and leaves user phrases alone', async () => {
+  const devices = await homeFixture()
+  const base = devices.get('switch.pc')
+  assert.ok(base)
+  devices.set('script.own', { ...base, entityId: 'script.own', functions: [], name: 'own', slug: 'own', voicePhrases: ['выключи компьютер'] })
+  for (let index = 0; index < 900; index++) {
+    const slug = `x${index}`
+    devices.set(`switch.${slug}`, { ...base, aliases: [], areaName: 'Кабинет', entityId: `switch.${slug}`,
+      functions: [{ ...base.functions[0], name: `set_${slug}_state` } as never], name: `длинное устройство номер ${index}`, slug })
+  }
+  const phrases = localVoicePhrases(devices)
+  assert.ok(phrases.length <= 3500)
+  assert.ok(Buffer.byteLength(JSON.stringify(phrases)) < 200_000)
+  assert.ok(!phrases.includes('выключи компьютер'))
 })

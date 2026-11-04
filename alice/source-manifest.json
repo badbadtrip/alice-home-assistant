@@ -177,7 +177,7 @@
   "bridge/internal/wire/wire_test.go": "728c473d4b623685ad9f743ebdcba0033f066cf964b27ffd912a22a4041eeba9",
   "bridge/cmd/quasar-bridge/chat_parameters_test.go": "104b7ffe6fa56160adc79509787056a85a1bca75bd56e85f6a1ba6fef1dc9c75",
   "bridge/cmd/quasar-bridge/config.go": "6b49012393e4792bb43553bc826b66bcbb1d33b9674f4e41f75b6b3d50bf9665",
-  "bridge/cmd/quasar-bridge/config_test.go": "78a5acfbc46fe2c3b12f75cc508514c3b1b2075b192722c9b8bf0eb135cea514",
+  "bridge/cmd/quasar-bridge/config_test.go": "6499b8e590d3ed27e395ab62eb9b985d34972dbbb116447df123cf57cbd520b8",
   "bridge/cmd/quasar-bridge/main.go": "107054e4b1aef88b21a97a4694a3d91e566c34be37dd681ab7cdb2bf7b6e144b",
   "bridge/cmd/quasar-bridge/mcp_process_test.go": "c92526aa1d12669b2c4c98d22d9767493b60e4212f63d0d7f8ef855e9ca5d53c",
   "bridge/cmd/quasar-bridge/music.go": "afd992fe32e591a34fce7531468c03c88822fbe28ef2609effb8846ba272f70f",

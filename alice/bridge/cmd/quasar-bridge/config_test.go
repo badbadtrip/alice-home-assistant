@@ -22,6 +22,8 @@ func TestRemovedListeningLimitIsRejected(t *testing.T) {
 
 func TestManagedHomeMCPFollowsAdoptedFunctionsBackend(t *testing.T) {
 	t.Setenv("QUASAR_HOME_FUNCTIONS_URL", "http://192.168.10.10:18081/")
+	t.Setenv("QUASAR_HOME_FUNCTIONS_TOKEN", "fixture-token")
+	t.Setenv("QUASAR_HOME_SPEAKER_ID", "fixture-station")
 	cfg, err := readConfig(configFile(t, `{"assistant_tools":{"enabled":true,"mcp_servers":[{"name":"home","url":"http://192.168.10.11:18080/mcp","bearer_token_env":"QUASAR_HOME_FUNCTIONS_TOKEN"},{"name":"search","url":"http://192.168.10.11:20129/mcp"}]}}`))
 	if err != nil {
 		t.Fatal(err)

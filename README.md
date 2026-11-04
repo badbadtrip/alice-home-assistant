@@ -62,9 +62,9 @@ python -m unittest discover -s tests -v
 python tools/check_release.py
 ```
 
-`tools/prepare.py` — инструмент сопровождающего для повторного импорта изменений
-из исходного рабочего дерева; он требует соседние исходники и не нужен для
-установки или Docker-сборки опубликованного репозитория.
+Весь код приложения, сервера и моста живёт в `alice/` и правится только здесь.
+После правок запустите `python tools/sync_release.py`: он копирует документы в
+`alice/` и обновляет `alice/source-manifest.json`.
 
 Исходное авторство, лицензии и ссылки на проекты сохранены в [NOTICE](NOTICE),
 `alice/bridge/LICENSE` и `alice/bridge/THIRD_PARTY_NOTICES`.

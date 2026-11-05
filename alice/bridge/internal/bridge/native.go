@@ -589,7 +589,7 @@ func (n *Native) maybeResolve(p *nativeRequest) {
 				n.mu.Unlock()
 				slog.Info("native_route_decision", "request", requestTag(p.id), "route", decision.Route, "source", decision.Source)
 				stop := func() {}
-				if decision.Route != "yandex" && decision.Route != "home" && (n.ProgressAfter > 0 || n.VoiceCues != nil) && decision.Source != "dialogue_reset" {
+				if decision.Route != "yandex" && decision.Route != "home" && decision.Route != "playback" && (n.ProgressAfter > 0 || n.VoiceCues != nil) && decision.Source != "dialogue_reset" {
 					if decision.Route == "home" { stop = n.progressAfter(p, 900*time.Millisecond) } else { stop = n.progress(p) }
 				}
 				result, err = routed.ResolveDecision(turnCtx, text, decision)

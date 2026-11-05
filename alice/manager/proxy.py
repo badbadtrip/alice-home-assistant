@@ -31,7 +31,7 @@ def allowed_path(raw, method):
         return None
     routes = {
         'GET': [r'/api/spotify', r'/api/music', r'/api/inventory', r'/api/access', r'/api/setup', r'/api/speakers', r'/api/assignments', r'/api/activity', r'/api/jobs/' + SPEAKER_ID, r'/api/speakers/' + SPEAKER_ID + r'/dictionary'],
-        'POST': [r'/api/spotify/(?:login|callback|sync)', r'/api/speakers', r'/api/phrase-check', r'/api/dictionary/alias', r'/api/speakers/' + SPEAKER_ID + r'/(?:file-read|file-write|console|indicator|fingerprint|trust|check|install|adopt|reboot|confirm|rollback|restart|configure)'],
+        'POST': [r'/api/spotify/(?:login|callback|sync)', r'/api/speakers', r'/api/phrase-check', r'/api/dictionary/alias', r'/api/speakers/' + SPEAKER_ID + r'/(?:file-read|file-write|console|indicator|volume|fingerprint|trust|check|install|adopt|reboot|confirm|rollback|restart|configure)'],
         'PATCH': [r'/api/speakers/' + SPEAKER_ID],
         'DELETE': [r'/api/speakers/' + SPEAKER_ID],
         'PUT': [r'/api/music', r'/api/access', r'/api/assignments/' + TARGET],

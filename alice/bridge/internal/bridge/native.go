@@ -15,6 +15,7 @@ import (
 	"github.com/coder/websocket"
 	request "github.com/freequasar/quasar-go-genproto/proto/alice/protos/api/alicekit/events/alice_request"
 	response "github.com/freequasar/quasar-go-genproto/proto/alice/protos/api/alicekit/events/alice_response"
+	asrcommon "github.com/freequasar/quasar-go-genproto/proto/alice/protos/api/alicekit/events/asr_result/common"
 	cancellation "github.com/freequasar/quasar-go-genproto/proto/alice/protos/api/alicekit/events/cancel_request"
 	header "github.com/freequasar/quasar-go-genproto/proto/alice/protos/api/alicekit/events/common/event_header"
 	continuation "github.com/freequasar/quasar-go-genproto/proto/alice/protos/api/alicekit/events/continue_request"
@@ -517,6 +518,7 @@ func (n *Native) Server(ctx context.Context, k websocket.MessageType, data []byt
 			return nil
 		}
 	}
+	emptyFinal := false
 	switch f.Kind() {
 	case "AliceResponse":
 		if !p.cloud {
@@ -543,9 +545,15 @@ func (n *Native) Server(ctx context.Context, k websocket.MessageType, data []byt
 				p.text = strings.Join(words, " ")
 			}
 		}
+		emptyFinal = !p.started && asr.GetEndOfUtt() && asr.GetResponseCode() == asrcommon.EAsrResponseCode_OK && strings.TrimSpace(p.text) == ""
 
 	}
 	n.mu.Unlock()
+	if emptyFinal {
+		if listener, ok := n.resolver.(interface{ EmptyInput(context.Context) }); ok {
+			listener.EmptyInput(p.ctx)
+		}
+	}
 	n.maybeResolve(p)
 	if err := n.down(ctx, k, data); err != nil {
 		return err

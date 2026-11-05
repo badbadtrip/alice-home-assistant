@@ -232,7 +232,7 @@ class Manager:
     @staticmethod
     def _connection_default():
         return {'status': 'unknown', 'last_seen': None, 'checked_at': None, 'error': None,
-                'speaker_id': None, 'voice_phrase_count': None, 'voice_phrase_revision': None, 'latency_ms': None,
+                'speaker_id': None, 'voice_phrase_count': None, 'voice_phrase_revision': None, 'latency_ms': None, 'volume_push': False,
                 'delivery': {'status': 'unknown', 'expected_revision': None, 'actual_revision': None, 'message': 'Ожидается проверка колонки.'}}
 
     @staticmethod
@@ -330,7 +330,7 @@ class Manager:
             count = health.get('voice_phrase_count')
             revision = health.get('voice_phrase_revision')
             value.update(status='online', last_seen=int(time.time()), error=None,
-                         speaker_id=speaker['id'],
+                         speaker_id=speaker['id'], volume_push=health.get('volume_push') is True,
                          voice_phrase_count=count if type(count) is int and 0 <= count <= 100000 else None,
                          voice_phrase_revision=revision if isinstance(revision, str) and re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', revision) else None)
         except Error as error:
@@ -1102,7 +1102,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == ['api', 'access'] and method in ('GET', 'PUT'):
             from admin import access
             return 200, access(manager, payload if method == 'PUT' else None)
-        if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] in ('file-read', 'file-write', 'console', 'indicator') and method == 'POST':
+        if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] in ('file-read', 'file-write', 'console', 'indicator', 'volume') and method == 'POST':
             from admin import station
             return 200, station(manager, path[2], path[3], payload)
         if path == ['api', 'setup'] and method == 'GET':

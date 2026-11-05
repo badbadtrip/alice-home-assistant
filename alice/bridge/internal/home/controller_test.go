@@ -187,3 +187,11 @@ func TestStateQuestionCannotPlanPhysicalActions(t *testing.T) {
 		t.Fatalf("answer=%q err=%v actions=%d", answer, err, f.actions)
 	}
 }
+
+func TestSpokenAnswerNeverReadsEntityIDs(t *testing.T) {
+	entities := []Entity{{ID: "light.desk", Name: "Настольная лампа"}, {ID: "light.desk_2", Name: "Торшер"}, {ID: "light.nameless"}}
+	got := spokenAnswer("Настольная лампа (light.desk) горит, light.desk_2 выключен, light.nameless нет", entities)
+	if want := "Настольная лампа горит, Торшер выключен, light.nameless нет"; got != want {
+		t.Fatalf("got %q", got)
+	}
+}

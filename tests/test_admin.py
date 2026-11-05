@@ -34,6 +34,12 @@ class AdminTests(unittest.TestCase):
   result=station(m,'test','console',{'command':"printf 'hello'; exit 3"});self.assertEqual(result['exit_code'],3);self.assertEqual(result['output'],'hello')
   m.jobs={'job':{'speaker_id':'test','status':'running'}}
   with self.assertRaises(Error):station(m,'test','console',{'command':'uname'})
+ def test_volume_validates_level_and_calls_loopback_bridge(self):
+  m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'}),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(return_value=b'{}'))
+  self.assertEqual(station(m,'test','volume',{'level':7}),{'level':7})
+  self.assertIn('http://127.0.0.1:18861/volume?level=7',m.ssh.call_args.args[1]);self.assertNotIn('--post-data',m.ssh.call_args.args[1])
+  for level in (-1,11,True,'5;reboot',None,5.0):
+   with self.subTest(level=level),self.assertRaises(Error):station(m,'test','volume',{'level':level})
  def test_indicator_validates_and_uses_atomic_persistent_write(self):
   raw=b'{"enabled":false,"color":"#00bfff"}\n'
   m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'}),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(side_effect=[b'ready\n',raw,b'']))

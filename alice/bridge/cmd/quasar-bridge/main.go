@@ -331,9 +331,10 @@ func main() {
 				return hf.VoicePhraseCount()
 			}
 			return 0
-		}(), "music_playback_enabled": musicQueue != nil})
+		}(), "music_playback_enabled": musicQueue != nil, "volume_push": true})
 		_, _ = w.Write(data)
 	})
+	mux.HandleFunc("GET /volume", proxy.VolumeHandler)
 	mux.Handle("/uni.ws", proxy)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if len(cfg.AllowedIPs) > 0 {

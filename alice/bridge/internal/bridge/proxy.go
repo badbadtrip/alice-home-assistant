@@ -17,6 +17,7 @@ type Proxy struct {
 	Upstream   string
 	Observer   func(direction string, kind websocket.MessageType, data []byte)
 	NewSession func(context.Context, Sender, Sender) Session
+	station    stationLink
 }
 
 type Sender func(context.Context, websocket.MessageType, []byte) error
@@ -71,6 +72,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	var session Session
 	var trace *conversation
+	defer p.station.attach(down.Write)()
 	downSend := Sender(down.Write)
 	if p.Journal != nil {
 		trace = newConversation(p.Journal)

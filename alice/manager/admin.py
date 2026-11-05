@@ -116,6 +116,13 @@ def station(manager, speaker_id, operation, payload):
         with manager.jobs_lock:
             if any(j['speaker_id'] == speaker_id and j['status'] == 'running' for j in manager.jobs.values()):
                 raise Error('Дождитесь завершения операции на колонке.', 409)
+        if operation == 'volume':
+            level = payload.get('level')
+            if type(level) is not int or not 0 <= level <= 10:
+                raise Error('Громкость колонки: от 0 до 10.')
+            # GET: BusyBox wget on Lite 2 has no --post-data.
+            manager.ssh(speaker, f'wget -T 3 -q -O - http://127.0.0.1:18861/volume?level={level}', timeout=8)
+            return {'level': level}
         if operation == 'console':
             command = payload.get('command')
             if not isinstance(command, str) or not command.strip() or len(command) > 8000 or '\x00' in command:

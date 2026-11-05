@@ -30,11 +30,11 @@ def allowed_path(raw, method):
     if decoded != parsed.path:
         return None
     routes = {
-        'GET': [r'/api/inventory', r'/api/access', r'/api/setup', r'/api/speakers', r'/api/assignments', r'/api/activity', r'/api/jobs/' + SPEAKER_ID, r'/api/speakers/' + SPEAKER_ID + r'/dictionary'],
+        'GET': [r'/api/music', r'/api/inventory', r'/api/access', r'/api/setup', r'/api/speakers', r'/api/assignments', r'/api/activity', r'/api/jobs/' + SPEAKER_ID, r'/api/speakers/' + SPEAKER_ID + r'/dictionary'],
         'POST': [r'/api/speakers', r'/api/phrase-check', r'/api/dictionary/alias', r'/api/speakers/' + SPEAKER_ID + r'/(?:file-read|file-write|console|indicator|fingerprint|trust|check|install|adopt|reboot|confirm|rollback|restart|configure)'],
         'PATCH': [r'/api/speakers/' + SPEAKER_ID],
         'DELETE': [r'/api/speakers/' + SPEAKER_ID],
-        'PUT': [r'/api/access', r'/api/assignments/' + TARGET],
+        'PUT': [r'/api/music', r'/api/access', r'/api/assignments/' + TARGET],
     }
     return decoded if any(re.fullmatch(pattern, decoded) for pattern in routes.get(method, [])) else None
 

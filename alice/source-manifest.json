@@ -1,7 +1,7 @@
 {
   ".dockerignore": "f5637e2b8658d025aaec96fc50343505ff3062c8501bddc101a0103376d642e7",
   "BRIDGE-SOURCE.json": "91ab3beccb0307ab1134fce34421728f4291d16dfdca79287ee1fd3e9c6bb0da",
-  "CHANGELOG.md": "b290fc77c32fac054aab1f34a8aad478617e716e729f8cbcf0871781d8853970",
+  "CHANGELOG.md": "b469bda4ac78d8664fe9c277087ede3ae98c4422e3c02a254c5c79f1cb82faed",
   "DOCS.md": "c27e97ee868c4823e4bf8acaf43a40cacc20b4233964bc3f3129352cb9710e4c",
   "Dockerfile": "9ba980871643eb93d3bafa1974b8404a6728d6bf09716343d370ddfe5f6026d1",
   "LICENSE": "6d751d46c8061b82dfeef2a722e08c8cab6bb9d2353844d3529a69eecff63c74",
@@ -139,7 +139,7 @@
   "bridge/internal/wire/probe_test.go": "1510485cc179798ffd77743cd97b9ffaec4eb8cd9b122fe9d884f455c1ca3285",
   "bridge/internal/wire/wire.go": "a970f6bd52f24581237623d85036b33b948d8e6b6f3d33c2925dfe42adac7b4e",
   "bridge/internal/wire/wire_test.go": "728c473d4b623685ad9f743ebdcba0033f066cf964b27ffd912a22a4041eeba9",
-  "config.yaml": "b8510e82cd19b07029302718b7828fa6fbbb23c516534533a2b1d5aaadd93c4b",
+  "config.yaml": "73349cddd42e388dd58768e60373928d55f384418d7411f99ca1f537d9c5de67",
   "manager/admin.py": "a828dd77e59358cb6572aa9b39a127e0342da2ea393c39b80a6de2361442fdfc",
   "manager/proxy.py": "319591fb787b7f47d0514a3494b93cbf9901ed69ed20ecd79bf4c037460849fe",
   "manager/requirements.txt": "7a336f995ac98be014af936622b528bb0ba3b22a3a3097638def074740c68de0",

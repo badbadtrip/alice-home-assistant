@@ -16,5 +16,5 @@ Home Assistant sees an update only when `version` in `alice/config.yaml` changes
 - Every shipped change raises that version and adds an entry to `CHANGELOG.md` and `alice/CHANGELOG.md`.
 - `alice/` is the only source of app, server and bridge code; nothing is imported from sibling projects.
 - Run `python tools/sync_release.py` to copy docs and refresh `alice/source-manifest.json`; `python tools/check_release.py` must pass.
-- Push a branch first. Merge to `main` only after the GitHub `Check` workflow is green: an update on `main` installs itself on the live HA.
+- Push a branch first. Merge to `main` only after the GitHub `Check` and `Image` workflows are green: an update on `main` installs itself on the live HA, and HA downloads the image `Image` published for that version instead of building it.
 - App updates never update bridges on speakers. Those stay manual, with a voice check.

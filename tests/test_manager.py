@@ -40,7 +40,7 @@ class ManagerTests(unittest.TestCase):
 
     def ready(self):
         self.manager.store.metadata(self.speaker['id'], trusted_fingerprint='SHA256:test', install={'state': 'ready'})
-        self.manager.connections[self.speaker['id']] = {'status': 'online'}
+        self.manager.connections[self.speaker['id']] = {'identity': (), 'value': {'status': 'online'}}
 
     def test_auto_update_starts_at_once_and_skips_current_bridge(self):
         self.ready()

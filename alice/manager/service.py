@@ -251,9 +251,9 @@ class Manager:
         return (speaker['host'], speaker['port'], speaker.get('trusted_fingerprint'))
 
     def speakers(self):
+        """Read cached observations only; never connect to a speaker in HTTP GET."""
         import updater
         auto_update = updater.enabled(self)
-        """Read cached observations only; never connect to a speaker in HTTP GET."""
         records = self.store.read('speakers.json')
         now = time.time()
         with self.connection_lock:

@@ -127,7 +127,7 @@ def cycle(manager, now=None):
         if speaker.get('install', {}).get('state') != 'ready':
             continue
         with manager.connection_lock:
-            online = (manager.connections.get(speaker['id']) or {}).get('status') == 'online'
+            online = manager.connections.get(speaker['id'], {}).get('value', {}).get('status') == 'online'
         if not online:
             continue
         try:

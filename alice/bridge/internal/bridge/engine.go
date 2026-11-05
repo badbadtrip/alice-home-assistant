@@ -127,6 +127,10 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 		if e.Playback == nil {
 			return Resolution{Route: "yandex"}, nil
 		}
+		if decision.Source == "playback_missing" {
+			result.Answer = "Не нашла такой плейлист в Spotify."
+			return result, nil
+		}
 		if player, ok := e.Playback.(PlaylistPlayer); ok && decision.Source == "playback_playlist" {
 			answer, err := player.PlayURI(ctx, e.playlistURI(text))
 			result.Answer = answer
@@ -243,6 +247,12 @@ func (e *Engine) SetRouting(cfg RoutingConfig) error {
 	e.routing.Store(p)
 	return nil
 }
+func (e *Engine) musicSource() string {
+	if source, ok := e.Home.(interface{ MusicSource() string }); ok {
+		return source.MusicSource()
+	}
+	return ""
+}
 func (e *Engine) playlistURI(text string) string {
 	source, ok := e.Home.(PlaylistSource)
 	if !ok {
@@ -297,11 +307,19 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 	if e.Playback != nil && playback.Command(text) != "" && e.Playback.Active(ctx) {
 		return RouteDecision{Route: "playback", Source: "playback"}
 	}
-	if _, ok := e.Playback.(PlaylistPlayer); ok && e.playlistURI(text) != "" {
-		return RouteDecision{Route: "playback", Source: "playback_playlist"}
-	}
-	if _, ok := e.Playback.(MusicResumer); ok && playback.Start(text) {
-		return RouteDecision{Route: "playback", Source: "playback_start"}
+	if _, ok := e.Playback.(PlaylistPlayer); ok {
+		if e.musicSource() == "yandex" {
+			// Stock music takes over, so Spotify must not keep playing under it.
+			if playback.MusicAsk(text) && e.Playback.Active(ctx) {
+				_, _ = e.Playback.Control(ctx, "pause")
+			}
+		} else if e.playlistURI(text) != "" {
+			return RouteDecision{Route: "playback", Source: "playback_playlist"}
+		} else if playback.Start(text) {
+			return RouteDecision{Route: "playback", Source: "playback_start"}
+		} else if playback.MusicAsk(text) {
+			return RouteDecision{Route: "playback", Source: "playback_missing"}
+		}
 	}
 	if matcher, ok := e.Home.(interface {
 		MatchDevice(context.Context, string) bool

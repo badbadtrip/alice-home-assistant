@@ -17,7 +17,7 @@ import { buildDevices, DeviceEntry, snapshotEntity } from './devices'
 import { executeFunction } from './execution'
 import { createHomeAssistantApi, HomeAssistantApi } from './home-assistant'
 import { getLogger } from './logger'
-import { musicRules, MusicSettingsSchema, readMusicSettings, resolveMusic, writeMusicSettings } from './music'
+import { MusicSettingsSchema, readMusicSettings, writeMusicSettings } from './music'
 import { previewCommand } from './preview'
 import { callReadTool, READ_TOOLS } from './read-tools'
 import { isSpeakerAllowed, speakerDevices } from './speaker-access'
@@ -223,13 +223,11 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
   })
 
   // Speaker upgrades keep their own config, so routes reach them with this table.
-  const publishedRouting = async (speaker: string | undefined): Promise<unknown> => {
+  const publishedRouting = async (): Promise<unknown> => {
     if (!process.env.ALICE_ROUTING_PATH) return undefined
     try {
       const config = JSON.parse(await readFile(process.env.ALICE_ROUTING_PATH, 'utf8')) as { routing?: { rules?: unknown[] } }
-      if (!config.routing) return undefined
-      const music = musicRules(await readMusicSettings(process.env.ALICE_MUSIC_PATH), speaker, homeAssistant)
-      return { ...config.routing, rules: [...music, ...config.routing.rules ?? []] }
+      return config.routing
     } catch { return undefined }
   }
   app.get('/music', async (_, response) => {
@@ -288,8 +286,15 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     const local = localVoicePhrases(allowed)
     if (local.length > 0) commands.push({ enabled: true, phrases: local, target: 'script.alice_local_dictionary' })
     const revision = createHash('sha256').update(JSON.stringify(commands)).digest('hex').slice(0, 16)
-    const { spotify_playlists: playlists } = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
-    response.json({ commands, device_names: deviceVoiceNames(allowed), playlists, revision, routing: await publishedRouting(request.get('x-alice-speaker')) })
+    const music = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
+    response.json({
+      commands,
+      device_names: deviceVoiceNames(allowed),
+      music_source: music.source,
+      playlists: music.spotify_playlists,
+      revision,
+      routing: await publishedRouting()
+    })
   })
 
   /**
@@ -355,10 +360,6 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
       area: z.string().max(100).optional(), text: z.string().max(2000), voice_only: z.boolean().optional()
     }).safeParse(request.body)
     if (!body.success) { response.status(400).json({ error: 'Invalid command' }); return }
-    const music = body.data.voice_only === true
-      ? undefined
-      : await resolveMusic(body.data.text, request.get('x-alice-speaker'), await readMusicSettings(process.env.ALICE_MUSIC_PATH), homeAssistant)
-    if (music) { response.json({ ...music, clarify: false, voice_match: false }); return }
     const result = resolveLightCommand(body.data.text, body.data.area, speakerDevices(await getDevices(), request.get('x-alice-speaker')), body.data.voice_only)
     response.json({ ...result, clarify: result.calls.length === 0 && (result.answer?.endsWith('?') ?? false), voice_match: body.data.voice_only === true && result.matched })
   })

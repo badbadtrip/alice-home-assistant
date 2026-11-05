@@ -21,6 +21,11 @@ var commands = []struct {
 
 var start = regexp.MustCompile(`^(?:включи|поставь|запусти)(?: мне| мою)? музыку$`)
 
+var musicAsk = regexp.MustCompile(`^(?:включи|поставь|запусти|играй)(?: мне| мою| мой)? (?:музыку|плейлист|песню|трек|альбом|группу|исполнителя|артиста)(?: |$)`)
+
+// MusicAsk recognizes any request to play music, named or not.
+func MusicAsk(text string) bool { return musicAsk.MatchString(normalize(text)) }
+
 // Start recognizes a plain request for music with nothing named.
 func Start(text string) bool { return start.MatchString(normalize(text)) }
 

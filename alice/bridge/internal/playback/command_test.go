@@ -37,3 +37,11 @@ func TestPickPlaylist(t *testing.T) {
 		t.Errorf("empty list: %q", got)
 	}
 }
+
+func TestMusicAsk(t *testing.T) {
+	for text, want := range map[string]bool{"Включи группу Кино": true, "Алиса, поставь песню": true, "Включи плейлист бег": true, "Включи свет": false, "Включи следующий трек": false} {
+		if MusicAsk(text) != want {
+			t.Errorf("%q", text)
+		}
+	}
+}

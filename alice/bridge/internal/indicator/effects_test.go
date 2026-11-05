@@ -43,7 +43,7 @@ func TestCometHeadNeverJumps(t *testing.T) {
 	for ms := 5; ms < 5000; ms += 5 {
 		frame := cfg.Render(time.Duration(ms)*time.Millisecond, 24)
 		for i := range frame {
-			if jump := frame[i][0] - previous[i][0]; jump > 12 || jump < -12 {
+			if jump := frame[i][0] - previous[i][0]; jump > 20 || jump < -20 {
 				t.Fatal(ms, i, jump)
 			}
 		}

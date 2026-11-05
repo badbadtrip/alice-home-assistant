@@ -121,7 +121,7 @@
   "bridge/internal/home/voice_cache.go": "5f5df49c39e579571932070d7258a920974eb6e3c77880e652fa5c246c909cec",
   "bridge/internal/home/voice_cache_test.go": "e1656a199cddb146e8925e220749f2e352d1170bcb7a9c9f09d32e631ef64bc8",
   "bridge/internal/indicator/effects.go": "e48f7e95e1682da6ac65ee5724089eea6d1a509ef639c5fecd65e97c295cedac",
-  "bridge/internal/indicator/effects_test.go": "51617777bb4720911d08bb4e560cbb126b3eb4284f429e6098f9833bcdd83a4b",
+  "bridge/internal/indicator/effects_test.go": "34ac9dc24e2b6c6ad5179011e4131c6968bf91d541ad1a63c87d6163c2fb4c44",
   "bridge/internal/indicator/indicator.go": "c48c43ea15db6094732101d5ed0ef0cb3fedd5da1128c2968be77ebb03c68732",
   "bridge/internal/indicator/indicator_test.go": "eae72e59e54be781f4cc4337b1709bab052949776895e7ad4646e9551470df6f",
   "bridge/internal/indicator/ring_linux.go": "23df5d1e33d57aedc8c1a920c81379ac9549b6e767a3caf281f6992c7ba3ae88",

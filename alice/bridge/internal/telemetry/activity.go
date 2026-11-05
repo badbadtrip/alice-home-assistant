@@ -16,7 +16,7 @@ type Call struct { Name string `json:"name"`; Status string `json:"status"`; Tar
 type Event struct {
  At string `json:"at"`; Calls []Call `json:"calls"`; DurationMS int64 `json:"duration_ms"`
  Error string `json:"error,omitempty"`; ID string `json:"id"`; Route string `json:"route"`
- LLMMS int64 `json:"llm_ms,omitempty"`; Source string `json:"source"`; SpeakerID string `json:"speaker_id"`; Status string `json:"status"`; Text string `json:"text"`
+ LLMMS int64 `json:"llm_ms,omitempty"`; Model string `json:"model,omitempty"`; Source string `json:"source"`; SpeakerID string `json:"speaker_id"`; Status string `json:"status"`; Text string `json:"text"`
 }
 type contextKey struct{}
 type Trace struct { mu sync.Mutex; began time.Time; event Event; explicit bool }
@@ -34,6 +34,11 @@ func Status(ctx context.Context,status string) {
 // AddLLM shows how much of a slow command the model took.
 func AddLLM(ctx context.Context,elapsed time.Duration) {
  if trace,ok:=ctx.Value(contextKey{}).(*Trace);ok {trace.mu.Lock();trace.event.LLMMS=min(trace.event.LLMMS+elapsed.Milliseconds(),600000);trace.mu.Unlock()}
+}
+// SetModel keeps the model that answered last; a gateway may hide it behind an alias.
+func SetModel(ctx context.Context,model string) {
+ if len(model)>64 {model=model[:64]}
+ if trace,ok:=ctx.Value(contextKey{}).(*Trace);ok&&model!="" {trace.mu.Lock();trace.event.Model=model;trace.mu.Unlock()}
 }
 func AddCall(ctx context.Context,name,status,target string) {
  if trace,ok:=ctx.Value(contextKey{}).(*Trace);ok {

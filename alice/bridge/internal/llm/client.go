@@ -187,7 +187,21 @@ func (c *Client) post(ctx context.Context, path string, request any) ([]byte, er
 		data, _, err = c.attempt(ctx, path, body)
 	}
 	slog.Info("llm_request", "elapsed_ms", time.Since(started).Milliseconds(), "ok", err == nil)
+	if err == nil {
+		telemetry.SetModel(ctx, c.answeredBy(data))
+	}
 	return data, err
+}
+
+// answeredBy prefers the model named in the reply over the configured alias.
+func (c *Client) answeredBy(data []byte) string {
+	var reply struct {
+		Model string `json:"model"`
+	}
+	if json.Unmarshal(data, &reply) == nil && reply.Model != "" {
+		return reply.Model
+	}
+	return c.Model
 }
 
 func (c *Client) attempt(ctx context.Context, path string, body []byte) ([]byte, bool, error) {

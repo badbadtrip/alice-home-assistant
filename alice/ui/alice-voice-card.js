@@ -377,6 +377,7 @@ button:active:not(:disabled){transform:scale(.97)}
       this._hass = hass;this.toggleAttribute("dark",!!hass.themes?.darkMode);this._syncShellTheme();
       const picker=this.shadowRoot.getElementById('target');if(picker)picker.hass=hass;
       this._refreshMedia();
+      if(!this._snapshotChecked){this._snapshotChecked=true;if(this._restoreSnapshot())this._render();}
       if (!this._loading && !this._loaded) this._load();
       if (!this._subscribing && !this._unsubscribe && this.isConnected) this._subscribe();
     }
@@ -467,12 +468,22 @@ button:active:not(:disabled){transform:scale(.97)}
       if (!this._hass || this._loading) return;
       this._loading = true;
       try {
-        this._registry = await this._records();
-        await this._loadManager();
+        await Promise.all([this._records().then(records=>{this._registry=records;this._commandsStale=false;this._renderIdle();}),this._loadManager()]);
         if(this._tab==='diagnostics'||this._journalOpen)await this._loadActivity();
-        this._loaded = true;
+        this._loaded = true;this._saveSnapshot();
       } catch(error) { this._message = 'Не удалось прочитать реестр: ' + (error.message ?? error); }
-      finally { this._loading = false; if(!this._dialog&&!this._speakerDialog&&!this._utility&&!this._admin&&!this._volumeDragging)this._render(); }
+      finally { this._loading = false;this._commandsStale=false;this._renderIdle(); }
+    }
+    _renderIdle(){if(!this._dialog&&!this._speakerDialog&&!this._utility&&!this._admin&&!this._volumeDragging)this._render();}
+    _snapshotKey(){return 'alice-panel-snapshot:v1:'+(this._config.manager_app??this._config.manager_url??'')+':'+this._config.label;}
+    _restoreSnapshot(){
+      try{const saved=JSON.parse(localStorage.getItem(this._snapshotKey())||'null');if(!saved||!Array.isArray(saved.speakers))return false;
+        this._speakers=saved.speakers;this._registry=saved.commands??[];this._assignments=saved.assignments??{};this._speakerIndicators=saved.indicators??{};this._mediaPlatforms=saved.platforms??{};this._speakersStale=true;this._commandsStale=true;this._indicatorsStale=true;return true;
+      }catch{return false;}
+    }
+    _saveSnapshot(){
+      if(this._managerError)return;
+      try{localStorage.setItem(this._snapshotKey(),JSON.stringify({speakers:this._speakers.map(s=>({id:s.id,name:s.name,area:s.area,area_id:s.area_id,profile:s.profile,model:s.model,media_entity:s.media_entity,trusted_fingerprint:!!s.trusted_fingerprint,install:s.install?{state:s.install.state,adopted:s.install.adopted}:undefined,last_check:s.last_check?{root:s.last_check.root}:undefined,connection:{status:'unknown',last_seen:s.connection?.last_seen}})),commands:this._registry.filter(item=>this._selected(item)),assignments:this._assignments,indicators:this._speakerIndicators??{},platforms:this._mediaPlatforms}));}catch{}
     }
     _name(item) { return this._hass?.states[item.entity_id]?.attributes.friendly_name ?? item.name ?? item.original_name ?? item.entity_id; }
     _selected(item) { return (item.labels ?? []).includes(this._config.label); }
@@ -543,8 +554,8 @@ button:active:not(:disabled){transform:scale(.97)}
     }
     async _readManager() {
       if(!this._config.manager_url&&!this._config.manager_app)return;
-      try {const [data,assign]=await Promise.all([this._api('/api/speakers'),this._api('/api/assignments')]);this._speakers=data.speakers??[];this._key=data.public_key;this._installationReady=data.installation_ready;this._advertisedUrl=data.advertised_url;this._adoptionEnabled=data.adoption_enabled===true;this._assignments=assign.assignments??{};this._managerError='';await Promise.all(this._speakers.filter(s=>s.media_entity).map(async speaker=>{try{const entry=await this._hass.callWS({type:'config/entity_registry/get',entity_id:speaker.media_entity});this._mediaPlatforms[speaker.media_entity]=entry?.platform??null;}catch{this._mediaPlatforms[speaker.media_entity]=null;}}));await this._loadSpeakerPreviews();}
-      catch(error){this._managerError=error.message;}
+      try {const [data,assign]=await Promise.all([this._api('/api/speakers'),this._api('/api/assignments')]);this._speakers=data.speakers??[];this._key=data.public_key;this._installationReady=data.installation_ready;this._advertisedUrl=data.advertised_url;this._adoptionEnabled=data.adoption_enabled===true;this._assignments=assign.assignments??{};this._managerError='';await Promise.all(this._speakers.filter(s=>s.media_entity).map(async speaker=>{try{const entry=await this._hass.callWS({type:'config/entity_registry/get',entity_id:speaker.media_entity});this._mediaPlatforms[speaker.media_entity]=entry?.platform??null;}catch{this._mediaPlatforms[speaker.media_entity]=null;}}));this._speakersStale=false;this._renderIdle();this._loadSpeakerPreviews().then(()=>{this._saveSnapshot();this._renderIdle();});}
+      catch(error){this._managerError=error.message;this._speakersStale=false;}
       this._resumeAddressSetup();
     }
     _addressResumeKey(){return 'alice-address-resume:'+this._config.manager_app;}
@@ -560,7 +571,7 @@ button:active:not(:disabled){transform:scale(.97)}
     _audience(target){const ids=this._assignments[target];return ids===undefined?'Все колонки':ids.length?ids.map(id=>this._speakers.find(s=>s.id===id)?.name??id).join(' · '):'Не назначено ни одной колонке';}
     _render() {
       if(!this._config)return;
-      const disabled=this._busy?'disabled':'';
+      const disabled=this._busy||this._speakersStale||this._commandsStale?'disabled':'';
       const rows=this._registry.filter(item=>this._selected(item));
       this.shadowRoot.innerHTML=`<main>${this._tab==='home'?this._home(rows,disabled):this._standalone(rows,disabled)}${this._dialog?this._editor(disabled):''}${this._speakerDialog?this._speakerEditor(disabled):''}${this._utility?this._utilityDialog():''}</main>`;
       this._bindNativePicker();this._bindUtilityPickers();this._syncIndicatorAnimations();
@@ -661,7 +672,7 @@ button:active:not(:disabled){transform:scale(.97)}
     _speakerPreviewConfig(s){const cfg=this._speakerIndicators?.[s.id]??{color:'#8a8a8a',brightness:75,mode:this._media(s).state?.state==='playing'?'breathe':'steady',enabled:true},color=/^#[0-9a-f]{6}$/i.test(cfg.color)?cfg.color:'#8a8a8a';return {cfg,attrs:`data-mode="${escape(cfg.mode??'steady')}" data-enabled="${!!cfg.enabled}" style="--led-color:${color};--led-brightness:${(cfg.brightness??100)/100};--led-period:${cfg.period_ms??2400}ms"`};}
     _speakerIllustration(s){return `<div class="art" data-speaker-preview="${escape(s.id)}" ${this._speakerPreviewConfig(s).attrs} title="Предпросмотр подсветки на экране, не состояние колонки">${this._devicePhoto(this._speakerModel(s),'home-'+s.id)}</div>`;}
     _speakerLedNote(s){const {cfg,attrs}=this._speakerPreviewConfig(s);return `<div class="led-note" ${attrs}>${cfg.enabled?'Подсветка, предпросмотр':'Подсветка выключена'}</div>`;}
-    async _loadSpeakerPreviews(){this._speakerIndicators??={};await Promise.allSettled(this._speakers.filter(s=>['midi','lite2'].includes(this._speakerModel(s))&&s.trusted_fingerprint&&!this._speakerIndicators[s.id]).map(async s=>{const result=await this._api('/api/speakers/'+encodeURIComponent(s.id)+'/indicator','POST',{action:'get'});this._speakerIndicators[s.id]=result.config;}));}
+    async _loadSpeakerPreviews(){this._speakerIndicators??={};const refresh=this._indicatorsStale;this._indicatorsStale=false;await Promise.allSettled(this._speakers.filter(s=>['midi','lite2'].includes(this._speakerModel(s))&&s.trusted_fingerprint&&(refresh||!this._speakerIndicators[s.id])).map(async s=>{const result=await this._api('/api/speakers/'+encodeURIComponent(s.id)+'/indicator','POST',{action:'get'});this._speakerIndicators[s.id]=result.config;}));}
 
     _indicatorValues(cfg,elapsed){
       const period=cfg.period_ms||2400,phase=(elapsed%period)/period,brightness=cfg.brightness??100;
@@ -812,9 +823,9 @@ button:active:not(:disabled){transform:scale(.97)}
     _editor(disabled){return `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="editor-title"><header class="dialog-head"><h2 id="editor-title">${this._editing?'Команда':'Новая команда'}</h2>${iconButton('close','close','Закрыть',disabled)}</header><form id="command-form"><div class="dialog-body">${this._message?`<div class="notice" role="status">${escape(this._message)}</div>`:''}<div id="editor-service-status"></div><div class="fields"><label>Фразы, каждая с новой строки<textarea id="phrases" required maxlength="12000" placeholder="Я ухожу" ${disabled}>${escape(this._draftPhrases)}</textarea></label><div><ha-entity-picker id="target"></ha-entity-picker>${this._editing?`<p class="help"><code>${escape(this._editing)}</code></p>`:''}</div><div id="audience">${this._audienceFields()}</div></div></div><footer class="dialog-foot"><button type="button" data-action="close" ${disabled}>Отмена</button><button id="save-command" class="primary" type="submit" disabled>${this._busy?'Сохранение…':'Сохранить'}</button></footer></form></section></div>`;}
     _needsSetup(s){return !this._managerError&&(['awaiting_reboot','awaiting_acceptance','adopting'].includes(s.install?.state)||s.install?.adopted&&s.install?.state==='rolled_back'||(s.connection?.status!=='online'&&!s.connection?.last_seen&&s.install?.state!=='ready'));}
     _setupNotice(){const pending=this._speakers.filter(s=>this._needsSetup(s));return pending.length?`<aside class="alert" role="alert">${icon('alert-outline')}<div><strong>${pending.length===1?'Колонка не подключена':'Колонки не подключены'}</strong><p>${this._installationReady===false?'Сначала укажите локальный адрес приложения.':'Завершите настройку моста, чтобы работали голосовые команды.'}</p></div><button class="primary" data-action="setup" data-id="${escape(pending[0].id)}">Настроить</button></aside>`:'';}
-    _speakerSummary(){const online=this._speakers.filter(s=>!this._managerError&&s.connection?.status==='online').length;return plural(this._speakers.length,'колонка','колонки','колонок')+' · на связи '+online;}
+    _speakerSummary(){const online=this._speakers.filter(s=>!this._managerError&&s.connection?.status==='online').length;return plural(this._speakers.length,'колонка','колонки','колонок')+(this._speakersStale?' · обновляем…':' · на связи '+online);}
     _speakerStatus(s){
-      if(this._needsSetup(s))return `<span class="is-warn"><span class="dot"></span>${s.install?.state==='awaiting_acceptance'?'Проверьте голос':s.install?.state==='awaiting_reboot'?'Нужна перезагрузка':'Мост не настроен'}</span><button data-action="setup" data-id="${escape(s.id)}">Настроить</button>`;
+      if(this._needsSetup(s))return `<span class="is-warn"><span class="dot"></span>${s.install?.state==='awaiting_acceptance'?'Проверьте голос':s.install?.state==='awaiting_reboot'?'Нужна перезагрузка':'Мост не настроен'}</span><button data-action="setup" data-id="${escape(s.id)}" ${this._speakersStale?'disabled':''}>Настроить</button>`;
       const c=s.connection??{},status=this._managerError?'unknown':c.status??'unknown',delivery=this._managerError?'unknown':c.delivery?.status??'unknown';
       const line=status==='online'?'На связи':status==='offline'?'Нет связи':'Статус уточняется',extra={pending:'команды обновляются',error:'ошибка синхронизации'}[delivery];
       return `<span class="${status==='online'?'is-ok':status==='offline'?'is-bad':''}" title="${escape(c.error??c.delivery?.message??'')}"><span class="dot"></span>${line}</span>${extra?`<span>${extra}</span>`:''}`;
@@ -827,9 +838,9 @@ button:active:not(:disabled){transform:scale(.97)}
     }
     _media(s){const state=this._hass?.states[s.media_entity];const available=!!state&&!['unavailable','unknown','off'].includes(state.state);const features=Number(state?.attributes.supported_features??0);return {state,available,features,can:bit=>available&&(features&bit)===bit,yandex:this._mediaPlatforms[s.media_entity]==='yandex_station'};}
     _mediaControls(s){const media=this._media(s),busy=this._stationBusy.has(s.id),id=escape(s.id);const volume=media.state?.attributes.volume_level;const known=typeof volume==='number'&&Number.isFinite(volume);const pending=this._pendingVolumes?.get(s.id);if(pending&&Date.now()>=pending.until)this._pendingVolumes.delete(s.id);const value=this._pendingVolumes?.get(s.id)?.value??(known?Math.round(volume*100):0);const action=media.state?.state==='playing'&&media.can(1)?'media_pause':media.state?.state==='paused'&&media.can(16384)?'media_play':media.can(4096)?'media_stop':media.can(1)?'media_pause':media.can(16384)?'media_play':null;const labels={media_stop:'Стоп',media_pause:'Пауза',media_play:'Воспроизвести'},glyphs={media_stop:'stop',media_pause:'pause',media_play:'play'};
-      const attrs=media.state?.attributes??{},title=['playing','paused'].includes(media.state?.state)?[attrs.media_title,attrs.media_artist].filter(Boolean).join(' · '):'',speak=media.can(512)&&media.yandex?'':'disabled',manager=this._managerError?'disabled':'';
+      const attrs=media.state?.attributes??{},title=['playing','paused'].includes(media.state?.state)?[attrs.media_title,attrs.media_artist].filter(Boolean).join(' · '):'',speak=media.can(512)&&media.yandex&&!this._speakersStale?'':'disabled',manager=this._managerError||this._speakersStale?'disabled':'';
       const tool=(action,name,label,attrs)=>`<button type="button" class="tool" data-action="${action}" data-id="${id}" title="${escape(label)}" ${attrs}>${icon(name)}<span>${label}</span></button>`,transport=(service,disabled)=>`<button type="button" class="icon" data-action="media" data-service="${service??''}" data-id="${id}" aria-label="${labels[service]??'Медиа недоступно'}" title="${labels[service]??'Медиа недоступно'}" ${disabled?'disabled':''}>${icon(glyphs[service]??'play')}</button>`;
-      return `${title?`<div class="now">${icon('music-note')}<span>${escape(title)}</span></div>`:''}<div class="deck-volume">${transport(action,!action||busy)}${action!=='media_stop'&&media.can(4096)?transport('media_stop',busy):''}<div class="range ${known?'':'unknown'}" style="--fill:${value}%"><span class="range-fill"></span><input type="range" aria-label="Громкость ${escape(s.name)}" min="0" max="100" step="5" value="${value}" data-volume="${id}" ${!media.can(4)||busy||!known?'disabled':''}></div><output data-volume-output="${id}">${known?value+' %':'—'}</output></div><div class="tools">${tool('tts','message-text-outline','Сказать',speak)}${tool('test-sound','volume-high','Проверить',speak)}${tool('activity','history','История',manager)}${tool('settings','cog-outline','Настройки',this._managerError||busy?'disabled':'')}</div><p class="media-note\" role="status" data-media-message="${id}">${escape(this._stationMessages[s.id]??(!s.media_entity?'Выберите медиаплеер в настройках.':!media.available?'Медиаплеер недоступен.':''))}</p>`;
+      return `${title?`<div class="now">${icon('music-note')}<span>${escape(title)}</span></div>`:''}<div class="deck-volume">${transport(action,!action||busy)}${action!=='media_stop'&&media.can(4096)?transport('media_stop',busy):''}<div class="range ${known?'':'unknown'}" style="--fill:${value}%"><span class="range-fill"></span><input type="range" aria-label="Громкость ${escape(s.name)}" min="0" max="100" step="10" value="${value}" data-volume="${id}" ${!media.can(4)||busy||!known?'disabled':''}></div><output data-volume-output="${id}">${known?value+' %':'—'}</output></div><div class="tools">${tool('tts','message-text-outline','Сказать',speak)}${tool('test-sound','volume-high','Проверить',speak)}${tool('activity','history','История',manager)}${tool('settings','cog-outline','Настройки',this._managerError||this._speakersStale||busy?'disabled':'')}</div><p class="media-note\" role="status" data-media-message="${id}">${escape(this._stationMessages[s.id]??(!s.media_entity?'Выберите медиаплеер в настройках.':!media.available?'Медиаплеер недоступен.':''))}</p>`;
     }
     async _setVolume(id,value){
       value=Math.max(0,Math.min(100,Math.round(value/5)*5));

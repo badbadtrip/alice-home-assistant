@@ -118,6 +118,28 @@ func (c *Client) Control(ctx context.Context, action string) (string, error) {
 	return "", nil
 }
 
+// PlayURI claims the speaker and starts a Spotify playlist or album from its beginning.
+func (c *Client) PlayURI(ctx context.Context, uri string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	conn, err := c.dial(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer conn.CloseNow()
+	if err := send(ctx, conn, "activate"); err != nil {
+		return "", err
+	}
+	data, err := json.Marshal(map[string]string{"type": "command", "command": "play", "uri": uri})
+	if err != nil {
+		return "", err
+	}
+	if err := conn.Write(ctx, websocket.MessageText, data); err != nil {
+		return "", err
+	}
+	return "", conn.Close(websocket.StatusNormalClosure, "")
+}
+
 // StartPlayback claims the speaker and resumes the last Spotify context.
 func (c *Client) StartPlayback(ctx context.Context) (string, error) {
 	if err := c.run(ctx, "activate", "play"); err != nil {

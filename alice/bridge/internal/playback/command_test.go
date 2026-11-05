@@ -22,3 +22,18 @@ func TestVoicePlaybackCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestPickPlaylist(t *testing.T) {
+	list := []Playlist{{"Утро", "spotify:playlist:first"}, {"Для бега", "spotify:album:run"}, {"Плохой", "https://evil"}}
+	for text, want := range map[string]string{
+		"Алиса, включи музыку": "spotify:playlist:first", "Включи плейлист для бега": "spotify:album:run",
+		"поставь плейлист Утро": "spotify:playlist:first", "включи плейлист неизвестный": "", "включи плейлист плохой": "", "включи свет": "",
+	} {
+		if got := PickPlaylist(text, list); got != want {
+			t.Errorf("%q: got %q want %q", text, got, want)
+		}
+	}
+	if got := PickPlaylist("включи музыку", nil); got != "" {
+		t.Errorf("empty list: %q", got)
+	}
+}

@@ -5,10 +5,21 @@ import z from 'zod'
 import { normalizeVoicePhrase } from './control'
 import { HomeAssistantApi } from './home-assistant'
 
+// Accepts a spotify: URI or an open.spotify.com link and keeps the URI.
+const SpotifyUri = z.string().trim().max(300).transform((value, context) => {
+  const match = /^spotify:(playlist|album):([A-Za-z0-9]+)$/u.exec(value) ??
+    /^https:\/\/open\.spotify\.com\/(?:intl-[a-z]+\/)?(playlist|album)\/([A-Za-z0-9]+)(?:[/?#].*)?$/u.exec(value)
+  if (!match) { context.addIssue({ code: 'custom', message: 'Invalid Spotify link' }); return z.NEVER }
+  return `spotify:${match[1] ?? ''}:${match[2] ?? ''}`
+})
+
+const SpotifyPlaylist = z.object({ name: z.string().trim().min(1).max(80), uri: SpotifyUri }).strict()
+
 export const MusicSettingsSchema = z.object({
   default_media: z.string().trim().max(200).default(''),
   players: z.record(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/u), z.string().regex(/^media_player\.[a-z0-9_]+$/u)).default({}),
-  source: z.enum(['yandex', 'music_assistant']).default('yandex')
+  source: z.enum(['yandex', 'music_assistant']).default('yandex'),
+  spotify_playlists: z.array(SpotifyPlaylist).max(50).default([])
 }).strict()
 
 export type MusicSettings = z.infer<typeof MusicSettingsSchema>

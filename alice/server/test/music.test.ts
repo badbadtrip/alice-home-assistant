@@ -69,3 +69,9 @@ test('published rules follow the source and the player state', () => {
   for (const text of ['включи свет', 'включи музыку в яндексе', 'поставь таймер на песню', 'пауза']) assert.ok(!matches(idle, text), text)
   assert.ok(matches(musicRules(settings, 'kitchen', api('playing')), 'пауза'))
 })
+
+test('spotify playlists keep a URI from a shared link and reject others', () => {
+  const parsed = MusicSettingsSchema.parse({ spotify_playlists: [{ name: 'Утро', uri: 'https://open.spotify.com/intl-ru/playlist/abc123?si=x' }, { name: 'Альбом', uri: 'spotify:album:def' }] })
+  assert.deepEqual(parsed.spotify_playlists.map(item => item.uri), ['spotify:playlist:abc123', 'spotify:album:def'])
+  assert.equal(MusicSettingsSchema.safeParse({ spotify_playlists: [{ name: 'Нет', uri: 'https://example.com/playlist/abc' }] }).success, false)
+})

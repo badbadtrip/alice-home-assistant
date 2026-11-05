@@ -24,6 +24,40 @@ var start = regexp.MustCompile(`^(?:включи|поставь|запусти)(
 // Start recognizes a plain request for music with nothing named.
 func Start(text string) bool { return start.MatchString(normalize(text)) }
 
+// Playlist is a Spotify source the user named in the panel.
+type Playlist struct {
+	Name string `json:"name"`
+	URI  string `json:"uri"`
+}
+
+var (
+	namedPlaylist = regexp.MustCompile(`^(?:включи|поставь|запусти)(?: мне| мой)? плейлист (.+)$`)
+	playlistURI   = regexp.MustCompile(`^spotify:(?:playlist|album):[A-Za-z0-9]+$`)
+)
+
+// PickPlaylist finds the URI for a spoken request. Plain "включи музыку" takes the first entry.
+func PickPlaylist(text string, playlists []Playlist) string {
+	if len(playlists) == 0 {
+		return ""
+	}
+	if Start(text) {
+		if playlistURI.MatchString(playlists[0].URI) {
+			return playlists[0].URI
+		}
+		return ""
+	}
+	match := namedPlaylist.FindStringSubmatch(normalize(text))
+	if match == nil {
+		return ""
+	}
+	for _, playlist := range playlists {
+		if normalize(playlist.Name) == match[1] && playlistURI.MatchString(playlist.URI) {
+			return playlist.URI
+		}
+	}
+	return ""
+}
+
 func Command(text string) string {
 	text = normalize(text)
 	for _, c := range commands {

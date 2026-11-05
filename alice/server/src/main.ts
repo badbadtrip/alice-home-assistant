@@ -255,7 +255,8 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     const local = localVoicePhrases(allowed)
     if (local.length > 0) commands.push({ enabled: true, phrases: local, target: 'script.alice_local_dictionary' })
     const revision = createHash('sha256').update(JSON.stringify(commands)).digest('hex').slice(0, 16)
-    response.json({ commands, device_names: deviceVoiceNames(allowed), revision, routing: await publishedRouting(request.get('x-alice-speaker')) })
+    const { spotify_playlists: playlists } = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
+    response.json({ commands, device_names: deviceVoiceNames(allowed), playlists, revision, routing: await publishedRouting(request.get('x-alice-speaker')) })
   })
 
   /**

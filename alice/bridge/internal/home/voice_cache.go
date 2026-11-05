@@ -12,6 +12,8 @@ import (
  "sync/atomic"
  "time"
  "unicode"
+
+ "quasarbridge/internal/playback"
 )
 
 type voicePhraseSnapshot struct {
@@ -19,6 +21,7 @@ type voicePhraseSnapshot struct {
  Revision string
  Active int
  Names []string
+ Playlists []playback.Playlist
 }
 type voicePhraseCache struct {
  snapshot atomic.Pointer[voicePhraseSnapshot]
@@ -69,6 +72,12 @@ func (f *Functions) VoicePhraseCount() int {
  return 0
 }
 
+// Playlists returns the Spotify playlists named in the panel.
+func (f *Functions) Playlists() []playback.Playlist {
+ if snapshot:=f.voice.snapshot.Load();snapshot!=nil {return snapshot.Playlists}
+ return nil
+}
+
 func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  ctx,cancel:=context.WithTimeout(ctx,2*time.Second);defer cancel()
  var response struct {
@@ -76,6 +85,7 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
   Commands []struct {Enabled *bool `json:"enabled"`; Phrases []string `json:"phrases"`; Target string `json:"target"`} `json:"commands"`
   DeviceNames []string `json:"device_names"`
   Routing json.RawMessage `json:"routing"`
+  Playlists []playback.Playlist `json:"playlists"`
  }
  if err:=f.request(ctx,http.MethodGet,"/voice-phrases",nil,&response);err!=nil {return err}
  if response.Revision=="" {return errors.New("incomplete voice table")}
@@ -102,7 +112,7 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  names:=make([]string,0,len(response.DeviceNames))
  for _,name:=range response.DeviceNames {if name=normalizeVoicePhrase(name);name!="" {names=append(names,name)}}
  previous:=f.voice.snapshot.Load()
- f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names})
+ f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names,Playlists:response.Playlists})
  f.applyRouting(response.Routing)
  if previous==nil || previous.Revision!=response.Revision {
   slog.Info("voice_phrase_cache_updated","phrases",len(phrases),"revision",response.Revision)

@@ -72,3 +72,16 @@ func TestRemoteEndpointRejected(t *testing.T) {
 		t.Fatal("remote endpoint accepted")
 	}
 }
+
+func TestPlayURISendsPlaylist(t *testing.T) {
+	seen := make(chan string, 2)
+	if _, err := server(t, "stopped", seen).PlayURI(context.Background(), "spotify:playlist:abc"); err != nil {
+		t.Fatal(err)
+	}
+	if got := <-seen; !strings.Contains(got, "activate") {
+		t.Fatalf("first command: %s", got)
+	}
+	if got := <-seen; !strings.Contains(got, `"uri":"spotify:playlist:abc"`) || !strings.Contains(got, `"command":"play"`) {
+		t.Fatalf("play command: %s", got)
+	}
+}

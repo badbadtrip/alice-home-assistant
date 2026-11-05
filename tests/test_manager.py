@@ -42,6 +42,21 @@ class ManagerTests(unittest.TestCase):
         self.manager.store.metadata(self.speaker['id'], trusted_fingerprint='SHA256:test', install={'state': 'ready'})
         self.manager.connections[self.speaker['id']] = {'identity': (), 'value': {'status': 'online'}}
 
+    def test_airplay_turns_on_unless_user_switched_it_off(self):
+        import updater
+        self.ready()
+        self.manager.connections[self.speaker['id']]['value']['airplay'] = {'enabled': False}
+        updater._airplay_retry.clear()
+        with patch('admin.station') as station:
+            updater.airplay_default(self.manager, [self.manager.store.speaker(self.speaker['id'])], 0)
+            station.assert_called_once_with(self.manager, self.speaker['id'], 'airplay', {'action': 'on'})
+            updater.airplay_default(self.manager, [self.manager.store.speaker(self.speaker['id'])], 1)
+            station.assert_called_once()
+        updater._airplay_retry.clear()
+        with patch('admin.station') as station:
+            updater.airplay_default(self.manager, [{**self.manager.store.speaker(self.speaker['id']), 'airplay_off': True}], 0)
+            station.assert_not_called()
+
     def test_auto_update_starts_at_once_and_skips_current_bridge(self):
         self.ready()
         job, update = self.rollout(actual='new')

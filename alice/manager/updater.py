@@ -19,7 +19,9 @@ MIXER_CHECK = ('(head -c 44100 /dev/zero | aplay -q -D default -t raw -f S16_LE 
                # A restart during playback can leave dmix locked; with no clients left it is safe to clear.
                'n=$(ipcs -m | awk \'$1=="0x00000400"||$1=="0x00000401"{s+=$6} END{print s+0}\'); '
                '[ "$n" = 0 ] && ipcrm -M 0x400 -M 0x401 -S 0x400; exit 1')
+AIRPLAY_RETRY = 600
 _next_run = {}
+_airplay_retry = {}
 
 
 def enabled(manager):
@@ -105,12 +107,31 @@ def _advance(manager, speaker, update, now):
     return False
 
 
+def airplay_default(manager, speakers, now):
+    """AirPlay is on unless the user switched it off; a capable bridge starts with it off."""
+    from admin import station
+    for speaker in speakers:
+        with manager.connection_lock:
+            value = manager.connections.get(speaker['id'], {}).get('value', {})
+        airplay = value.get('airplay')
+        if value.get('status') != 'online' or not airplay or airplay.get('enabled') or speaker.get('airplay_off'):
+            continue
+        if now < _airplay_retry.get(speaker['id'], 0):
+            continue
+        _airplay_retry[speaker['id']] = now + AIRPLAY_RETRY
+        try:
+            station(manager, speaker['id'], 'airplay', {'action': 'on'})
+        except Exception:
+            pass
+
+
 def cycle(manager, now=None):
     now = time.time() if now is None else now
     if now < _next_run.get(id(manager), 0):
         return
     _next_run[id(manager)] = now + INTERVAL
     speakers = [s for s in manager.store.read('speakers.json') if s.get('trusted_fingerprint')]
+    airplay_default(manager, speakers, now)
     # In-flight work finishes even if the switch was turned off meanwhile.
     for speaker in speakers:
         if _advance(manager, speaker, speaker.get('bridge_update') or {}, now):

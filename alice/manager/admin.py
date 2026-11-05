@@ -138,6 +138,7 @@ def station(manager, speaker_id, operation, payload):
                 script = ('wget -T 12 -q -O - "' + url + 'stop" && '
                           'if [ -x /data/airplay/bin/shairport-sync ]; then rm -f /data/airplay/disabled; /data/airplay/ctl.sh start; fi; true')
             output = manager.ssh(speaker, script, timeout=25)
+            manager.store.metadata(speaker_id, airplay_off=action == 'off')
             state = json.loads(output.decode().strip().splitlines()[0])
             return {'enabled': state.get('enabled') is True, 'connected': state.get('connected') is True, 'playing': state.get('playing') is True, 'error': bool(state.get('error'))}
         if operation == 'console':

@@ -28,6 +28,51 @@ class ManagerTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def rollout(self, hour=4, actual='old', **kwargs):
+        import updater
+        updater._next_run.clear()
+        ssh = lambda speaker, command, *a, **k: (actual + ' x').encode() if 'sha256sum' in command else b'{"status":"ok","speaker_id":"%s","client_frames":2}' % speaker['id'].encode()
+        with patch.object(updater, 'target', return_value='new'), patch.object(updater, '_playing', return_value=kwargs.get('playing', False)), \
+             patch.object(updater, 'notify'), patch.object(self.manager, 'ssh', side_effect=ssh), \
+             patch.object(self.manager, 'job', return_value={'job_id': 'j'}) as job:
+            updater.cycle(self.manager, hour=hour)
+        return job, self.manager.store.speaker(self.speaker['id']).get('bridge_update')
+
+    def ready(self):
+        self.manager.store.metadata(self.speaker['id'], trusted_fingerprint='SHA256:test', install={'state': 'ready'})
+        self.manager.connections[self.speaker['id']] = {'status': 'online'}
+
+    def test_auto_update_waits_for_night_and_silence(self):
+        self.ready()
+        job, update = self.rollout(hour=14)
+        job.assert_not_called(); self.assertEqual(update['state'], 'pending')
+        job, update = self.rollout(hour=4, playing=True)
+        job.assert_not_called()
+        job, update = self.rollout(hour=4)
+        job.assert_called_once_with(self.speaker['id'], 'install'); self.assertEqual(update['state'], 'updating')
+
+    def test_auto_update_verifies_then_asks_for_voice(self):
+        import updater
+        self.ready()
+        self.rollout()
+        self.manager.jobs['j'] = {'status': 'succeeded'}
+        self.assertEqual(self.rollout()[1]['state'], 'verifying')
+        self.assertEqual(self.rollout()[1]['state'], 'awaiting_voice')
+        job, _ = self.rollout(); job.assert_not_called()
+        self.assertEqual(updater.confirm(self.manager, self.speaker['id']), {'state': 'current'})
+
+    def test_auto_update_failure_stops_rollout_and_switch_disables_it(self):
+        import updater
+        self.ready()
+        self.rollout()
+        self.manager.jobs['j'] = {'status': 'failed'}
+        self.assertEqual(self.rollout()[1]['state'], 'failed')
+        job, _ = self.rollout(); job.assert_not_called()
+        self.manager.store.metadata(self.speaker['id'], bridge_update=None)
+        self.assertTrue(updater.enabled(self.manager))
+        updater.set_enabled(self.manager, False)
+        job, _ = self.rollout(); job.assert_not_called()
+
     def airplay_cycle(self, lost):
         self.manager.airplay_next_check = self.manager.airplay_next_try = 0.0
         with patch.object(self.manager, '_airplay_lost', return_value=lost), patch.object(self.manager, 'ssh') as ssh:

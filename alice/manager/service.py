@@ -233,6 +233,11 @@ class Manager:
                 self.airplay_cycle()
             except Exception:
                 pass
+            try:
+                import updater
+                updater.cycle(self)
+            except Exception:
+                pass
             self.monitor_stop.wait(max(0.1, 15 - (time.monotonic() - began)))
 
     @staticmethod
@@ -246,6 +251,8 @@ class Manager:
         return (speaker['host'], speaker['port'], speaker.get('trusted_fingerprint'))
 
     def speakers(self):
+        import updater
+        auto_update = updater.enabled(self)
         """Read cached observations only; never connect to a speaker in HTTP GET."""
         records = self.store.read('speakers.json')
         now = time.time()
@@ -260,7 +267,7 @@ class Manager:
                     connection['status'] = 'unknown'
                     connection['error'] = 'Статус устарел. Ожидается следующая проверка.'
                     connection['delivery'] = {**connection.get('delivery', {}), 'status': 'unknown', 'message': 'Статус колонки устарел.'}
-                result.append({**speaker, 'connection': connection})
+                result.append({**speaker, 'connection': connection, 'auto_update': auto_update})
             return result
 
     def _airplay_lost(self):
@@ -1131,6 +1138,13 @@ class Handler(BaseHTTPRequestHandler):
             return 200, manager.phrase_check(payload)
         if path == ['api', 'activity'] and method == 'GET':
             return 200, manager._hf_request('/events')
+        if path == ['api', 'auto-update'] and method == 'POST':
+            import updater
+            if set(payload) == {'enabled'} and isinstance(payload['enabled'], bool):
+                return 200, updater.set_enabled(manager, payload['enabled'])
+            if set(payload) == {'confirm'} and isinstance(payload['confirm'], str) and ID.fullmatch(payload['confirm']):
+                return 200, updater.confirm(manager, payload['confirm'])
+            raise Error('Ожидается enabled или confirm.')
         if path == ['api', 'speakers']:
             if method == 'GET':
                 return 200, {'speakers': manager.speakers(), **manager.setup()}

@@ -592,9 +592,9 @@ button:active:not(:disabled){transform:scale(.97)}
       const body=tab==='commands'?`<div class="sec"><p>${this._commandSummary(rows)}</p><div class="sec-actions"><button data-action="preview">Проверить фразу</button>${iconButton('refresh','refresh','Обновить',disabled)}</div></div>${this._commandList(rows,disabled)}<p class="foot">Скажите «Алиса» и любую из фраз.</p>`:tab==='diagnostics'?this._diagnostics():this._speakerPanel(disabled);
       return `<header class="bar"><h1>${title}</h1>${action}</header>${nav}${this._notice()}${body}`;
     }
-    async _openAdmin(){
+    async _openAdmin(tab='devices'){
       if(!this._hass.user?.is_admin){this._message='Управление доступно администратору HA.';this._render();return;}
-      this._admin={tab:'devices',busy:true,message:'Получаем устройства и метки из Home Assistant…',labels:[],entities:[],inventory:[],devices:[],areas:[],config:{labels:[],entities:{}},speakerId:this._speakers[0]?.id??'',path:'/data/opt/quasar-bridge/config.json',content:'',command:'',output:'',scope:'enabled',page:0,expanded:new Set()};this._render();
+      this._admin={tab,busy:true,message:tab==='devices'?'Получаем устройства и метки из Home Assistant…':'',labels:[],entities:[],inventory:[],devices:[],areas:[],config:{labels:[],entities:{}},speakerId:this._speakers[0]?.id??'',path:'/data/opt/quasar-bridge/config.json',content:'',command:'',output:'',scope:'enabled',page:0,expanded:new Set()};this._render();
       const a=this._admin;
       try{const [access]=await Promise.all([this._api('/api/access'),this._refreshAdminHA(a,false)]);a.config=access.config;a.revision=access.revision;a.saved=JSON.stringify(access.config);a.message='';if(!this._adminRows(a).some(e=>e.enabled))a.scope='all';await this._subscribeAdminHA(a);}
       catch(error){a.message=error.message;a.failed=true;}
@@ -843,7 +843,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(a&&!adminSection(section)){this._stopAdminHA();this._admin=null;}
       const previous=this._section;this._section=section;this._journalOpen=section==='journal';
       if(!adminSection(section)){this._render();if(section==='journal')this._loadActivity();return;}
-      if(!this._admin){await this._openAdmin();if(!this._admin){this._section=previous;this._render();return;}}
+      if(!this._admin){await this._openAdmin(section==='settings'?'devices':section);if(!this._admin){this._section=previous;this._render();return;}}
       await this._adminAction('admin-tab',{dataset:{tab:section==='settings'?'devices':section}});
     }
     async _openGuide(){try{const base=await this._managerBase(),target=(base??'')+'/wiki/Home';if(window!==window.top&&this._config.app_embedded)window.parent.location.href=target;else window.location.href=target;}catch(error){this._message=error.message;this._render();}}

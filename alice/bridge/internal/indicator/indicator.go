@@ -9,9 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -153,9 +155,33 @@ func (c *Controller) Request(ctx context.Context) func() {
 }
 
 type Controller struct {
-	Path   string
-	mu     sync.Mutex
-	active int
+	Path     string
+	mu       sync.Mutex
+	active   int
+	sources  []func() bool
+	reported atomic.Bool
+}
+
+// AddMusic adds a player that can say for itself whether it is playing.
+func (c *Controller) AddMusic(source func() bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sources = append(c.sources, source)
+}
+
+// SetMusic records what Home Assistant knows about the speaker's own player.
+func (c *Controller) SetMusic(playing bool) { c.reported.Store(playing) }
+
+func (c *Controller) sourcePlaying() bool {
+	c.mu.Lock()
+	sources := slices.Clone(c.sources)
+	c.mu.Unlock()
+	for _, source := range sources {
+		if source() {
+			return true
+		}
+	}
+	return c.reported.Load()
 }
 
 func New(configPath string) *Controller {
@@ -210,11 +236,23 @@ func pick(cfg Config, thinking, playing bool) (Config, bool) {
 	return cfg.Lamp.look()
 }
 
-// audioPlaying is true for any source: every player ends in the same sound card.
+// audioPlaying reads the sound card. A sound server keeps it running in silence,
+// so that owner proves nothing; its player reports through AddMusic instead.
 func audioPlaying() bool {
 	paths, _ := filepath.Glob("/proc/asound/card0/pcm*p/sub0/status")
 	for _, path := range paths {
-		if raw, err := os.ReadFile(path); err == nil && bytes.HasPrefix(raw, []byte("state: RUNNING")) {
+		raw, err := os.ReadFile(path)
+		if err != nil || !bytes.HasPrefix(raw, []byte("state: RUNNING")) {
+			continue
+		}
+		var owner int
+		for line := range strings.Lines(string(raw)) {
+			if value, ok := strings.CutPrefix(line, "owner_pid"); ok {
+				owner, _ = strconv.Atoi(strings.TrimSpace(strings.TrimLeft(value, " :\t")))
+			}
+		}
+		command, _ := os.ReadFile("/proc/" + strconv.Itoa(owner) + "/cmdline")
+		if !bytes.Contains(command, []byte("pulseaudio")) {
 			return true
 		}
 	}
@@ -256,16 +294,19 @@ func (c *Controller) Serve(ctx context.Context) {
 		return
 	}
 	started := time.Now()
-	ticker := time.NewTicker(33 * time.Millisecond)
+	ticker := time.NewTicker(16 * time.Millisecond)
 	defer ticker.Stop()
 	var cfg Config
 	var gate musicGate
 	var nextCheck time.Time
+	var sourced atomic.Bool
 	playing, allowed, lit := false, false, false
-	dark := make([]Pixel, led.size)
+	black := make([]Pixel, led.size)
+	off := make([]Light, led.size)
+	var soft smoother
 	defer func() {
 		if lit {
-			_ = led.show(dark)
+			_ = led.show(black)
 		}
 	}()
 	for {
@@ -276,15 +317,21 @@ func (c *Controller) Serve(ctx context.Context) {
 			if now.After(nextCheck) {
 				nextCheck = now.Add(time.Second)
 				cfg, allowed = c.load(), unmuted()
-				playing = gate.update(audioPlaying())
+				card := gate.update(audioPlaying())
+				go func() { sourced.Store(c.sourcePlaying()) }()
+				playing = card || sourced.Load()
 			}
 			look, ok := pick(cfg, c.thinking(), playing)
-			if ok && allowed {
-				_ = led.show(look.Render(now.Sub(started), led.size))
+			switch {
+			case ok && allowed:
+				_ = led.show(soft.next(look.Render(now.Sub(started), led.size)))
 				lit = true
-			} else if lit {
-				_ = led.show(dark)
-				lit = false
+			case lit:
+				frame := soft.next(off)
+				if soft.dark() {
+					frame, lit = black, false
+				}
+				_ = led.show(frame)
 			}
 		}
 	}

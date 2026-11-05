@@ -85,6 +85,12 @@ func (c *Client) status(ctx context.Context) (string, error) {
 	}
 }
 
+// Playing is true only while sound is actually coming out.
+func (c *Client) Playing(ctx context.Context) bool {
+	status, err := c.status(ctx)
+	return err == nil && status == "playing"
+}
+
 // Active is true while Spotify owns this speaker, so Yandex must not get the control.
 func (c *Client) Active(ctx context.Context) bool {
 	status, err := c.status(ctx)

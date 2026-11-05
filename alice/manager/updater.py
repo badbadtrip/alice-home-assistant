@@ -11,7 +11,7 @@ from pathlib import Path
 import time
 from urllib.request import Request, urlopen
 
-INTERVAL = 60
+INTERVAL = 30
 VERIFY_SECONDS = 300
 SETTINGS = 'auto-update.json'
 # Silence proves the mixer accepts audio: a stale dmix lock hangs every player.
@@ -23,6 +23,7 @@ MIXER_CHECK = ('(head -c 44100 /dev/zero | aplay -q -D default -t raw -f S16_LE 
 AIRPLAY_RETRY = 600
 _next_run = {}
 _airplay_retry = {}
+_music_sent = {}
 
 
 def enabled(manager):
@@ -139,6 +140,24 @@ def airplay_default(manager, speakers, now):
             pass
 
 
+def music_state(manager, speakers):
+    """Tells a bridge what HA knows about the stock player, which the bridge cannot see."""
+    for speaker in speakers:
+        entity = speaker.get('media_entity')
+        with manager.connection_lock:
+            value = manager.connections.get(speaker['id'], {}).get('value', {})
+        if not entity or value.get('status') != 'online' or not value.get('airplay'):
+            continue
+        try:
+            state = _ha('states/' + entity)
+            playing = bool(state) and state.get('state') == 'playing'
+            if _music_sent.get(speaker['id']) != playing:
+                manager.ssh(speaker, 'wget -T 3 -q -O /dev/null "http://127.0.0.1:18861/music-state?playing=%d"' % playing, timeout=8)
+                _music_sent[speaker['id']] = playing
+        except Exception:
+            pass
+
+
 def cycle(manager, now=None):
     now = time.time() if now is None else now
     if now < _next_run.get(id(manager), 0):
@@ -146,6 +165,7 @@ def cycle(manager, now=None):
     _next_run[id(manager)] = now + INTERVAL
     speakers = [s for s in manager.store.read('speakers.json') if s.get('trusted_fingerprint')]
     airplay_default(manager, speakers, now)
+    music_state(manager, speakers)
     # In-flight work finishes even if the switch was turned off meanwhile.
     for speaker in speakers:
         if _advance(manager, speaker, speaker.get('bridge_update') or {}, now):

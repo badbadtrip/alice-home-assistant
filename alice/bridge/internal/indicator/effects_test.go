@@ -12,10 +12,28 @@ func TestEveryEffectDrawsWithinTheCap(t *testing.T) {
 			t.Fatal(mode, len(frame))
 		}
 		for _, p := range frame {
-			if p.R > 204 || p.G > 204 || p.B > 204 {
+			if p[0] > 204 || p[1] > 204 || p[2] > 204 {
 				t.Fatal(mode, p)
 			}
 		}
+	}
+}
+
+func TestSmootherShowsValuesBetweenLevels(t *testing.T) {
+	var s smoother
+	total := 0
+	for range 1000 {
+		frame := s.next([]Light{{10.25, 0, 0}})
+		total += int(frame[0].R)
+	}
+	if average := float64(total) / 1000; average < 10.1 || average > 10.3 {
+		t.Fatal(average)
+	}
+	for range 100 {
+		s.next([]Light{{}})
+	}
+	if !s.dark() {
+		t.Fatal("did not fade out")
 	}
 }
 

@@ -148,8 +148,9 @@ func main() {
 		ChatParameters: cfg.LLMChatParameters,
 	}
 	var planner home.Planner = lc
+	var ring *indicator.Controller
 	if diagnostics == 0 {
-		ring := indicator.New(*path)
+		ring = indicator.New(*path)
 		go ring.Serve(context.Background())
 		lc.OnRequest = ring.Request
 	}
@@ -205,6 +206,13 @@ func main() {
 		engine.Assistant = &assistant.Agent{Client: lc, Tools: tools, MaxRounds: cfg.AssistantTools.MaxRounds, MaxCalls: cfg.AssistantTools.MaxCalls}
 	}
 	// A speaker with its own Spotify client answers playback commands directly.
+	if local := (&soloist.Client{StateDir: "/data/soloist/state"}); ring != nil && local.Available() {
+		ring.AddMusic(func() bool {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return local.Playing(ctx)
+		})
+	}
 	if local := (&soloist.Client{StateDir: "/data/soloist/state"}); engine.Playback == nil && local.Available() {
 		engine.Playback = local
 	}
@@ -343,6 +351,12 @@ func main() {
 		_, _ = w.Write(data)
 	})
 	mux.HandleFunc("GET /volume", proxy.VolumeHandler)
+	mux.HandleFunc("GET /music-state", func(w http.ResponseWriter, r *http.Request) {
+		if ring != nil {
+			ring.SetMusic(r.URL.Query().Get("playing") == "1")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
 	mux.Handle("/uni.ws", proxy)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if len(cfg.AllowedIPs) > 0 {
@@ -369,6 +383,9 @@ func main() {
 	} else {
 		airPlay = control
 		mux.Handle("GET /airplay", control)
+		if ring != nil {
+			ring.AddMusic(func() bool { return control.health()["playing"] == true })
+		}
 		defer control.shutdown()
 		go control.resume()
 	}

@@ -85,7 +85,7 @@ NonNullable<HomeFunctionsConfig['voice_commands']> {
     const legacy = Object.values(config.voice_commands ?? {}).find(c => c.automation === item.entityId)
     result[slugify(item.entityId)] = {
       automation: item.entityId,
-      description: item.name ?? api.getEntityState(item.entityId)?.name ?? legacy?.description ?? item.entityId,
+      description: (item.name || api.getEntityState(item.entityId)?.name || legacy?.description) || item.entityId,
       phrases,
       verify: legacy?.verify ?? []
     }

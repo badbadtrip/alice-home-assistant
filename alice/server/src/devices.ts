@@ -88,7 +88,8 @@ export async function buildDevices (homeAssistant: HomeAssistantApi,
     const entityConfig = config.entities[item.entityId] ?? EMPTY_ENTITY_CONFIG
     const areaName = entityConfig.area ?? item.areaName
     const areaId = entityConfig.area ? slugify(entityConfig.area) : item.areaId
-    const name = entityConfig.description ?? item.name ?? state.name
+    // HA gives an empty name to entities named after their device, not a missing one.
+    const name = (entityConfig.description || item.name || state.name) || item.entityId
     const isReadOnly = domain === 'sensor' || domain === 'binary_sensor'
     // Sensors often share names ("Temperature"); entity IDs keep their keys distinct.
     const slug = entityConfig.slug ?? slugify(item.entityId)

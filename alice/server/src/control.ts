@@ -234,11 +234,11 @@ export function dictionaryReport (devices: Map<string, DeviceEntry>,
     }
     byDevice.set(intent.device, [...byDevice.get(intent.device) ?? [], phrase])
   }
-  const groups = [...byDevice].map(([device, list]) => ({ phrases: list, title: device.name ?? device.entityId }))
+  const groups = [...byDevice].map(([device, list]) => ({ phrases: list, title: device.name || device.entityId }))
   if (shared.length > 0) groups.unshift({ phrases: shared, title: 'Свет и датчики по комнате' })
   for (const device of devices.values()) {
     if (device.voicePhrases) continue
-    const title = device.name ?? device.entityId
+    const title = device.name || device.entityId
     if (device.isLighting && !device.areaId) warnings.push(`${title}: свет не привязан к комнате.`)
     if (spokenNames(device).length === 0) warnings.push(`${title}: нет устного имени, добавьте алиас в Home Assistant.`)
   }
@@ -250,7 +250,7 @@ export function dictionaryReport (devices: Map<string, DeviceEntry>,
     if (device.voicePhrases) continue
     const owned = device.aliases ?? []
     for (const alias of owned) {
-      aliases.push({ alias, entityId: device.entityId, name: device.name ?? device.entityId })
+      aliases.push({ alias, entityId: device.entityId, name: device.name || device.entityId })
     }
   }
   return {
@@ -298,7 +298,7 @@ export function localVoicePhrases (devices: Map<string, DeviceEntry>): string[] 
 function aliasTargets (devices: Map<string, DeviceEntry>): { entityId: string; name: string }[] {
   const targets: { entityId: string; name: string }[] = []
   for (const device of devices.values()) {
-    if (!device.voicePhrases) targets.push({ entityId: device.entityId, name: device.name ?? device.entityId })
+    if (!device.voicePhrases) targets.push({ entityId: device.entityId, name: device.name || device.entityId })
   }
   return targets
 }

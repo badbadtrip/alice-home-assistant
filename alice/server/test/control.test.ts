@@ -265,3 +265,9 @@ test('an alias cannot take a name another device answers to', () => {
   assert.equal(aliasConflict('Компьютер', 'switch.pc', realHome()), undefined)
   assert.equal(aliasConflict('торшер', 'light.room', realHome()), undefined)
 })
+
+test('a warning names an entity that has an empty HA name', () => {
+  const device = { entityId: 'switch.unnamed', functions: [], name: '' } as unknown as DeviceEntry
+  const { warnings } = dictionaryReport(new Map([['unnamed', device]]))
+  assert.deepEqual(warnings, ['switch.unnamed: нет устного имени, добавьте алиас в Home Assistant.'])
+})

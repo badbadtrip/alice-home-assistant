@@ -18,10 +18,11 @@ const timeout = 3 * time.Second
 
 type Client struct{ StateDir string }
 
-// Available reports whether this speaker has a running Soloist service.
+// Available reports whether Soloist is installed. The bridge boots first, so the
+// endpoint files may not exist yet; commands read them when they run.
 func (c *Client) Available() bool {
-	_, err := c.endpoint()
-	return err == nil
+	info, err := os.Stat(c.StateDir)
+	return err == nil && info.IsDir()
 }
 
 func (c *Client) endpoint() (string, error) {

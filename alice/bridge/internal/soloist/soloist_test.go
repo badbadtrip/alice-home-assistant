@@ -68,7 +68,7 @@ func TestRemoteEndpointRejected(t *testing.T) {
 	dir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(dir, "ws.addr"), []byte("192.168.1.2"), 0o600)
 	_ = os.WriteFile(filepath.Join(dir, "ws.port"), []byte("1"), 0o600)
-	if (&Client{StateDir: dir}).Available() {
+	if _, err := (&Client{StateDir: dir}).endpoint(); err == nil {
 		t.Fatal("remote endpoint accepted")
 	}
 }
@@ -83,5 +83,14 @@ func TestPlayURISendsPlaylist(t *testing.T) {
 	}
 	if got := <-seen; !strings.Contains(got, `"uri":"spotify:playlist:abc"`) || !strings.Contains(got, `"command":"play"`) {
 		t.Fatalf("play command: %s", got)
+	}
+}
+
+func TestAvailableBeforeServiceStarts(t *testing.T) {
+	if !(&Client{StateDir: t.TempDir()}).Available() {
+		t.Fatal("installed service must count before its endpoint exists")
+	}
+	if (&Client{StateDir: filepath.Join(t.TempDir(), "missing")}).Available() {
+		t.Fatal("speaker without Soloist must not count")
 	}
 }

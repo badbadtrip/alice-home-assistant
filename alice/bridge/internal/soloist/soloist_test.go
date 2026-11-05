@@ -1,0 +1,74 @@
+package soloist
+
+import (
+	"context"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/coder/websocket"
+)
+
+func server(t *testing.T, status string, seen chan<- string) *Client {
+	t.Helper()
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.CloseNow()
+		for {
+			_, data, err := conn.Read(r.Context())
+			if err != nil {
+				return
+			}
+			seen <- string(data)
+			if strings.Contains(string(data), "get_state") {
+				_ = conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"playback_state","status":"`+status+`"}`))
+			}
+		}
+	}))
+	t.Cleanup(s.Close)
+	host, port, _ := net.SplitHostPort(strings.TrimPrefix(s.URL, "http://"))
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "ws.addr"), []byte(host+"\n"), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "ws.port"), []byte(port+"\n"), 0o600)
+	return &Client{StateDir: dir}
+}
+
+func TestActiveFollowsPlaybackState(t *testing.T) {
+	seen := make(chan string, 8)
+	if !server(t, "playing", seen).Active(context.Background()) {
+		t.Fatal("playing is active")
+	}
+	if server(t, "stopped", seen).Active(context.Background()) {
+		t.Fatal("stopped is not active")
+	}
+}
+
+func TestControlSendsCommand(t *testing.T) {
+	seen := make(chan string, 8)
+	c := server(t, "playing", seen)
+	if _, err := c.Control(context.Background(), "next"); err != nil {
+		t.Fatal(err)
+	}
+	if got := <-seen; !strings.Contains(got, "skip_next") {
+		t.Fatal(got)
+	}
+	if _, err := c.Control(context.Background(), "restart"); err == nil {
+		t.Fatal("unknown action accepted")
+	}
+}
+
+func TestRemoteEndpointRejected(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "ws.addr"), []byte("192.168.1.2"), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "ws.port"), []byte("1"), 0o600)
+	if (&Client{StateDir: dir}).Available() {
+		t.Fatal("remote endpoint accepted")
+	}
+}

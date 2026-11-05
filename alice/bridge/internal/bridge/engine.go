@@ -27,6 +27,9 @@ type PlaybackController interface {
 	Active(context.Context) bool
 	Control(context.Context, string) (string, error)
 }
+type MusicResumer interface {
+	StartPlayback(context.Context) (string, error)
+}
 type MusicStarter interface {
 	CanStartMusic(string) bool
 	StartMusic(context.Context, string) (string, error)
@@ -117,6 +120,11 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 	case "playback":
 		if e.Playback == nil {
 			return Resolution{Route: "yandex"}, nil
+		}
+		if resumer, ok := e.Playback.(MusicResumer); ok && decision.Source == "playback_start" {
+			answer, err := resumer.StartPlayback(ctx)
+			result.Answer = answer
+			return result, err
 		}
 		action := playback.Command(text)
 		if action == "" {
@@ -270,6 +278,9 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 	}
 	if e.Playback != nil && playback.Command(text) != "" && e.Playback.Active(ctx) {
 		return RouteDecision{Route: "playback", Source: "playback"}
+	}
+	if _, ok := e.Playback.(MusicResumer); ok && playback.Start(text) {
+		return RouteDecision{Route: "playback", Source: "playback_start"}
 	}
 	if matcher, ok := e.Home.(interface {
 		MatchDevice(context.Context, string) bool

@@ -27,6 +27,7 @@ import (
 	"quasarbridge/internal/journal"
 	"quasarbridge/internal/indicator"
 	"quasarbridge/internal/llm"
+	"quasarbridge/internal/soloist"
 	"quasarbridge/internal/wire"
 )
 
@@ -200,6 +201,10 @@ func main() {
 		tools := &assistant.Tools{Config: cfg.AssistantTools, JournalConfig: source, WebReader: reader, Playback: musicPlayback}
 		engine.Music = tools
 		engine.Assistant = &assistant.Agent{Client: lc, Tools: tools, MaxRounds: cfg.AssistantTools.MaxRounds, MaxCalls: cfg.AssistantTools.MaxCalls}
+	}
+	// A speaker with its own Spotify client answers playback commands directly.
+	if local := (&soloist.Client{StateDir: "/data/soloist/state"}); engine.Playback == nil && local.Available() {
+		engine.Playback = local
 	}
 	if err := engine.SetRouting(withoutModelFallback(cfg.Routing, llmDisabled)); err != nil {
 		slog.Error("routing rejected", "error", err)

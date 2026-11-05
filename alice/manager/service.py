@@ -1142,9 +1142,7 @@ class Handler(BaseHTTPRequestHandler):
             import updater
             if set(payload) == {'enabled'} and isinstance(payload['enabled'], bool):
                 return 200, updater.set_enabled(manager, payload['enabled'])
-            if set(payload) == {'confirm'} and isinstance(payload['confirm'], str) and ID.fullmatch(payload['confirm']):
-                return 200, updater.confirm(manager, payload['confirm'])
-            raise Error('Ожидается enabled или confirm.')
+            raise Error('Ожидается enabled.')
         if path == ['api', 'speakers']:
             if method == 'GET':
                 return 200, {'speakers': manager.speakers(), **manager.setup()}

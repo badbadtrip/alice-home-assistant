@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime, timezone
 import hashlib
 import io
 import json
@@ -73,7 +74,12 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(self.rollout()[1]['state'], 'verifying')
         self.assertEqual(self.rollout()[1]['state'], 'awaiting_voice')
         job, _ = self.rollout(); job.assert_not_called()
-        self.assertEqual(updater.confirm(self.manager, self.speaker['id']), {'state': 'current'})
+        at = self.manager.store.speaker(self.speaker['id'])['bridge_update']['at']
+        stamp = datetime.fromtimestamp(at + 5, timezone.utc).isoformat().replace('+00:00', 'Z')
+        with patch.object(self.manager, '_hf_request', return_value={'events': [{'speaker_id': 'other', 'at': stamp}]}):
+            self.assertEqual(self.rollout()[1]['state'], 'awaiting_voice')
+        with patch.object(self.manager, '_hf_request', return_value={'events': [{'speaker_id': self.speaker['id'], 'at': stamp}]}):
+            self.assertEqual(self.rollout()[1]['state'], 'current')
 
     def test_auto_update_failure_stops_rollout_and_switch_disables_it(self):
         import updater

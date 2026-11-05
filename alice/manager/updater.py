@@ -1,8 +1,9 @@
 """Staged automatic bridge updates: right after an app update, one speaker at a time, with rollback.
 
-Health cannot prove the microphone works, so a passed update still asks for a
-voice check. Any failure stops the rollout of that version on every speaker.
+Health cannot prove the microphone works, so an update counts as finished only
+after the next voice request reaches the bridge. Any failure stops the rollout of that version on every speaker.
 """
+from datetime import datetime
 import hashlib
 import json
 import os
@@ -77,6 +78,13 @@ def _job_status(manager, job_id):
         return (manager.jobs.get(job_id) or {}).get('status', 'lost')
 
 
+def _heard(manager, speaker, since):
+    for event in manager._hf_request('/events').get('events', []):
+        if event.get('speaker_id') == speaker['id'] and datetime.fromisoformat(event['at'].replace('Z', '+00:00')).timestamp() >= since:
+            return True
+    return False
+
+
 def _advance(manager, speaker, update, now):
     """Moves an update in flight. Returns True while it blocks the next speaker."""
     state, version = update.get('state'), update.get('target')
@@ -93,11 +101,17 @@ def _advance(manager, speaker, update, now):
     if state == 'verifying':
         if _verified(manager, speaker):
             _set(manager, speaker, version, 'awaiting_voice')
-            notify(speaker['name'] + ': мост обновлён. Скажите «Алиса, который час?» и подтвердите проверку в панели.')
         elif now - update.get('at', 0) >= VERIFY_SECONDS:
             job = manager.job(speaker['id'], 'rollback')
             _set(manager, speaker, version, 'rolling_back', job_id=job['job_id'])
         return True
+    if state == 'awaiting_voice':
+        try:
+            if _heard(manager, speaker, update.get('at', now)):
+                _set(manager, speaker, version, 'current')
+        except Exception:
+            pass
+        return False
     if state == 'rolling_back':
         if _job_status(manager, update.get('job_id')) == 'running':
             return True
@@ -161,13 +175,3 @@ def cycle(manager, now=None):
             continue
         _set(manager, speaker, version, 'updating', job_id=job['job_id'])
         return
-
-
-def confirm(manager, speaker_id):
-    speaker = manager.store.speaker(speaker_id)
-    update = speaker.get('bridge_update') or {}
-    if update.get('state') != 'awaiting_voice':
-        from service import Error
-        raise Error('Колонка не ожидает проверки голоса.', 409)
-    _set(manager, speaker, update.get('target'), 'current')
-    return {'state': 'current'}

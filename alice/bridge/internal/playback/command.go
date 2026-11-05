@@ -51,11 +51,18 @@ func PickPlaylist(text string, playlists []Playlist) string {
 		return ""
 	}
 	for _, playlist := range playlists {
-		if normalize(playlist.Name) == match[1] && playlistURI.MatchString(playlist.URI) {
+		if playlistName(playlist.Name) == playlistName(match[1]) && playlistURI.MatchString(playlist.URI) {
 			return playlist.URI
 		}
 	}
 	return ""
+}
+
+var spokenDigits = strings.NewReplacer("один", "1", "первый", "1", "два", "2", "второй", "2", "три", "3", "третий", "3", "четыре", "4", "пять", "5")
+
+// playlistName compares what was said with a panel name: "плейлист номер 1" equals "номер один".
+func playlistName(name string) string {
+	return spokenDigits.Replace(strings.TrimPrefix(normalize(name), "плейлист "))
 }
 
 func Command(text string) string {

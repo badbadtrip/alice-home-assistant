@@ -70,6 +70,15 @@ func useHomeEndpoint(cfg *config) {
 	}
 }
 
+// The key lives on the speaker, so only the bridge knows whether a refusal has
+// anywhere to go. The app publishes one table for speakers with and without a model.
+func withoutModelFallback(routing bridge.RoutingConfig, disabled bool) bridge.RoutingConfig {
+	if disabled {
+		routing.Refusal.Enabled = false
+	}
+	return routing
+}
+
 func readConfig(path string) (config, error) {
 	cfg := config{DialogueContext: dialogue.DefaultConfig(), Routing: bridge.DefaultRoutingConfig(), ConversationLog: journal.DefaultConfig(), AssistantTools: assistant.DefaultConfig(), LocalProgress: progressConfig{AfterMS: 2000, IntervalMS: 4000}, LLMAPI: "chat_completions", LLMMaxOutputTokens: 4096, ListenAfterReply: true}
 	raw, err := os.ReadFile(path)

@@ -101,7 +101,6 @@ def configure(data, root, raw, overrides=Path('/config/functions-overrides.json'
     config=json.loads((root/'bridge-config.json').read_text())
     if not value.get('llm_base_url'):
         config['routing']['default_route']='yandex'
-        config['routing']['refusal']={'enabled':False}
     else:
         config['llm_base_url']=value['llm_base_url']
         config['llm_model']=value['llm_model']

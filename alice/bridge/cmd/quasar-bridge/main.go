@@ -167,7 +167,7 @@ func main() {
 			if err := json.Unmarshal(raw, &next, json.RejectUnknownMembers(true)); err != nil {
 				return errors.New("invalid routing JSON")
 			}
-			return engine.SetRouting(next)
+			return engine.SetRouting(withoutModelFallback(next, llmDisabled))
 		}
 		engine.Home = hf
 	}
@@ -201,7 +201,7 @@ func main() {
 		engine.Music = tools
 		engine.Assistant = &assistant.Agent{Client: lc, Tools: tools, MaxRounds: cfg.AssistantTools.MaxRounds, MaxCalls: cfg.AssistantTools.MaxCalls}
 	}
-	if err := engine.SetRouting(cfg.Routing); err != nil {
+	if err := engine.SetRouting(withoutModelFallback(cfg.Routing, llmDisabled)); err != nil {
 		slog.Error("routing rejected", "error", err)
 		os.Exit(1)
 	}

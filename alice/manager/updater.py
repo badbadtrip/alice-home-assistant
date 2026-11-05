@@ -1,4 +1,4 @@
-"""Staged automatic bridge updates: one speaker at a time, at night, with rollback.
+"""Staged automatic bridge updates: right after an app update, one speaker at a time, with rollback.
 
 Health cannot prove the microphone works, so a passed update still asks for a
 voice check. Any failure stops the rollout of that version on every speaker.
@@ -10,13 +10,15 @@ from pathlib import Path
 import time
 from urllib.request import Request, urlopen
 
-INTERVAL = 300
-QUIET_HOURS = range(3, 6)
+INTERVAL = 60
 VERIFY_SECONDS = 300
 SETTINGS = 'auto-update.json'
 # Silence proves the mixer accepts audio: a stale dmix lock hangs every player.
 MIXER_CHECK = ('(head -c 44100 /dev/zero | aplay -q -D default -t raw -f S16_LE -c 2 -r 44100) & p=$!; i=0; '
-               'while [ $i -lt 6 ]; do sleep 1; i=$((i+1)); kill -0 $p 2>/dev/null || exit 0; done; killall aplay; exit 1')
+               'while [ $i -lt 6 ]; do sleep 1; i=$((i+1)); kill -0 $p 2>/dev/null || exit 0; done; killall aplay; sleep 1; '
+               # A restart during playback can leave dmix locked; with no clients left it is safe to clear.
+               'n=$(ipcs -m | awk \'$1=="0x00000400"||$1=="0x00000401"{s+=$6} END{print s+0}\'); '
+               '[ "$n" = 0 ] && ipcrm -M 0x400 -M 0x401 -S 0x400; exit 1')
 _next_run = {}
 
 
@@ -51,18 +53,6 @@ def notify(message):
         _ha('services/persistent_notification/create', {'title': 'Мост Алисы', 'message': message, 'notification_id': 'alice_bridge_update'})
     except Exception:
         pass
-
-
-def _playing(manager, speaker):
-    with manager.connection_lock:
-        airplay = (manager.connections.get(speaker['id']) or {}).get('airplay') or {}
-    if airplay.get('playing'):
-        return True
-    entity = speaker.get('media_entity')
-    if not entity:
-        return False
-    state = _ha('states/' + entity)
-    return bool(state) and state.get('state') == 'playing'
 
 
 def _verified(manager, speaker):
@@ -115,7 +105,7 @@ def _advance(manager, speaker, update, now):
     return False
 
 
-def cycle(manager, now=None, hour=None):
+def cycle(manager, now=None):
     now = time.time() if now is None else now
     if now < _next_run.get(id(manager), 0):
         return
@@ -130,7 +120,6 @@ def cycle(manager, now=None, hour=None):
         return
     if any((s.get('bridge_update') or {}).get('state') == 'failed' and s['bridge_update'].get('target') == version for s in speakers):
         return
-    hour = time.localtime(now).tm_hour if hour is None else hour
     for speaker in speakers:
         update = speaker.get('bridge_update') or {}
         if update.get('target') == version and update.get('state') in ('current', 'awaiting_voice'):
@@ -145,10 +134,6 @@ def cycle(manager, now=None, hour=None):
             actual = manager.ssh(speaker, 'sha256sum /data/opt/quasar-bridge/bin/quasar-bridge', timeout=12).decode().split()[0]
             if actual == version:
                 _set(manager, speaker, version, 'current')
-                continue
-            if hour not in QUIET_HOURS or _playing(manager, speaker):
-                if update.get('state') != 'pending' or update.get('target') != version:
-                    _set(manager, speaker, version, 'pending')
                 continue
             job = manager.job(speaker['id'], 'install')
         except Exception:

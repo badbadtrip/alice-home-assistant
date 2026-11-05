@@ -28,27 +28,26 @@ class ManagerTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def rollout(self, hour=4, actual='old', **kwargs):
+    def rollout(self, actual='old'):
         import updater
         updater._next_run.clear()
         ssh = lambda speaker, command, *a, **k: (actual + ' x').encode() if 'sha256sum' in command else b'{"status":"ok","speaker_id":"%s","client_frames":2}' % speaker['id'].encode()
-        with patch.object(updater, 'target', return_value='new'), patch.object(updater, '_playing', return_value=kwargs.get('playing', False)), \
+        with patch.object(updater, 'target', return_value='new'), \
              patch.object(updater, 'notify'), patch.object(self.manager, 'ssh', side_effect=ssh), \
              patch.object(self.manager, 'job', return_value={'job_id': 'j'}) as job:
-            updater.cycle(self.manager, hour=hour)
+            updater.cycle(self.manager)
         return job, self.manager.store.speaker(self.speaker['id']).get('bridge_update')
 
     def ready(self):
         self.manager.store.metadata(self.speaker['id'], trusted_fingerprint='SHA256:test', install={'state': 'ready'})
         self.manager.connections[self.speaker['id']] = {'status': 'online'}
 
-    def test_auto_update_waits_for_night_and_silence(self):
+    def test_auto_update_starts_at_once_and_skips_current_bridge(self):
         self.ready()
-        job, update = self.rollout(hour=14)
-        job.assert_not_called(); self.assertEqual(update['state'], 'pending')
-        job, update = self.rollout(hour=4, playing=True)
-        job.assert_not_called()
-        job, update = self.rollout(hour=4)
+        job, update = self.rollout(actual='new')
+        job.assert_not_called(); self.assertEqual(update['state'], 'current')
+        self.manager.store.metadata(self.speaker['id'], bridge_update=None)
+        job, update = self.rollout()
         job.assert_called_once_with(self.speaker['id'], 'install'); self.assertEqual(update['state'], 'updating')
 
     def test_auto_update_verifies_then_asks_for_voice(self):

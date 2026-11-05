@@ -78,6 +78,7 @@ details[open]>summary:before{transform:rotate(45deg)}
 .state>span{display:inline-flex;align-items:center;gap:6px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
 .is-ok .dot,.dot.ok{background:var(--ok)}.is-bad .dot,.dot.bad{background:var(--err)}.is-warn .dot,.dot.warn{background:var(--warn)}
+.air{display:inline-flex;--mdc-icon-size:16px;color:var(--muted)}.air.on{color:var(--spk,var(--primary-color))}
 .state button{min-height:28px;padding:0 8px;margin-left:-4px;font-size:13px}
 .now{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden}
 .now span{overflow:hidden;text-overflow:ellipsis}.now ha-icon{--mdc-icon-size:16px;color:var(--accent)}
@@ -859,8 +860,8 @@ button:active:not(:disabled){transform:scale(.97)}
     _speakerStatus(s){
       if(this._needsSetup(s))return `<span class="is-warn"><span class="dot"></span>${s.install?.state==='awaiting_acceptance'?'Проверьте голос':s.install?.state==='awaiting_reboot'?'Нужна перезагрузка':'Мост не настроен'}</span><button data-action="setup" data-id="${escape(s.id)}" ${this._speakersStale?'disabled':''}>Настроить</button>`;
       const c=s.connection??{},status=this._managerError?'unknown':c.status??'unknown',delivery=this._managerError?'unknown':c.delivery?.status??'unknown';
-      const line=status==='online'?'На связи':status==='offline'?'Нет связи':'Статус уточняется',extra={pending:'команды обновляются',error:'ошибка синхронизации'}[delivery],update={updating:'мост обновляется',verifying:'мост обновляется',rolling_back:'возврат версии моста',failed:'обновление моста не прошло'}[s.bridge_update?.state],airplay=c.airplay?.playing?'AirPlay играет':c.airplay?.connected?'AirPlay подключён':'';
-      return `<span class="${status==='online'?'is-ok':status==='offline'?'is-bad':''}" title="${escape(c.error??c.delivery?.message??'')}"><span class="dot"></span>${line}</span>${[extra,update,airplay].filter(Boolean).map(text=>`<span>${text}</span>`).join('')}`;
+      const line=status==='online'?'На связи':status==='offline'?'Нет связи':'Статус уточняется',extra={pending:'команды обновляются',error:'ошибка синхронизации'}[delivery],update={updating:'мост обновляется',verifying:'мост обновляется',rolling_back:'возврат версии моста',failed:'обновление моста не прошло'}[s.bridge_update?.state],airplayText=c.airplay?.enabled?(c.airplay.error?'AirPlay: ошибка приёмника':c.airplay.playing?'AirPlay играет':c.airplay.connected?'AirPlay подключён':'AirPlay готов'):'',airplay=airplayText?`<span class="air ${c.airplay.playing||c.airplay.connected?'on':''}" role="img" aria-label="${airplayText}" title="${airplayText}">${icon('cast-audio')}</span>`:'';
+      return `<span class="${status==='online'?'is-ok':status==='offline'?'is-bad':''}" title="${escape(c.error??c.delivery?.message??'')}"><span class="dot"></span>${line}</span>${airplay}${[extra,update].filter(Boolean).map(text=>`<span>${text}</span>`).join('')}`;
     }
     _speakerFacts(s){
       const c=s.connection??{},status=this._managerError?'unknown':c.status??'unknown',delivery=this._managerError?'unknown':c.delivery?.status??'unknown';

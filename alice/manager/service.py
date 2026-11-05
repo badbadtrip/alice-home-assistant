@@ -28,6 +28,12 @@ STARTUP_FILES = ('start.sh', 'supervise.sh', 'rollback-bind.sh', 'S98quasarbridg
 ENTITY = re.compile(r'^(automation|script)\.[a-z0-9_]+$')
 MEDIA_ENTITY = re.compile(r'^media_player\.[a-z0-9_]+$')
 ID = re.compile(r'^[a-z0-9][a-z0-9_-]{0,63}$')
+def airplay_state(value):
+    if not isinstance(value, dict):
+        return None
+    return {key: value.get(key) is True for key in ('enabled', 'connected', 'playing')} | {'error': bool(value.get('error'))}
+
+
 AIRPLAY_ENTITY = re.compile(r'^media_player\.[a-z0-9_]*_airplay$')
 # Exit 3: no receiver on this speaker. Exit 4: it is playing, never interrupt that.
 AIRPLAY_REANNOUNCE = ('[ -x /data/airplay/ctl.sh ] || exit 3; '
@@ -232,7 +238,7 @@ class Manager:
     @staticmethod
     def _connection_default():
         return {'status': 'unknown', 'last_seen': None, 'checked_at': None, 'error': None,
-                'speaker_id': None, 'voice_phrase_count': None, 'voice_phrase_revision': None, 'latency_ms': None, 'volume_push': False,
+                'speaker_id': None, 'voice_phrase_count': None, 'voice_phrase_revision': None, 'latency_ms': None, 'volume_push': False, 'airplay': None,
                 'delivery': {'status': 'unknown', 'expected_revision': None, 'actual_revision': None, 'message': 'Ожидается проверка колонки.'}}
 
     @staticmethod
@@ -330,7 +336,7 @@ class Manager:
             count = health.get('voice_phrase_count')
             revision = health.get('voice_phrase_revision')
             value.update(status='online', last_seen=int(time.time()), error=None,
-                         speaker_id=speaker['id'], volume_push=health.get('volume_push') is True,
+                         speaker_id=speaker['id'], volume_push=health.get('volume_push') is True, airplay=airplay_state(health.get('airplay')),
                          voice_phrase_count=count if type(count) is int and 0 <= count <= 100000 else None,
                          voice_phrase_revision=revision if isinstance(revision, str) and re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', revision) else None)
         except Error as error:
@@ -1102,7 +1108,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == ['api', 'access'] and method in ('GET', 'PUT'):
             from admin import access
             return 200, access(manager, payload if method == 'PUT' else None)
-        if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] in ('file-read', 'file-write', 'console', 'indicator', 'volume') and method == 'POST':
+        if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] in ('file-read', 'file-write', 'console', 'indicator', 'volume', 'airplay') and method == 'POST':
             from admin import station
             return 200, station(manager, path[2], path[3], payload)
         if path == ['api', 'setup'] and method == 'GET':

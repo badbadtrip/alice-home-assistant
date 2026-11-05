@@ -306,6 +306,7 @@ func main() {
 			return n
 		}
 	}
+	var airPlay *airPlayControl
 	mux := http.NewServeMux()
 	if musicQueue != nil {
 		mux.Handle("/music-stream/", musicQueue)
@@ -331,7 +332,12 @@ func main() {
 				return hf.VoicePhraseCount()
 			}
 			return 0
-		}(), "music_playback_enabled": musicQueue != nil, "volume_push": true})
+		}(), "music_playback_enabled": musicQueue != nil, "volume_push": true, "airplay": func() map[string]any {
+			if airPlay != nil {
+				return airPlay.health()
+			}
+			return nil
+		}()})
 		_, _ = w.Write(data)
 	})
 	mux.HandleFunc("GET /volume", proxy.VolumeHandler)
@@ -356,6 +362,14 @@ func main() {
 	server := &http.Server{Addr: cfg.Listen, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if control, err := newAirPlayControl(ctx, os.Getenv("QUASAR_DATA_DIR"), os.Getenv("QUASAR_HOME_AREA")); err != nil {
+		slog.Warn("airplay_unavailable", "error", err)
+	} else {
+		airPlay = control
+		mux.Handle("GET /airplay", control)
+		defer control.shutdown()
+		go control.resume()
+	}
 	if hf != nil {
 		hf.StartVoiceCache(ctx)
   hf.StartActivity(ctx)

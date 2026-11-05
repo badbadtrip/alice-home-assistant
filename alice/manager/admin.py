@@ -123,6 +123,22 @@ def station(manager, speaker_id, operation, payload):
             # GET: BusyBox wget on Lite 2 has no --post-data.
             manager.ssh(speaker, f'wget -T 3 -q -O - http://127.0.0.1:18861/volume?level={level}', timeout=8)
             return {'level': level}
+        if operation == 'airplay':
+            action = payload.get('action')
+            if action not in ('on', 'off'):
+                raise Error('Выберите: включить или выключить AirPlay.')
+            url = 'http://127.0.0.1:18861/airplay?action='
+            # Both receivers need UDP 319/320. The disabled file also stops the old
+            # service from returning at boot; ctl.sh is absent on a clean speaker.
+            if action == 'on':
+                script = ('if [ -x /data/airplay/ctl.sh ]; then touch /data/airplay/disabled; /data/airplay/ctl.sh stop; sleep 1; fi; '
+                          'wget -T 12 -q -O - "' + url + 'start"')
+            else:
+                script = ('wget -T 12 -q -O - "' + url + 'stop" && '
+                          'if [ -x /data/airplay/ctl.sh ]; then rm -f /data/airplay/disabled; /data/airplay/ctl.sh start; fi; true')
+            output = manager.ssh(speaker, script, timeout=25)
+            state = json.loads(output.decode().strip().splitlines()[0])
+            return {'enabled': state.get('enabled') is True, 'connected': state.get('connected') is True, 'playing': state.get('playing') is True, 'error': bool(state.get('error'))}
         if operation == 'console':
             command = payload.get('command')
             if not isinstance(command, str) or not command.strip() or len(command) > 8000 or '\x00' in command:

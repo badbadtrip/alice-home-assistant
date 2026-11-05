@@ -2,26 +2,18 @@
 package indicator
 
 import (
+	"bytes"
 	"context"
-	_ "embed"
 	"encoding/json/v2"
-	"fmt"
-	"io"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
-
-//go:embed ring.sh
-var script string
-
-//go:embed plum.sh
-var plumScript string
 
 type Config struct {
 	Enabled    bool   `json:"enabled"`
@@ -29,11 +21,30 @@ type Config struct {
 	Brightness *int   `json:"brightness,omitempty"`
 	Mode       string `json:"mode,omitempty"`
 	PeriodMS   int    `json:"period_ms,omitempty"`
+	Music      *Layer `json:"music,omitempty"`
+	Lamp       *Layer `json:"lamp,omitempty"`
+}
+
+// Layer is a look for the ring outside model calls.
+type Layer struct {
+	Enabled    bool   `json:"enabled"`
+	Color      string `json:"color"`
+	Brightness *int   `json:"brightness,omitempty"`
+	Mode       string `json:"mode,omitempty"`
+	PeriodMS   int    `json:"period_ms,omitempty"`
+}
+
+func (l *Layer) look() (Config, bool) {
+	if l == nil || !l.Enabled {
+		return Config{}, false
+	}
+	c := Config{Enabled: true, Color: l.Color, Brightness: l.Brightness, Mode: l.Mode, PeriodMS: l.PeriodMS}
+	return c, c.valid()
 }
 
 func (c Config) valid() bool {
 	return hex.MatchString(c.Color) && (c.Brightness == nil || (*c.Brightness >= 1 && *c.Brightness <= 100)) &&
-		(c.Mode == "" || c.Mode == "steady" || c.Mode == "breathe" || c.Mode == "double" || c.Mode == "rainbow") &&
+		modes[c.Mode] &&
 		(c.PeriodMS == 0 || (c.PeriodMS >= 800 && c.PeriodMS <= 8000))
 }
 
@@ -99,6 +110,7 @@ func (c Config) Frame(elapsed time.Duration) [9]int {
 }
 
 var hex = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+var modes = map[string]bool{"": true, "steady": true, "breathe": true, "double": true, "rainbow": true, "comet": true, "wave": true, "sparkle": true, "fire": true}
 
 type turnKey struct{}
 type turn struct {
@@ -144,94 +156,136 @@ type Controller struct {
 	Path   string
 	mu     sync.Mutex
 	active int
-	cancel context.CancelFunc
-	done   chan struct{}
 }
 
 func New(configPath string) *Controller {
 	_, midiErr := os.Stat("/sys/class/leds/cucumber:red:ring23")
 	_, plumErr := os.Stat("/sys/class/leds/plum:red:ring3")
 	if midiErr == nil || plumErr == nil {
-		_ = os.WriteFile(filepath.Join(filepath.Dir(configPath), "indicator-ready"), []byte("2\n"), 0600)
+		_ = os.WriteFile(filepath.Join(filepath.Dir(configPath), "indicator-ready"), []byte("3\n"), 0600)
 	}
 	return &Controller{Path: filepath.Join(filepath.Dir(configPath), "indicator.json")}
 }
 
 // Begin is shared by every model consumer (answers, classifier and planner).
-// A separate shell owns restoration, even if the bridge is killed abruptly.
 func (c *Controller) Begin() func() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.active++
-	if c.active == 1 {
-		var cfg Config
-		raw, err := os.ReadFile(c.Path)
-		if err == nil && json.Unmarshal(raw, &cfg) == nil && cfg.Enabled && cfg.valid() {
-			ctx, cancel := context.WithCancel(context.Background())
-			c.cancel, c.done = cancel, make(chan struct{})
-			go c.run(ctx, cfg, c.done)
-		}
-	}
 	var once sync.Once
 	return func() {
 		once.Do(func() {
 			c.mu.Lock()
 			defer c.mu.Unlock()
 			c.active--
-			if c.active == 0 && c.cancel != nil {
-				c.cancel()
-				<-c.done
-				c.cancel = nil
-			}
 		})
 	}
 }
 
-func (c *Controller) run(ctx context.Context, cfg Config, done chan struct{}) {
-	defer close(done)
-	// Do not use CommandContext: the helper must process EOF and restore triggers.
-	helper := script
-	_, plumErr := os.Stat("/sys/class/leds/plum:red:ring3")
-	plum := plumErr == nil
-	if cfg.Mode == "rainbow" && !plum {
-		return
+func (c *Controller) thinking() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.active > 0
+}
+
+func (c *Controller) load() Config {
+	var cfg Config
+	raw, err := os.ReadFile(c.Path)
+	if err != nil || json.Unmarshal(raw, &cfg) != nil {
+		return Config{}
 	}
-	if plum {
-		helper = plumScript
+	return cfg
+}
+
+// pick chooses the look: model call, then music, then lamp.
+func pick(cfg Config, thinking, playing bool) (Config, bool) {
+	if thinking && cfg.Enabled && cfg.valid() {
+		return cfg, true
 	}
-	cmd := exec.Command("/bin/sh", "-c", helper, "alice-ring", cfg.Color[1:])
-	input, err := cmd.StdinPipe()
+	if playing {
+		if look, ok := cfg.Music.look(); ok {
+			return look, true
+		}
+	}
+	return cfg.Lamp.look()
+}
+
+// audioPlaying is true for any source: every player ends in the same sound card.
+func audioPlaying() bool {
+	paths, _ := filepath.Glob("/proc/asound/card0/pcm*p/sub0/status")
+	for _, path := range paths {
+		if raw, err := os.ReadFile(path); err == nil && bytes.HasPrefix(raw, []byte("state: RUNNING")) {
+			return true
+		}
+	}
+	return false
+}
+
+func unmuted() bool {
+	raw, err := os.ReadFile("/sys/kernel/debug/gpio")
+	if err != nil {
+		return false
+	}
+	for line := range strings.Lines(string(raw)) {
+		if strings.Contains(line, "|mute-switch ") {
+			return strings.Contains(line, " in  hi")
+		}
+	}
+	return false
+}
+
+// musicGate ignores short sounds: spoken answers must not start the music look.
+type musicGate struct{ on, off int }
+
+func (g *musicGate) update(running bool) bool {
+	if running {
+		g.on, g.off = min(g.on+1, 6), 0
+	} else {
+		g.off++
+		if g.off >= 3 {
+			g.on = 0
+		}
+	}
+	return g.on >= 6
+}
+
+// Serve draws the ring until ctx ends and leaves it dark.
+func (c *Controller) Serve(ctx context.Context) {
+	led, err := openRing()
 	if err != nil {
 		return
 	}
-	if err = cmd.Start(); err != nil {
-		input.Close()
-		return
-	}
 	started := time.Now()
-	writeFrame := func(elapsed time.Duration) error {
-		if plum {
-			f := cfg.Frame(elapsed)
-			_, err := fmt.Fprintf(input, "F %d %d %d %d %d %d %d %d %d\n", f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8])
-			return err
-		}
-		_, err := io.WriteString(input, fmt.Sprintf("%d\n", cfg.Level(elapsed)))
-		return err
-	}
-	_ = writeFrame(0)
-	ticker := time.NewTicker(40 * time.Millisecond)
+	ticker := time.NewTicker(33 * time.Millisecond)
 	defer ticker.Stop()
-	running := true
-	for running {
+	var cfg Config
+	var gate musicGate
+	var nextCheck time.Time
+	playing, allowed, lit := false, false, false
+	dark := make([]Pixel, led.size)
+	defer func() {
+		if lit {
+			_ = led.show(dark)
+		}
+	}()
+	for {
 		select {
 		case <-ctx.Done():
-			running = false
-		case <-ticker.C:
-			if err := writeFrame(time.Since(started)); err != nil {
-				running = false
+			return
+		case now := <-ticker.C:
+			if now.After(nextCheck) {
+				nextCheck = now.Add(time.Second)
+				cfg, allowed = c.load(), unmuted()
+				playing = gate.update(audioPlaying())
+			}
+			look, ok := pick(cfg, c.thinking(), playing)
+			if ok && allowed {
+				_ = led.show(look.Render(now.Sub(started), led.size))
+				lit = true
+			} else if lit {
+				_ = led.show(dark)
+				lit = false
 			}
 		}
 	}
-	input.Close()
-	cmd.Wait()
 }

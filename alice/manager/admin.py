@@ -174,13 +174,22 @@ def station(manager, speaker_id, operation, payload):
             brightness=payload.get('brightness',100)
             mode=payload.get('mode','steady')
             period=payload.get('period_ms',2400)
-            if type(brightness) is not int or not 1<=brightness<=100 or mode not in ('steady','breathe','double','rainbow') or type(period) is not int or not 800<=period<=8000:
-                raise Error('Яркость: 1–100%, эффект: постоянный, дыхание, пульсация или радуга; период: 800–8000 мс.')
-            if mode == 'rainbow':
-                capable = manager.ssh(speaker, 'if test -d /sys/class/leds/plum:red:ring3 && test "$(cat /data/opt/quasar-bridge/indicator-ready)" = 2; then echo rainbow; fi', timeout=12).decode().strip()
+            modes=('steady','breathe','double','rainbow','comet','wave','sparkle','fire')
+            if type(brightness) is not int or not 1<=brightness<=100 or mode not in modes or type(period) is not int or not 800<=period<=8000:
+                raise Error('Яркость: 1–100%, эффект из списка; период: 800–8000 мс.')
+            layers={}
+            for key in ('music','lamp'):
+                layer=payload.get(key)
+                if layer is None:
+                    continue
+                if not isinstance(layer,dict) or not isinstance(layer.get('enabled'),bool) or not isinstance(layer.get('color'),str) or not re.fullmatch(r'#[0-9a-fA-F]{6}',layer['color']) or layer.get('mode') not in modes or type(layer.get('brightness',100)) is not int or not 1<=layer.get('brightness',100)<=100 or type(layer.get('period_ms',2400)) is not int or not 800<=layer.get('period_ms',2400)<=8000:
+                    raise Error('Проверьте настройки подсветки для музыки и лампы.')
+                layers[key]={'enabled':layer['enabled'],'color':layer['color'].lower(),'mode':layer['mode'],'brightness':layer.get('brightness',100),'period_ms':layer.get('period_ms',2400)}
+            if mode not in ('steady','breathe','double') or layers:
+                capable = manager.ssh(speaker, 'if test "$(cat /data/opt/quasar-bridge/indicator-ready)" = 3; then echo rainbow; fi', timeout=12).decode().strip()
                 if capable != 'rainbow':
-                    raise Error('Радуга доступна на Лайт 2 после обновления моста.', 409)
-            config = {'enabled': payload['enabled'], 'color': payload['color'].lower(),'brightness':brightness,'mode':mode,'period_ms':period}
+                    raise Error('Эти эффекты доступны после обновления моста.', 409)
+            config = {'enabled': payload['enabled'], 'color': payload['color'].lower(),'brightness':brightness,'mode':mode,'period_ms':period,**layers}
             raw = (json.dumps(config) + '\n').encode()
             suffix = '.alice-backup-' + secrets.token_hex(8)
             # Color is read on the next model request; no service restart needed.

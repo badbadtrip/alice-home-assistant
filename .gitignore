@@ -10,3 +10,4 @@ node_modules/
 runtime.env
 id_ed25519*
 state/
+.impeccable/

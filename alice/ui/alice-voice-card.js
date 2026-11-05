@@ -260,6 +260,53 @@ details[open]>summary:before{transform:rotate(45deg)}
   .indicator-top{flex-wrap:wrap}.indicator-top>label:first-child{flex-basis:100%}.switch{justify-content:space-between;width:100%}
   .bar-label{display:none}}
 @media(max-width:360px){.controls{gap:3px}.controls button.icon{width:38px;min-height:38px}.seg button{padding:0 6px}}
+
+/* App frame */
+main{max-width:1360px;padding:0 24px 48px}
+.appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:24px;height:64px;margin:0 -24px 20px;padding:0 24px;background:var(--primary-background-color,var(--surface));box-shadow:0 1px 0 var(--line)}
+.brand{display:flex;align-items:center;gap:8px;color:var(--accent)}.brand svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}.brand h1{font-size:20px;color:var(--text)}
+.tabs{display:flex;align-items:stretch;gap:4px;align-self:stretch}
+.tabs button{position:relative;height:100%;min-height:0;padding:0 14px;border-radius:0;color:var(--muted);font-weight:500}.tabs button:hover:not(:disabled){background:none;color:var(--text)}
+.tabs button ha-icon{display:none}.tabs button[aria-current]{color:var(--text)}.tabs button[aria-current]:after{content:'';position:absolute;right:14px;bottom:0;left:14px;height:3px;border-radius:3px 3px 0 0;background:var(--accent)}
+.appbar-actions{display:flex;align-items:center;gap:4px;margin-left:auto}
+/* Speaker deck */
+.stage{display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
+@media(min-width:1100px){.stage{grid-template-columns:minmax(0,1fr) 380px;gap:32px;align-items:start}}
+.page-narrow{max-width:820px;margin:0 auto}
+.more{width:100%;margin-top:8px}
+.speakers{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.spk{--spk:var(--accent);display:flex;flex-direction:column;gap:8px;padding:20px;border-radius:28px}
+.spk-name h3{font-size:24px;font-weight:500;line-height:1.2}.spk-name .help{margin-top:2px}.spk-name .state{margin-top:2px}
+.art{width:100%;display:grid;place-items:center;padding:8px 0}
+.art:before{content:'';position:absolute;inset:0;background:radial-gradient(closest-side,color-mix(in srgb,var(--led-color) 30%,transparent),transparent);opacity:var(--led-brightness)}
+.art[data-enabled=false]:before{display:none}
+.art .indicator-photo{position:relative;width:min(72%,260px);margin:0;border-radius:0;background:none}.spk:has(.now) .art .indicator-photo{background:none}
+.art .indicator-product-image,.art .indicator-photo-light{inset:0;width:100%;height:100%}
+.art small{position:absolute;right:0;bottom:0;padding:2px 8px;border-radius:8px;background:var(--tint);font-size:11px}
+.deck-volume{display:flex;align-items:center;gap:8px}.deck-volume .range{flex:1;min-width:0;height:56px;border-radius:18px;--fill-color:var(--spk)}.deck-volume .range-fill{border-radius:18px}.deck-volume .range-fill:after{top:18px;bottom:18px}
+.deck-volume button.icon{width:56px;height:56px;flex-shrink:0;background:color-mix(in srgb,var(--spk) 22%,transparent);color:var(--text)}.deck-volume button.icon:hover:not(:disabled){background:color-mix(in srgb,var(--spk) 34%,transparent);color:var(--text)}
+.deck-volume output{min-width:52px;text-align:right;font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
+.art .device-lite2{width:min(60%,216px)}
+.tools{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:8px}
+.tool{flex-direction:column;gap:2px;min-height:56px;padding:6px 2px;color:var(--muted);font-size:12px;font-weight:400}.tool:hover:not(:disabled){background:var(--tint);color:var(--text)}.tool span{overflow:hidden;max-width:100%;text-overflow:ellipsis;white-space:nowrap}
+button:active:not(:disabled){transform:scale(.97)}
+/* Sections that used to live in a dialog */
+.admin-page{width:100%;height:auto;max-height:none;overflow:visible;border-radius:0;background:none;box-shadow:none}
+.admin-title{margin-bottom:12px;font-size:18px}
+.admin-page .admin-shell{grid-template-columns:200px minmax(0,1fr);gap:24px;border:0}.admin-page .admin-shell.solo{grid-template-columns:minmax(0,820px);justify-content:center}
+.admin-page .rail{position:sticky;top:80px;align-self:start;padding:0;border:0}
+.admin-page .admin-scroll{overflow:visible;padding:0 0 16px}
+.admin-page .admin-footer{position:sticky;bottom:0;z-index:5;margin:0 -8px;padding:10px 8px;background:var(--primary-background-color,var(--surface))}
+@media(max-width:760px){.admin-page .admin-shell{grid-template-columns:minmax(0,1fr);grid-template-rows:none;gap:8px}.admin-page .rail{position:static;flex-direction:row;overflow-x:auto;padding-bottom:6px}}
+@media(max-width:700px){main{padding:0 16px calc(88px + env(safe-area-inset-bottom))}
+  .appbar{height:56px;margin:0 -16px 12px;padding:0 16px}
+  .tabs{position:fixed;right:0;bottom:0;left:0;z-index:30;gap:0;height:calc(64px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--surface);box-shadow:0 -1px 0 var(--line)}
+  .tabs button{flex:1;flex-direction:column;gap:2px;padding:0 2px;font-size:11px;font-weight:400}.tabs button ha-icon{display:block}.tabs button[aria-current]{color:var(--accent)}.tabs button[aria-current]:after{display:none}
+  .speakers{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:min(86%,360px);gap:12px;margin:0 -16px;padding:0 16px 4px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding:0 16px;scrollbar-width:none}.speakers:has(>:only-child){grid-auto-columns:100%}.spk{scroll-snap-align:start}
+  .tools{gap:0}.tool{padding:6px 0;font-size:11px}
+  .admin-page .admin-footer{bottom:calc(64px + env(safe-area-inset-bottom))}}
+@media(prefers-reduced-motion:no-preference){.art[data-mode=breathe]:before{animation:spk-breathe var(--led-period) ease-in-out infinite}}
+@keyframes spk-breathe{50%{opacity:calc(var(--led-brightness)*.45)}}
 `;
   const sheet=new CSSStyleSheet();sheet.replaceSync(STYLES);
   class AliceVoiceCard extends HTMLElement {
@@ -271,13 +318,13 @@ details[open]>summary:before{transform:rotate(45deg)}
       this._resumeHandler=()=>{if(this.ownerDocument.visibilityState!=='hidden')this._recoverManager();};
       this._stationBusy=new Set();this._stationMessages={};this._mediaPlatforms={};this._utility=null;this._events=[];this._activityPage=0;
       this.shadowRoot.addEventListener('toggle',e=>{if(e.target.matches('details.admin-entity-details')&&this._admin){if(e.target.open)this._admin.expanded.add(e.target.dataset.entity);else this._admin.expanded.delete(e.target.dataset.entity);}if(e.target.id==='home-journal'&&e.target.isConnected){this._journalOpen=e.target.open;if(e.target.open)this._loadActivity();}if(e.target.matches('details[data-speaker]')){const id=e.target.dataset.speaker;if(e.target.open)this._expandedSpeakers.add(id);else this._expandedSpeakers.delete(id);}},true);
-      this._tab='commands'; this._speakers=[]; this._assignments={}; this._chosen=[]; this._all=true;
+      this._tab='commands'; this._section='speakers'; this._speakers=[]; this._assignments={}; this._chosen=[]; this._all=true;
       this.shadowRoot.addEventListener('click', e => this._click(e));
       this.shadowRoot.addEventListener('pointerdown',e=>{if(e.target.dataset.volume)this._volumeDragging=e.target.dataset.volume;});
       for(const event of ['pointerup','pointercancel'])this.shadowRoot.addEventListener(event,e=>{if(e.target.dataset.volume&&this._volumeDragging===e.target.dataset.volume)this._volumeDragging=undefined;});
       this.shadowRoot.addEventListener('submit', e => { e.preventDefault(); if(e.target.id==='admin-form')return; if(e.target.id==='utility-form')return this._submitUtility();e.target.id==='speaker-form' ? this._register(e.target) : this._save(); });
       this.shadowRoot.addEventListener('keydown',e=>{
-        const openDialog=this.shadowRoot.querySelector('.dialog');if(e.key==='Tab'&&openDialog){const fields=[...openDialog.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,ha-entity-picker,ha-form,[tabindex="0"]')].filter(el=>el.getClientRects().length),first=fields[0],last=fields[fields.length-1];if(fields.length&&e.shiftKey&&this.shadowRoot.activeElement===first){e.preventDefault();last.focus();}else if(fields.length&&!e.shiftKey&&this.shadowRoot.activeElement===last){e.preventDefault();first.focus();}}
+        const openDialog=this.shadowRoot.querySelector('.overlay .dialog');if(e.key==='Tab'&&openDialog){const fields=[...openDialog.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,ha-entity-picker,ha-form,[tabindex="0"]')].filter(el=>el.getClientRects().length),first=fields[0],last=fields[fields.length-1];if(fields.length&&e.shiftKey&&this.shadowRoot.activeElement===first){e.preventDefault();last.focus();}else if(fields.length&&!e.shiftKey&&this.shadowRoot.activeElement===last){e.preventDefault();first.focus();}}
         if(e.composedPath().some(el=>el?.localName==='ha-entity-picker'))return;
         if(e.key==='Escape'&&this._admin&&!this._admin.busy){this._adminAction('admin-close');return;}
         if(e.key==='Escape' && this._dialog && !this._busy){this._dialog=false;this._render();}
@@ -365,7 +412,7 @@ details[open]>summary:before{transform:rotate(45deg)}
         if(this._busy||!this._hass)return;
         await this._loadManager();this._renderEditorStatus();
         this._repairSpeakerView();
-        if(['home','speakers'].includes(this._tab)&&!this._speakerDialog){
+        if(this._onSpeakers()&&!this._speakerDialog){
           for(const speaker of this._speakers){const region=this.shadowRoot.querySelector('[data-connection="'+speaker.id+'"]');if(region)region.innerHTML=this._speakerStatus(speaker);}
           const summary=this.shadowRoot.getElementById('speaker-summary');if(summary)summary.textContent=this._speakerSummary();const setup=this.shadowRoot.getElementById('setup-notice-region');if(setup){const markup=this._setupNotice();if(setup.innerHTML!==markup)setup.innerHTML=markup;}
         }
@@ -382,6 +429,7 @@ details[open]>summary:before{transform:rotate(45deg)}
       this._unsubscribe?.(); this._unsubscribe = undefined;
       clearTimeout(this._refreshTimer);clearInterval(this._connectionTimer);
     }
+    _onSpeakers(){return this._tab==='speakers'||this._tab==='home'&&this._section==='speakers';}
     async _recoverManager(){
       if(!this.isConnected||!this._hass||this._recoveringManager)return;
       this._recoveringManager=true;this._ingress=undefined;
@@ -389,7 +437,7 @@ details[open]>summary:before{transform:rotate(45deg)}
       finally{this._recoveringManager=false;}
     }
     _repairSpeakerView(){
-      if(!['home','speakers'].includes(this._tab)||this._dialog||this._speakerDialog||this._utility||this._admin||this._volumeDragging)return;
+      if(!this._onSpeakers()||this._dialog||this._speakerDialog||this._utility||this._admin||this._volumeDragging)return;
       const rendered=[...this.shadowRoot.querySelectorAll('[data-connection]')].map(el=>el.dataset.connection);
       if(rendered.length!==this._speakers.length||this._speakers.some(s=>!rendered.includes(s.id))||!!this._managerError!==!!this.shadowRoot.querySelector('[data-manager-error]'))this._render();
     }
@@ -511,7 +559,7 @@ details[open]>summary:before{transform:rotate(45deg)}
       if(!this._config)return;
       const disabled=this._busy?'disabled':'';
       const rows=this._registry.filter(item=>this._selected(item));
-      this.shadowRoot.innerHTML=`<main>${this._tab==='home'?this._home(rows,disabled):this._standalone(rows,disabled)}${this._dialog?this._editor(disabled):''}${this._speakerDialog?this._speakerEditor(disabled):''}${this._utility?this._utilityDialog():''}${this._admin?this._adminDialog():''}</main>`;
+      this.shadowRoot.innerHTML=`<main>${this._tab==='home'?this._home(rows,disabled):this._standalone(rows,disabled)}${this._dialog?this._editor(disabled):''}${this._speakerDialog?this._speakerEditor(disabled):''}${this._utility?this._utilityDialog():''}</main>`;
       this._bindNativePicker();this._bindUtilityPickers();this._syncIndicatorAnimations();
       if(this._dialog)queueMicrotask(()=>this.shadowRoot.querySelector('#phrases')?.focus());
     }
@@ -670,7 +718,7 @@ details[open]>summary:before{transform:rotate(45deg)}
 
 
     _adminDialog(){
-      const a=this._admin,blocked=a.busy?'disabled':'',groups=[['Дом',[['devices','Устройства','home-lightbulb-outline'],['dictionary','Словарь','text-search']]],['Колонка',[['indicator','Подсветка','palette-outline'],['files','Файлы','file-document-outline'],['console','SSH-консоль','console']]],['Приложение',[['app','Подключение','connection'],['advanced','Конфигурация','code-json']]]];let body='';
+      const a=this._admin,blocked=a.busy?'disabled':'',groups=[['Дом',[['devices','Устройства','home-lightbulb-outline']]],['Колонка',[['indicator','Подсветка','palette-outline'],['files','Файлы','file-document-outline'],['console','SSH-консоль','console']]],['Приложение',[['app','Подключение','connection'],['advanced','Конфигурация','code-json']]]];let body='';
       const station=`<label>Колонка<select data-admin-field="speakerId" ${blocked}>${this._speakers.map(s=>`<option value="${escape(s.id)}" ${s.id===a.speakerId?'selected':''}>${escape(s.name)} · ${escape(s.host)}</option>`).join('')}</select></label>`;
       if(a.tab==='devices')body=`<div id="admin-access-body" class="fields">${this._adminAccessBody()}</div>`;
       if(a.tab==='indicator')body=this._indicatorBody(station,blocked);
@@ -682,14 +730,16 @@ details[open]>summary:before{transform:rotate(45deg)}
         const values={...a.options,...a.appDraft},field=(key,label,placeholder='')=>`<label>${label}<input data-app-field="${key}" type="${key==='llm_api_key'?'password':'text'}" value="${escape(key==='llm_api_key'?a.appDraft?.llm_api_key??'':values[key]??'')}" placeholder="${escape(placeholder)}" autocomplete="off" ${blocked}></label>`;
         body=a.options?`<section class="group"><h3>Нейросеть</h3>${field('llm_base_url','Адрес API','https://…/v1')}${field('llm_model','Модель')}${field('llm_api_key','Ключ',a.options.llm_api_key?'Сохранён. Оставьте пустым, чтобы не менять':'Ключ сервиса')}<p class="help">Заполняются вместе, применяются при подготовке моста.</p></section><section class="group"><h3>Колонки</h3>${field('advertised_url','Локальный адрес приложения','http://192.168.…:18081')}<details><summary>Дополнительно</summary><div class="fields">${field('speaker_network','Сеть колонок (CIDR)')}${field('voice_command_label','Метка голосовых команд')}</div></details></section><div class="actions"><button type="button" class="primary" data-action="admin-save-app" ${blocked}>Сохранить</button><button type="button" class="secondary" data-action="admin-restart-app" ${blocked}>Перезапустить приложение</button></div><p class="help">Новые значения начинают работать после перезапуска. Подключённые колонки обновляются через настройки моста.</p>`:'<p>Загрузка…</p>';
       }
-      return `<div class="overlay" data-admin-backdrop><section class="dialog admin-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-title"><header class="dialog-head"><h2 id="admin-title">Настройки</h2>${iconButton('admin-close','close','Закрыть',blocked)}</header><div class="admin-shell"><nav class="rail" role="tablist" aria-orientation="vertical" aria-label="Разделы настроек">${groups.map(([title,tabs])=>`<h3>${title}</h3>${tabs.map(([id,label,name])=>`<button type="button" role="tab" aria-selected="${a.tab===id}" data-action="admin-tab" data-tab="${id}" ${blocked}>${icon(name)}${label}</button>`).join('')}`).join('')}</nav><div class="admin-main"><div class="admin-scroll">${a.message?`<div class="notice" role="status">${escape(a.message)}</div>`:''}<form id="admin-form">${body}</form></div><footer id="admin-footer" class="admin-footer" aria-live="polite">${this._adminFooter()}</footer></div></div></section></div>`;
+      const solo=this._section==='dictionary',title=solo?'Словарь':'Настройки';
+      return `<section class="dialog admin-dialog admin-page" aria-labelledby="admin-title"><h2 id="admin-title" class="admin-title">${title}</h2><div class="admin-shell ${solo?'solo':''}">${solo?'':`<nav class="rail" role="tablist" aria-orientation="vertical" aria-label="Разделы настроек">${groups.map(([name,tabs])=>`<h3>${name}</h3>${tabs.map(([id,label,glyph])=>`<button type="button" role="tab" aria-selected="${a.tab===id}" data-action="admin-tab" data-tab="${id}" ${blocked}>${icon(glyph)}${label}</button>`).join('')}`).join('')}</nav>`}<div class="admin-main"><div class="admin-scroll">${a.message?`<div class="notice" role="status">${escape(a.message)}</div>`:''}<form id="admin-form">${body}</form></div><footer id="admin-footer" class="admin-footer" aria-live="polite">${this._adminFooter()}</footer></div></div></section>`;
     }
+    _leaveAdmin(section='speakers'){this._stopAdminHA();this._admin=null;this._section=section;this._journalOpen=section==='journal';this._render();if(section==='journal')this._loadActivity();this.shadowRoot.querySelector('[data-section="'+section+'"]')?.focus();}
     async _adminAction(action,button){
       if(action==='admin-open')return this._openAdmin();
       const a=this._admin;if(!a||a.busy)return;
-      if(action==='admin-close'){if(this._adminDirty()){a.closeConfirm=true;this._renderAdminFooter();return;}this._stopAdminHA();this._admin=null;this._render();this.shadowRoot.querySelector('[data-action=admin-open]')?.focus();return;}
+      if(action==='admin-close'){a.pendingSection=undefined;if(this._adminDirty()){a.closeConfirm=true;this._renderAdminFooter();return;}this._leaveAdmin();return;}
       if(action==='admin-keep-editing'){a.closeConfirm=false;this._renderAdminFooter();return;}
-      if(action==='admin-discard-close'){this._stopAdminHA();this._admin=null;this._render();this.shadowRoot.querySelector('[data-action=admin-open]')?.focus();return;}
+      if(action==='admin-discard-close'){this._leaveAdmin(a.pendingSection);return;}
       if(action==='admin-undo-access'){a.config=JSON.parse(a.saved);a.closeConfirm=false;this._render();return;}
       if(action==='admin-toggle-labels'){a.labelsOpen=!(a.labelsOpen??a.config.labels.length===0);this._render();return;}
       if(action==='admin-scope'){a.scope=button.dataset.scope;a.page=0;this._render();return;}
@@ -726,7 +776,27 @@ details[open]>summary:before{transform:rotate(45deg)}
       finally{a.busy=false;this._render();}
     }
 
-    _home(rows,disabled){const framed=this._config.app_embedded&&window!==window.top;return `<header class="bar ${framed?'framed':''}"><h1 ${framed?'class="sr-only"':''}>Алиса</h1><div class="actions"><button class="secondary" data-action="tts">${icon('bullhorn-outline')}<span class="bar-label">Объявление</span></button><button class="secondary" data-action="admin-open" aria-label="Настройки">${icon('cog-outline')}<span class="bar-label">Настройки</span></button></div></header>${this._notice()}<div id="setup-notice-region">${this._setupNotice()}</div><div class="cols"><section aria-labelledby="speakers-title"><div class="sec"><div><h2 id="speakers-title">Колонки</h2><p id="speaker-summary">${this._speakerSummary()}</p></div><div class="sec-actions">${iconButton('refresh','refresh','Обновить',disabled)}<button data-action="add-speaker" ${this._managerError?'disabled':''}>${icon('plus')}Колонка</button></div></div>${this._speakerPanel(disabled)}</section><section aria-labelledby="commands-title"><div class="sec"><div><h2 id="commands-title">Команды</h2><p>${this._commandSummary(rows)}</p></div><div class="sec-actions">${iconButton('preview','text-search','Проверить фразу без выполнения')}<button data-action="new">${icon('plus')}Команда</button></div></div>${this._commandList(rows,disabled)}<p class="foot">Скажите «Алиса» и любую из фраз.</p></section></div><details id="home-journal" class="journal" ${this._journalOpen?'open':''}><summary>Журнал</summary>${this._diagnostics()}</details>`;}
+    _appbar(){const tabs=[['speakers','Колонки','speaker'],['commands','Команды','microphone-outline'],['dictionary','Словарь','text-search'],['journal','Журнал','history'],['settings','Настройки','cog-outline']];return `<header class="appbar"><div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/></svg><h1>Алиса</h1></div><nav class="tabs" aria-label="Разделы">${tabs.map(([id,label,name])=>`<button type="button" data-action="section" data-section="${id}" ${this._section===id?'aria-current="page"':''}>${icon(name)}<span>${label}</span></button>`).join('')}</nav><div class="appbar-actions"><button type="button" class="secondary" data-action="tts">${icon('bullhorn-outline')}<span class="bar-label">Объявление</span></button><button type="button" class="icon" data-action="guide" aria-label="Руководство" title="Руководство">${icon('help-circle-outline')}</button></div></header>`;}
+    _commandsHead(rows,title,tag='h2'){return `<div class="sec"><div><${tag} id="commands-title">${title}</${tag}><p>${this._commandSummary(rows)}</p></div><div class="sec-actions">${iconButton('preview','text-search','Проверить фразу без выполнения')}<button data-action="new">${icon('plus')}Команда</button></div></div>`;}
+    _home(rows,disabled){
+      const section=this._section,shown=rows.slice(0,6);let body;
+      if(section==='commands')body=`<section class="page-narrow" aria-labelledby="commands-title">${this._commandsHead(rows,'Команды')}${this._commandList(rows,disabled)}<p class="foot">Скажите «Алиса» и любую из фраз.</p></section>`;
+      else if(section==='journal')body=`<section class="page-narrow" aria-labelledby="journal-title"><div class="sec"><h2 id="journal-title">Журнал</h2></div>${this._diagnostics()}</section>`;
+      else if(section==='dictionary'||section==='settings')body=this._admin?this._adminDialog():'<p class="help">Загрузка…</p>';
+      else body=`<div id="setup-notice-region">${this._setupNotice()}</div><div class="stage"><section aria-labelledby="speakers-title"><div class="sec"><div><h2 id="speakers-title">Колонки</h2><p id="speaker-summary">${this._speakerSummary()}</p></div><div class="sec-actions">${iconButton('refresh','refresh','Обновить',disabled)}<button data-action="add-speaker" ${this._managerError?'disabled':''}>${icon('plus')}Колонка</button></div></div>${this._speakerPanel(disabled)}</section><section aria-labelledby="commands-title">${this._commandsHead(rows,'Команды')}${this._commandList(shown,disabled)}${rows.length>shown.length?`<button class="more" data-action="section" data-section="commands">Все команды: ${rows.length}</button>`:''}<p class="foot">Скажите «Алиса» и любую из фраз.</p></section></div>`;
+      return `${this._appbar()}${this._notice()}${body}`;
+    }
+    async _go(section){
+      const adminSection=s=>s==='dictionary'||s==='settings',a=this._admin;
+      if(a?.busy||section===this._section)return;
+      if(a&&!adminSection(section)&&this._adminDirty()){a.closeConfirm=true;a.pendingSection=section;this._renderAdminFooter();return;}
+      if(a&&!adminSection(section)){this._stopAdminHA();this._admin=null;}
+      const previous=this._section;this._section=section;this._journalOpen=section==='journal';
+      if(!adminSection(section)){this._render();if(section==='journal')this._loadActivity();return;}
+      if(!this._admin){await this._openAdmin();if(!this._admin){this._section=previous;this._render();return;}}
+      await this._adminAction('admin-tab',{dataset:{tab:section==='dictionary'?'dictionary':'devices'}});
+    }
+    async _openGuide(){try{const base=await this._managerBase(),target=(base??'')+'/wiki/Home';if(window!==window.top&&this._config.app_embedded)window.parent.location.href=target;else window.location.href=target;}catch(error){this._message=error.message;this._render();}}
     _command(item,disabled){
       const phrases=[...new Map(aliases(item).map(p=>[normalize(p),p])).values()],state=this._hass?.states[item.entity_id]?.state;
       const ready=!!state&&state!=='unavailable'&&state!=='unknown'&&(!item.entity_id.startsWith('automation.')||state==='on');
@@ -753,8 +823,8 @@ details[open]>summary:before{transform:rotate(45deg)}
     _media(s){const state=this._hass?.states[s.media_entity];const available=!!state&&!['unavailable','unknown','off'].includes(state.state);const features=Number(state?.attributes.supported_features??0);return {state,available,features,can:bit=>available&&(features&bit)===bit,yandex:this._mediaPlatforms[s.media_entity]==='yandex_station'};}
     _mediaControls(s){const media=this._media(s),busy=this._stationBusy.has(s.id),id=escape(s.id);const volume=media.state?.attributes.volume_level;const known=typeof volume==='number'&&Number.isFinite(volume);const pending=this._pendingVolumes?.get(s.id);if(pending&&Date.now()>=pending.until)this._pendingVolumes.delete(s.id);const value=this._pendingVolumes?.get(s.id)?.value??(known?Math.round(volume*100):0);const action=media.state?.state==='playing'&&media.can(1)?'media_pause':media.state?.state==='paused'&&media.can(16384)?'media_play':media.can(4096)?'media_stop':media.can(1)?'media_pause':media.can(16384)?'media_play':null;const labels={media_stop:'Стоп',media_pause:'Пауза',media_play:'Воспроизвести'},glyphs={media_stop:'stop',media_pause:'pause',media_play:'play'};
       const attrs=media.state?.attributes??{},title=['playing','paused'].includes(media.state?.state)?[attrs.media_title,attrs.media_artist].filter(Boolean).join(' · '):'',speak=media.can(512)&&media.yandex?'':'disabled',manager=this._managerError?'disabled':'';
-      const transport=(service,disabled)=>`<button type="button" class="icon" data-action="media" data-service="${service??''}" data-id="${id}" aria-label="${labels[service]??'Медиа недоступно'}" title="${labels[service]??'Медиа недоступно'}" ${disabled?'disabled':''}>${icon(glyphs[service]??'play')}</button>`;
-      return `${title?`<div class="now">${icon('music-note')}<span>${escape(title)}</span></div>`:''}<div class="range ${known?'':'unknown'}" style="--fill:${value}%"><span class="range-fill"></span>${icon(value===0&&known?'volume-off':'volume-medium')}<output data-volume-output="${id}">${known?value+' %':'—'}</output><input type="range" aria-label="Громкость ${escape(s.name)}" min="0" max="100" step="5" value="${value}" data-volume="${id}" ${!media.can(4)||busy||!known?'disabled':''}></div><div class="controls">${transport(action,!action||busy)}${action!=='media_stop'&&media.can(4096)?transport('media_stop',busy):''}<span class="gap"></span>${iconButton('tts','message-text-outline','Сказать','data-id="'+id+'" '+speak)}${iconButton('test-sound','volume-high','Проверить звук','data-id="'+id+'" '+speak)}${iconButton('activity','history','Последние команды','data-id="'+id+'" '+manager)}${iconButton('settings','cog-outline','Настройки колонки','data-id="'+id+'" '+(this._managerError||busy?'disabled':''))}</div><p class="media-note" role="status" data-media-message="${id}">${escape(this._stationMessages[s.id]??(!s.media_entity?'Выберите медиаплеер в настройках.':!media.available?'Медиаплеер недоступен.':''))}</p>`;
+      const tool=(action,name,label,attrs)=>`<button type="button" class="tool" data-action="${action}" data-id="${id}" title="${escape(label)}" ${attrs}>${icon(name)}<span>${label}</span></button>`,transport=(service,disabled)=>`<button type="button" class="icon" data-action="media" data-service="${service??''}" data-id="${id}" aria-label="${labels[service]??'Медиа недоступно'}" title="${labels[service]??'Медиа недоступно'}" ${disabled?'disabled':''}>${icon(glyphs[service]??'play')}</button>`;
+      return `${title?`<div class="now">${icon('music-note')}<span>${escape(title)}</span></div>`:''}<div class="deck-volume">${transport(action,!action||busy)}${action!=='media_stop'&&media.can(4096)?transport('media_stop',busy):''}<div class="range ${known?'':'unknown'}" style="--fill:${value}%"><span class="range-fill"></span><input type="range" aria-label="Громкость ${escape(s.name)}" min="0" max="100" step="5" value="${value}" data-volume="${id}" ${!media.can(4)||busy||!known?'disabled':''}></div><output data-volume-output="${id}">${known?value+' %':'—'}</output></div><div class="tools">${tool('tts','message-text-outline','Сказать',speak)}${tool('test-sound','volume-high','Проверить',speak)}${tool('activity','history','История',manager)}${tool('settings','cog-outline','Настройки',this._managerError||busy?'disabled':'')}</div><p class="media-note\" role="status" data-media-message="${id}">${escape(this._stationMessages[s.id]??(!s.media_entity?'Выберите медиаплеер в настройках.':!media.available?'Медиаплеер недоступен.':''))}</p>`;
     }
     async _setVolume(id,value){
       value=Math.max(0,Math.min(100,Math.round(value/5)*5));
@@ -768,7 +838,8 @@ details[open]>summary:before{transform:rotate(45deg)}
     _refreshMedia(){if(!this.shadowRoot)return;for(const speaker of this._speakers??[]){const region=this.shadowRoot.querySelector('[data-media="'+speaker.id+'"]');if(region&&this._volumeDragging!==speaker.id&&!this._stationBusy.has(speaker.id)){const pending=this._pendingVolumes?.get(speaker.id),actual=this._media(speaker).state?.attributes.volume_level;if(pending&&typeof actual==='number'&&Math.abs(actual*100-pending.value)<.51)this._pendingVolumes.delete(speaker.id);region.innerHTML=this._mediaControls(speaker);}}}
     async _mediaAction(id,service,data={}){const speaker=this._speakers.find(s=>s.id===id);if(!speaker||this._stationBusy.has(id))return;const media=this._media(speaker);const bits={volume_set:4,media_stop:4096,media_pause:1,media_play:16384,play_media:512};if(!bits[service]||!media.can(bits[service])||(service==='play_media'&&!media.yandex)){this._stationMessages[id]='Это действие недоступно для выбранного медиаплеера.';this._refreshMedia();return false;}
       this._stationBusy.add(id);const utility=this._utility;const relatedButtons=[...this.shadowRoot.querySelectorAll('.utility-dialog button[data-id="'+id+'"]')].filter(el=>['tts','test-sound','media'].includes(el.dataset.action)).map(el=>({el,disabled:el.disabled}));for(const item of relatedButtons)item.el.disabled=true;if(utility?.type==='control'&&utility.speakerId===id){utility.message='Отправка запроса…';this._utilityMessage();}for(const control of this.shadowRoot.querySelectorAll('[data-media="'+id+'"] input,[data-media="'+id+'"] button[data-service]'))control.disabled=true;try{await this._hass.callService('media_player',service,data,{entity_id:speaker.media_entity});this._stationMessages[id]=service==='volume_set'?'':'Запрос отправлен в Home Assistant.';return true;}catch(error){this._stationMessages[id]='Не удалось отправить запрос. Повторите ещё раз.';return false;}finally{this._stationBusy.delete(id);for(const item of relatedButtons)if(item.el.isConnected)item.el.disabled=item.disabled;if(this._utility===utility&&utility?.type==='control'&&utility.speakerId===id){utility.message=this._stationMessages[id];this._utilityMessage();}this._refreshMedia();}}
-    _speakerPanel(disabled){return `${this._managerError?'<div class="notice" data-manager-error role="status"><span>Нет связи с сервисом колонок. Данные могут быть устаревшими.</span><button data-action="refresh">Повторить</button></div>':''}${this._tab==='home'?'':`<div class="sec"><p id="speaker-summary">${this._speakerSummary()}</p>${iconButton('refresh','refresh','Обновить',disabled)}</div>`}<div class="speakers">${this._speakers.map(s=>`<article class="spk"><div class="spk-top">${this._speakerIllustration(s)}<div class="spk-name"><h3>${escape(s.name)}</h3><p class="help">${escape(s.area||'Комната не указана')}</p><div class="state" data-connection="${escape(s.id)}">${this._speakerStatus(s)}</div></div></div><div data-media="${escape(s.id)}">${this._mediaControls(s)}</div></article>`).join('')}</div>${!this._speakers.length&&!this._managerError?'<div class="list"><div class="empty"><h3>Колонок пока нет</h3><p>Добавьте станцию, чтобы управлять звуком и назначать команды.</p></div></div>':''}`;}
+    _speakerTint(s){const color=this._speakerIndicators?.[s.id]?.color;return /^#[0-9a-f]{6}$/i.test(color??'')?`style="--spk:${color}"`:'';}
+    _speakerPanel(disabled){return `${this._managerError?'<div class="notice" data-manager-error role="status"><span>Нет связи с сервисом колонок. Данные могут быть устаревшими.</span><button data-action="refresh">Повторить</button></div>':''}${this._tab==='home'?'':`<div class="sec"><p id="speaker-summary">${this._speakerSummary()}</p>${iconButton('refresh','refresh','Обновить',disabled)}</div>`}<div class="speakers">${this._speakers.map(s=>`<article class="spk" ${this._speakerTint(s)}><div class="spk-name"><h3>${escape(s.name)}</h3><p class="help">${escape(s.area||'Комната не указана')}</p><div class="state" data-connection="${escape(s.id)}">${this._speakerStatus(s)}</div></div>${this._speakerIllustration(s)}<div data-media="${escape(s.id)}">${this._mediaControls(s)}</div></article>`).join('')}</div>${!this._speakers.length&&!this._managerError?'<div class="list"><div class="empty"><h3>Колонок пока нет</h3><p>Добавьте станцию, чтобы управлять звуком и назначать команды.</p></div></div>':''}`;}
     _diagnostics(){return `<div class="journal-tools"><p class="help">Обработанные запросы. Проверка фразы сюда не попадает.</p>${iconButton('activity-refresh','refresh','Обновить журнал')}</div><div id="activity-region">${this._activityMarkup()}</div>`;}
     _statusLabel(status){return ({handled:'Обработано',forwarded:'Передано Алисе',answered:'Ответ дан',accepted:'Запрос принят',confirmed:'Состояние подтверждено',already:'Уже в нужном состоянии',clarification:'Нужно уточнение',unavailable:'Недоступно',error:'Ошибка',cancelled:'Отменено',success:'Выполнено',completed:'Выполнено',failed:'Ошибка',pending:'В обработке'})[status]??'Статус не указан';}
     _routeLabel(route){return ({home:'Управление домом',yandex:'Штатная Алиса',llm:'Нейросеть',playback:'Воспроизведение'})[route]??'Маршрут не определён';}
@@ -911,7 +982,6 @@ details[open]>summary:before{transform:rotate(45deg)}
       finally {this._busy=false;this._render();}
     }
     async _click(event) {
-      if(event.target.matches('[data-admin-backdrop]'))return this._adminAction('admin-close');
       const button = event.target.closest('button[data-action]');
       if (!button || button.disabled || this._busy) return;
       const {action,id}=button.dataset;
@@ -930,6 +1000,8 @@ details[open]>summary:before{transform:rotate(45deg)}
       if(action==='activity-next'||action==='activity-prev'){this._activityPage+=action==='activity-next'?1:-1;const region=this.shadowRoot.getElementById('activity-region');if(region)region.innerHTML=this._activityMarkup(this._utility?.speakerId);return;}
       if(action==='add-speaker'){this._speakerDialog=true;this._message='';this._render();return;}
       if(action==='close-speaker'){this._speakerDialog=false;this._render();return;}
+      if(action==='section')return this._go(button.dataset.section);
+      if(action==='guide')return this._openGuide();
       if(['commands','speakers','diagnostics'].includes(action)){this._tab=action;this._render();if(action==='diagnostics')this._loadActivity();return;}
       if(action==='retry-editor'){button.disabled=true;await this._loadManager();await this._bindNativePicker();return;}
       if(action==='close'){this._dialog=false;this._render();return;}

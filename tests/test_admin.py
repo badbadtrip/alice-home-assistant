@@ -44,7 +44,7 @@ class AdminTests(unittest.TestCase):
   m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'}),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(return_value=b'{"enabled":true,"connected":false,"playing":false,"error":""}\n'))
   self.assertTrue(station(m,'test','airplay',{'action':'on'})['enabled'])
   script=m.ssh.call_args.args[1];self.assertLess(script.index('ctl.sh stop'),script.index('action=start'));self.assertIn('touch /data/airplay/disabled',script)
-  station(m,'test','airplay',{'action':'off'});script=m.ssh.call_args.args[1];self.assertLess(script.index('action=stop'),script.index('ctl.sh start'))
+  station(m,'test','airplay',{'action':'off'});script=m.ssh.call_args.args[1];self.assertLess(script.index('action=stop'),script.index('ctl.sh start'));self.assertIn('[ -x /data/airplay/bin/shairport-sync ]',script)
   with self.assertRaises(Error):station(m,'test','airplay',{'action':'reboot'})
  def test_indicator_validates_and_uses_atomic_persistent_write(self):
   raw=b'{"enabled":false,"color":"#00bfff"}\n'

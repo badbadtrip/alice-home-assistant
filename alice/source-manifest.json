@@ -150,7 +150,7 @@
   "bridge/internal/wire/wire.go": "a970f6bd52f24581237623d85036b33b948d8e6b6f3d33c2925dfe42adac7b4e",
   "bridge/internal/wire/wire_test.go": "728c473d4b623685ad9f743ebdcba0033f066cf964b27ffd912a22a4041eeba9",
   "config.yaml": "f56f2541265bd93c79628b3518b714c59488c01f7bff2abdf9fc2ce0a03e6f81",
-  "manager/admin.py": "ca3e97b046c306fef47c3396b70c3758e7bd52c231db94869180b8af33e8c89b",
+  "manager/admin.py": "3bd6528ba16050adc47e1a839a74f437390315331abeaf9256592eac392484c9",
   "manager/proxy.py": "4feca546bbc87fd06ab356c680e525186c7aeeb85d2101395f25d45fbe39dc38",
   "manager/requirements.txt": "7a336f995ac98be014af936622b528bb0ba3b22a3a3097638def074740c68de0",
   "manager/service.py": "fda8ddedcce362e852ff821d767b8e04ea26edd887958d7d29bf1852029b3449",

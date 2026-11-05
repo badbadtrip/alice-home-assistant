@@ -129,13 +129,14 @@ def station(manager, speaker_id, operation, payload):
                 raise Error('Выберите: включить или выключить AirPlay.')
             url = 'http://127.0.0.1:18861/airplay?action='
             # Both receivers need UDP 319/320. The disabled file also stops the old
-            # service from returning at boot; ctl.sh is absent on a clean speaker.
+            # service from returning at boot. Lite 2 keeps ctl.sh without shairport:
+            # the same boot hook also starts Soloist.
             if action == 'on':
                 script = ('if [ -x /data/airplay/ctl.sh ]; then touch /data/airplay/disabled; /data/airplay/ctl.sh stop; sleep 1; fi; '
                           'wget -T 12 -q -O - "' + url + 'start"')
             else:
                 script = ('wget -T 12 -q -O - "' + url + 'stop" && '
-                          'if [ -x /data/airplay/ctl.sh ]; then rm -f /data/airplay/disabled; /data/airplay/ctl.sh start; fi; true')
+                          'if [ -x /data/airplay/bin/shairport-sync ]; then rm -f /data/airplay/disabled; /data/airplay/ctl.sh start; fi; true')
             output = manager.ssh(speaker, script, timeout=25)
             state = json.loads(output.decode().strip().splitlines()[0])
             return {'enabled': state.get('enabled') is True, 'connected': state.get('connected') is True, 'playing': state.get('playing') is True, 'error': bool(state.get('error'))}

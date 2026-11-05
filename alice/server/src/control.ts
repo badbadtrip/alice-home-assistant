@@ -40,7 +40,9 @@ export function resolveLightCommand (text: string, speakerArea: string | undefin
   const match = LIGHT_GRAMMAR.exec(lightCommand)
   const lights = match ? resolveLights(match, speakerArea, devices) : undefined
   const index = localIndex(devices)
-  const intent = lights ? undefined : index.get(voicePhrase) ?? index.get(placeLast(voicePhrase)) ?? speakerLight(match, speakerArea, index)
+  const intent = lights
+    ? undefined
+    : index.get(voicePhrase) ?? index.get(placeLast(voicePhrase)) ?? speakerLight(match, speakerArea, index)
   const hasCalls = (lights?.calls.length ?? 0) > 0 || intent?.state !== undefined
   if (isQuestion && hasCalls) {
     return isVoiceOnly ? { answer: 'Скажите команду ещё раз, без вопроса.', calls: [], matched: true } : { calls: [], matched: false }

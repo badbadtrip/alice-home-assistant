@@ -169,7 +169,7 @@
   "server/src/activity.ts": "367c1666b2ce9265b0d157af2bfcb2fe9e8c2ef61dc60a1cd4aa0c87051d08d5",
   "server/src/arguments.ts": "4eca4c3fcef7d3e2b77a5426126967425d3a2abbe7c9f6da91bb4a76a8065d8b",
   "server/src/config.ts": "021d689e294931dcc6eeb80563b82d0f1ea8622647923ee00c680bb09090567d",
-  "server/src/control.ts": "8a2da8a0beb527fd532d1f0d62212a883c19187fdd79ee64fc87c75e1056710b",
+  "server/src/control.ts": "d3c2afe6aac512ce17eaf3aeb2c61b5c7ddc973b8c7cc900855eedb87452fbee",
   "server/src/devices.ts": "24360e200b1ab4513d8d694772689768b20ebb94e17eb387776d083f9714fade",
   "server/src/domains/build.ts": "faa805f69a5084b8052ef4a5fcfbc20a1f83894f5004e64f063523862eaec751",
   "server/src/domains/features.ts": "f5d2d395bd191c3ba9546f9b24f4d48b66f408760c0019e2c9053f651730d0fc",

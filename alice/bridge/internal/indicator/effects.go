@@ -118,8 +118,13 @@ func (c Config) Render(elapsed time.Duration, n int) []Light {
 			shade = hue(phase + position)
 		case "comet":
 			behind := math.Mod(phase-position+1, 1)
-			head := math.Min(1, (1-behind)*float64(n)/1.5)
-			level *= math.Max(.03, math.Exp(-behind*5)*head)
+			// The LED ahead of the head fades in, so the head never jumps onto it.
+			lead := 1.5 / float64(n)
+			if behind > 1-lead {
+				level *= math.Max(.03, (behind-1+lead)/lead)
+			} else {
+				level *= math.Max(.03, math.Exp(-behind*5))
+			}
 		case "wave":
 			level *= .55 + .45*math.Sin(2*math.Pi*(phase*2-position))
 		case "sparkle":

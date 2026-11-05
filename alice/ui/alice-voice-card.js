@@ -733,7 +733,7 @@ button:active:not(:disabled){transform:scale(.97)}
         if(cfg.mode==='rainbow')rgb=hue(phase+position);
         else if(cfg.mode==='breathe')level*=.625+.375*Math.cos(2*Math.PI*phase);
         else if(cfg.mode==='double'){const peak=center=>{const d=Math.abs(phase-center),v=Math.min(d,1-d)/.065;return Math.exp(-v*v);};level*=.2+.8*Math.max(peak(0),peak(.24));}
-        else if(cfg.mode==='comet'){const behind=(phase-position+1)%1;level*=Math.max(.03,Math.exp(-behind*5)*Math.min(1,(1-behind)*n/1.5));}
+        else if(cfg.mode==='comet'){const behind=(phase-position+1)%1,lead=1.5/n;level*=Math.max(.03,behind>1-lead?(behind-1+lead)/lead:Math.exp(-behind*5));}
         else if(cfg.mode==='wave')level*=.55+.45*Math.sin(2*Math.PI*(phase*2-position));
         else if(cfg.mode==='sparkle'){const beat=ms/period*(.7+.6*random(i,1))+random(i,2),glint=Math.max(0,Math.sin(2*Math.PI*beat));level*=.12+.88*glint**3;}
         else if(cfg.mode==='fire'){const t=ms/period*8,flame=.3+.7*(.6*drift(i,t)+.4*drift(i+64,t*2.3));rgb=[255,255*(.08+.42*flame*flame),0];level*=flame;}

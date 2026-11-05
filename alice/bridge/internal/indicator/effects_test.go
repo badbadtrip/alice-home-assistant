@@ -37,6 +37,20 @@ func TestSmootherShowsValuesBetweenLevels(t *testing.T) {
 	}
 }
 
+func TestCometHeadNeverJumps(t *testing.T) {
+	cfg := Config{Color: "#ffffff", Mode: "comet", PeriodMS: 2400}
+	previous := cfg.Render(0, 24)
+	for ms := 5; ms < 5000; ms += 5 {
+		frame := cfg.Render(time.Duration(ms)*time.Millisecond, 24)
+		for i := range frame {
+			if jump := frame[i][0] - previous[i][0]; jump > 12 || jump < -12 {
+				t.Fatal(ms, i, jump)
+			}
+		}
+		previous = frame
+	}
+}
+
 func TestLookPriority(t *testing.T) {
 	cfg := Config{Enabled: true, Color: "#111111", Music: &Layer{Enabled: true, Color: "#222222"}, Lamp: &Layer{Enabled: true, Color: "#333333"}}
 	for _, test := range []struct {

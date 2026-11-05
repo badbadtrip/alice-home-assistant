@@ -48,6 +48,9 @@ test('playback controls act only while Music Assistant plays here', async () => 
   await resolveMusic('пауза', 'kitchen', settings, playing)
   assert.deepEqual(playing.calls[0]?.slice(0, 2), ['media_player', 'media_pause'])
   assert.equal(await resolveMusic('пауза', 'kitchen', settings, api('idle')), undefined)
+  await resolveMusic('Алиса, следующую', 'kitchen', settings, playing)
+  assert.equal(playing.calls[1]?.[1], 'media_next_track')
+  assert.ok(matches(musicRules(settings, 'kitchen', playing), 'Алиса, следующую песню'))
 })
 
 test('a missing default asks for the setting and a failure is spoken', async () => {

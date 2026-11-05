@@ -97,7 +97,9 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 		}
 		return Resolution{Route: "llm", Answer: "Начинаем новый разговор."}, nil
 	}
-	if route != "llm" && !e.dialogue().Clear(ctx, ticket) {
+	// A new topic ends the conversation, but "тише" in the middle of one does not.
+	aside := route == "playback" || decision.Rule == "playback_and_volume" || decision.Rule == "speaker_playback"
+	if route != "llm" && !aside && !e.dialogue().Clear(ctx, ticket) {
 		return Resolution{Route: route}, context.Canceled
 	}
 	result := Resolution{Route: route}
@@ -268,6 +270,11 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 	}
 	if e.Playback != nil && playback.Command(text) != "" && e.Playback.Active(ctx) {
 		return RouteDecision{Route: "playback", Source: "playback"}
+	}
+	if matcher, ok := e.Home.(interface {
+		MatchDevice(context.Context, string) bool
+	}); ok && matcher.MatchDevice(ctx, text) {
+		return RouteDecision{Route: "home", Source: "device_name"}
 	}
 	if d, ok := p.match(text); ok {
 		if d.Route == "llm" && e.Music != nil && e.Music.CanStartMusic(text) {

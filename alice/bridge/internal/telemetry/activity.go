@@ -16,7 +16,7 @@ type Call struct { Name string `json:"name"`; Status string `json:"status"`; Tar
 type Event struct {
  At string `json:"at"`; Calls []Call `json:"calls"`; DurationMS int64 `json:"duration_ms"`
  Error string `json:"error,omitempty"`; ID string `json:"id"`; Route string `json:"route"`
- Source string `json:"source"`; SpeakerID string `json:"speaker_id"`; Status string `json:"status"`; Text string `json:"text"`
+ LLMMS int64 `json:"llm_ms,omitempty"`; Source string `json:"source"`; SpeakerID string `json:"speaker_id"`; Status string `json:"status"`; Text string `json:"text"`
 }
 type contextKey struct{}
 type Trace struct { mu sync.Mutex; began time.Time; event Event; explicit bool }
@@ -31,6 +31,10 @@ func Begin(ctx context.Context,text,route,source string)(context.Context,*Trace)
 func Status(ctx context.Context,status string) {
  if trace,ok:=ctx.Value(contextKey{}).(*Trace);ok {trace.mu.Lock();trace.event.Status=status;trace.explicit=true;trace.mu.Unlock()}
 }
+// AddLLM shows how much of a slow command the model took.
+func AddLLM(ctx context.Context,elapsed time.Duration) {
+ if trace,ok:=ctx.Value(contextKey{}).(*Trace);ok {trace.mu.Lock();trace.event.LLMMS=min(trace.event.LLMMS+elapsed.Milliseconds(),600000);trace.mu.Unlock()}
+}
 func AddCall(ctx context.Context,name,status,target string) {
  if trace,ok:=ctx.Value(contextKey{}).(*Trace);ok {
   trace.mu.Lock();defer trace.mu.Unlock()
@@ -39,11 +43,19 @@ func AddCall(ctx context.Context,name,status,target string) {
   if rank(status)>rank(trace.event.Status) {trace.event.Status=status;trace.explicit=true}
  }
 }
+// Raw errors may carry private text, so the journal keeps only a fixed class.
+func errorClass(err error) string {
+ text:=err.Error()
+ for _,class:=range [][2]string{{"LLM returned HTTP","Model refused the request"},{"LLM transport","Model unreachable"},{"LLM answer exceeded","Model answer too long"},{"LLM returned no answer","Model returned nothing"},{"home plan","Model returned a bad plan"},{"home function plan","Model returned a bad plan"},{"home-functions","Home functions unavailable"}} {
+  if strings.Contains(text,class[0]) {return class[1]}
+ }
+ return "Command processing failed"
+}
 func (t *Trace) Finish(route string,err error,answered bool) Event {
  t.mu.Lock();defer t.mu.Unlock();event:=t.event
  if route!="" {event.Route=clip(route,16)}
  event.DurationMS=time.Since(t.began).Milliseconds();if event.DurationMS>600000 {event.DurationMS=600000}
- if err!=nil {event.Status="error";event.Error="Command processing failed";if errors.Is(err,context.Canceled)||errors.Is(err,context.DeadlineExceeded) {event.Status="cancelled";event.Error=""}
+ if err!=nil {event.Status="error";event.Error=errorClass(err);if errors.Is(err,context.Canceled)||errors.Is(err,context.DeadlineExceeded) {event.Status="cancelled";event.Error="";if errors.Is(err,context.DeadlineExceeded) {event.Status="error";event.Error="Timed out"}}
  }else if !t.explicit {switch {case event.Route=="yandex":event.Status="forwarded";case answered:event.Status="answered";default:event.Status="handled"}}
  event.Calls=append([]Call{},event.Calls...);return event
 }

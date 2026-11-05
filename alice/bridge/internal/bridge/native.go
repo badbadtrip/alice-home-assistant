@@ -26,6 +26,7 @@ import (
 
 	"quasarbridge/internal/dialogue"
 	"quasarbridge/internal/indicator"
+	"quasarbridge/internal/llm"
 	"quasarbridge/internal/sound"
 	"quasarbridge/internal/wire"
 )
@@ -505,7 +506,7 @@ func (n *Native) Server(ctx context.Context, k websocket.MessageType, data []byt
 				}
 				if err != nil {
 					n.discardSound(p)
-					result.Answer = "Сейчас не получилось получить ответ локальной модели."
+					result.Answer = "Нейросеть сейчас не отвечает. Попробуйте ещё раз."
 				}
 				_ = n.sendCancel(p.ctx, p.id)
 				if err := n.reply(p, result.Answer); err != nil {
@@ -606,13 +607,15 @@ func (n *Native) maybeResolve(p *nativeRequest) {
 		}
 		if err != nil {
 			n.discardSound(p)
-			if result.Route == "home" {
+			if result.Route == "home" && errors.Is(err, llm.ErrNoAction) {
+				result.Answer = "Не поняла команду, ничего не меняла."
+			} else if result.Route == "home" {
 				result.Answer = "Не удалось подтвердить выполнение команды в умном доме."
 			} else if result.Route == "music" {
 				result.Answer = "Не удалось включить музыку с этой страницы."
 			} else {
 				result.Route = "llm"
-				result.Answer = "Сейчас не получилось получить ответ локальной модели."
+				result.Answer = "Нейросеть сейчас не отвечает. Попробуйте ещё раз."
 			}
 		}
 		n.mu.Lock()

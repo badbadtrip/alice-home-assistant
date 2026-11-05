@@ -31,6 +31,7 @@ type Functions struct {
 	Token     string
 	Planner   Planner
 	HTTP      *http.Client
+	OnRouting func([]byte) error
 	pendingMu sync.Mutex
 	pending   map[string]homeClarification
 }
@@ -210,16 +211,16 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 		prompt += ` speaker_area — комната колонки. Для «здесь», «тут» или команды свету без комнаты используй только эту комнату. Явно названная комната важнее speaker_area. Розетки и компьютеры не являются освещением; не включай их в команду свету. Если комната или устройство неоднозначны, задай уточнение.`
 		answer, err := f.Planner.Complete(ctx, []llm.Message{{Role: "system", Content: prompt}, {Role: "user", Content: string(data)}}, true)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("%w: %w", llm.ErrNoAction, err)
 		}
 		decoder := json.NewDecoder(strings.NewReader(answer))
 		decoder.DisallowUnknownFields()
 		if err = decoder.Decode(&plan); err != nil {
-			return "", errors.New("invalid home function plan")
+			return "", fmt.Errorf("%w: invalid home function plan", llm.ErrNoAction)
 		}
 		var trailing any
 		if err = decoder.Decode(&trailing); err != io.EOF {
-			return "", errors.New("trailing home plan data")
+			return "", fmt.Errorf("%w: trailing home plan data", llm.ErrNoAction)
 		}
 		slog.Info("home_plan", "source", "llm", "calls", len(plan.Calls))
 	}

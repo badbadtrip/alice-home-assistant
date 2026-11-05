@@ -52,6 +52,24 @@ type config struct {
 	Routing            bridge.RoutingConfig `json:"routing"`
 }
 
+// runtime.env follows the app when it moves, config.json survives upgrades. The
+// home tools must use the address and credentials the home route already works with.
+func useHomeEndpoint(cfg *config) {
+	base := strings.TrimRight(os.Getenv("QUASAR_HOME_FUNCTIONS_URL"), "/")
+	if base == "" {
+		return
+	}
+	for i := range cfg.AssistantTools.MCPServers {
+		server := &cfg.AssistantTools.MCPServers[i]
+		if server.Name != "home" || server.Command != "" {
+			continue
+		}
+		server.URL, server.URLEnv = base+"/mcp", ""
+		server.BearerTokenEnv = "QUASAR_HOME_FUNCTIONS_TOKEN"
+		server.HeadersEnv = map[string]string{"X-Alice-Speaker": "QUASAR_HOME_SPEAKER_ID"}
+	}
+}
+
 func readConfig(path string) (config, error) {
 	cfg := config{DialogueContext: dialogue.DefaultConfig(), Routing: bridge.DefaultRoutingConfig(), ConversationLog: journal.DefaultConfig(), AssistantTools: assistant.DefaultConfig(), LocalProgress: progressConfig{AfterMS: 2000, IntervalMS: 4000}, LLMAPI: "chat_completions", LLMMaxOutputTokens: 4096, ListenAfterReply: true}
 	raw, err := os.ReadFile(path)
@@ -72,6 +90,7 @@ func readConfig(path string) (config, error) {
 			*target = value
 		}
 	}
+	useHomeEndpoint(&cfg)
 	if value, ok := os.LookupEnv("QUASAR_ALLOWED_IPS"); ok {
 		cfg.AllowedIPs = nil
 		for item := range strings.SplitSeq(value, ",") {

@@ -162,6 +162,13 @@ func main() {
 	var hf *home.Functions
 	if endpoint := os.Getenv("QUASAR_HOME_FUNCTIONS_URL"); endpoint != "" {
 		hf = &home.Functions{SpeakerID: os.Getenv("QUASAR_HOME_SPEAKER_ID"), Area: os.Getenv("QUASAR_HOME_AREA"), URL: endpoint, Token: os.Getenv("QUASAR_HOME_FUNCTIONS_TOKEN"), Planner: planner}
+		hf.OnRouting = func(raw []byte) error {
+			next := bridge.DefaultRoutingConfig()
+			if err := json.Unmarshal(raw, &next, json.RejectUnknownMembers(true)); err != nil {
+				return errors.New("invalid routing JSON")
+			}
+			return engine.SetRouting(next)
+		}
 		engine.Home = hf
 	}
 	if cfg.AssistantTools.Enabled {

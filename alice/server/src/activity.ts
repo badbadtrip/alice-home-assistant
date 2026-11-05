@@ -12,6 +12,7 @@ export const ActivityEvent = z.object({
   duration_ms: z.number().int().min(0).max(600_000),
   error: z.string().max(200).optional(),
   id: z.string().regex(/^[a-f0-9-]{16,64}$/u),
+  llm_ms: z.number().int().min(0).max(600_000).optional(),
   route: z.string().max(32),
   source: z.string().max(64),
   speaker_id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/u),

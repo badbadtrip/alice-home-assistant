@@ -50,7 +50,7 @@ func (a *Agent) complete(ctx context.Context, messages []llm.Message, structured
 	if structured {
 		return "", errors.New("assistant tools do not support structured planning")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 65*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	// A request's MCP sessions and capabilities must not mutate the shared Agent.
 	local := *a

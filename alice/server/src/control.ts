@@ -13,6 +13,7 @@ export function normalizeCommand (text: string): string {
 export function normalizeVoicePhrase (text: string): string {
   return text.toLocaleLowerCase('ru').replaceAll('ё', 'е').replaceAll(/\p{P}+/gu, ' ')
     .replaceAll(/\s+/gu, ' ').trim().replace(/^алиса(?: |$)/u, '').trim()
+    .replaceAll(/(?:^| )пожалуйста(?= |$)/gu, '').trim()
 }
 
 // Exact grammar only: negations, conditions, compound commands and unknown
@@ -278,6 +279,16 @@ export function aliasConflict (alias: string, entityId: string, devices: Map<str
     if (device.entityId !== entityId && !device.voicePhrases && spokenNames(device).includes(name)) return device.name
   }
   return undefined
+}
+
+// What a device answers to, for routing only: naming one keeps a command at home.
+export function deviceVoiceNames (devices: Map<string, DeviceEntry>): string[] {
+  const names = new Set<string>()
+  for (const device of devices.values()) {
+    if (device.voicePhrases) continue
+    for (const name of spokenNames(device)) names.add(name).add(inflect(name).accusative)
+  }
+  return [...names].slice(0, 2000)
 }
 
 export function localVoicePhrases (devices: Map<string, DeviceEntry>): string[] {

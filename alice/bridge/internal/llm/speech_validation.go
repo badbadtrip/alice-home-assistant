@@ -11,6 +11,9 @@ var serviceMarkup = regexp.MustCompile(`(?i)(?:</?[|｜]|<\s*/?\s*(?:[\w.-]+:)?(
 // ErrDisabled marks a request that needs a model when none is configured.
 var ErrDisabled = errors.New("LLM disabled: configure a provider for free-form requests")
 
+// ErrNoAction marks a failure before any device was touched.
+var ErrNoAction = errors.New("no home action was taken")
+
 func ValidateAnswer(text string) error {
     if serviceMarkup.MatchString(text) {
         return errors.New("LLM returned service markup instead of a final answer")

@@ -8,10 +8,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
+
+	"quasarbridge/internal/telemetry"
 )
+
+// A person is waiting at the speaker, so one slow attempt must not last a minute.
+const requestTimeout = 20 * time.Second
+
+var codeFence = regexp.MustCompile("(?s)^```[a-zA-Z]*\\s*(.*?)\\s*```$")
 
 type Message struct {
 	Role       string     `json:"role"`
@@ -75,7 +84,14 @@ func (c *Client) Complete(ctx context.Context, messages []Message, structured bo
 		return "", errors.New("unexpected tool call in plain completion")
 	}
 	if !structured { if err := ValidateAnswer(m.Content); err != nil { return "", err } }
-	return strings.TrimSpace(m.Content), nil
+	content := strings.TrimSpace(m.Content)
+	if structured {
+		// Some providers wrap JSON in a Markdown fence despite response_format.
+		if fence := codeFence.FindStringSubmatch(content); fence != nil {
+			content = fence[1]
+		}
+	}
+	return content, nil
 }
 func (c *Client) Chat(ctx context.Context, messages []Message, tools []Tool) (Message, error) {
 	return c.chat(ctx, messages, false, tools)
@@ -146,23 +162,44 @@ func (c *Client) chatCompletions(ctx context.Context, messages []Message, struct
 }
 
 func (c *Client) post(ctx context.Context, path string, request any) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
 	body, err := json.Marshal(request)
 	if err != nil {
 		return nil, errors.New("cannot encode LLM request")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(c.BaseURL, "/")+path, bytes.NewReader(body))
-	if err != nil {
+	if _, err := http.NewRequest(http.MethodPost, strings.TrimRight(c.BaseURL, "/")+path, nil); err != nil {
 		return nil, errors.New("invalid LLM endpoint")
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if c.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.APIKey)
 	}
 	if c.OnRequest != nil {
 		finish := c.OnRequest(ctx)
 		defer finish()
+	}
+	started := time.Now()
+	defer func() { telemetry.AddLLM(ctx, time.Since(started)) }()
+	data, retry, err := c.attempt(ctx, path, body)
+	if retry && ctx.Err() == nil {
+		// A model call changes nothing, so one repeat after a refused request is safe.
+		slog.Info("llm_retry", "error", err)
+		select {
+		case <-ctx.Done():
+			return nil, err
+		case <-time.After(300 * time.Millisecond):
+		}
+		data, _, err = c.attempt(ctx, path, body)
+	}
+	slog.Info("llm_request", "elapsed_ms", time.Since(started).Milliseconds(), "ok", err == nil)
+	return data, err
+}
+
+func (c *Client) attempt(ctx context.Context, path string, body []byte) ([]byte, bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(c.BaseURL, "/")+path, bytes.NewReader(body))
+	if err != nil {
+		return nil, false, errors.New("invalid LLM endpoint")
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.APIKey)
 	}
 	hc := c.HTTP
 	if hc == nil {
@@ -171,24 +208,25 @@ func (c *Client) post(ctx context.Context, path string, request any) ([]byte, er
 	resp, err := hc.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("LLM transport: %w", ctx.Err())
+			return nil, false, fmt.Errorf("LLM transport: %w", ctx.Err())
 		}
-		return nil, errors.New("LLM transport failed")
+		return nil, true, errors.New("LLM transport failed")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("LLM returned HTTP %d", resp.StatusCode)
+		retry := resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500
+		return nil, retry, fmt.Errorf("LLM returned HTTP %d", resp.StatusCode)
 	}
 	const maxResponseBytes = 2 << 20
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("LLM transport: %w", ctx.Err())
+			return nil, false, fmt.Errorf("LLM transport: %w", ctx.Err())
 		}
-		return nil, errors.New("cannot read LLM response")
+		return nil, false, errors.New("cannot read LLM response")
 	}
 	if len(data) > maxResponseBytes {
-		return nil, errors.New("LLM response exceeded size limit")
+		return nil, false, errors.New("LLM response exceeded size limit")
 	}
-	return data, nil
+	return data, false, nil
 }

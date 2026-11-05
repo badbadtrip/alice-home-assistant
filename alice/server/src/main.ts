@@ -7,11 +7,12 @@ import {
 import dotenv from 'dotenv'
 import express from 'express'
 import { createHash, timingSafeEqual } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import z from 'zod'
 
 import { ActivityEvent, ActivityJournal, ActivityRecord } from './activity'
 import { loadConfig } from './config'
-import { aliasConflict, dictionaryReport, localVoicePhrases, resolveLightCommand } from './control'
+import { aliasConflict, deviceVoiceNames, dictionaryReport, localVoicePhrases, resolveLightCommand } from './control'
 import { buildDevices, DeviceEntry, snapshotEntity } from './devices'
 import { executeFunction } from './execution'
 import { createHomeAssistantApi, HomeAssistantApi } from './home-assistant'
@@ -219,6 +220,14 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     response.json({ saved: true })
   })
 
+  // Speaker upgrades keep their own config, so routes reach them with this table.
+  const publishedRouting = async (): Promise<unknown> => {
+    if (!process.env.ALICE_ROUTING_PATH) return undefined
+    try {
+      const config = JSON.parse(await readFile(process.env.ALICE_ROUTING_PATH, 'utf8')) as { routing?: unknown }
+      return config.routing
+    } catch { return undefined }
+  }
   app.get('/voice-phrases', async (request, response) => {
     const commands = []
     const devices = await getDevices()
@@ -227,10 +236,11 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     }
     // Not a real script: the speaker keeps only these targets, and resolves every
     // match through /resolve, so this entry just carries the local dictionary.
-    const local = localVoicePhrases(speakerDevices(devices, request.get('x-alice-speaker')))
+    const allowed = speakerDevices(devices, request.get('x-alice-speaker'))
+    const local = localVoicePhrases(allowed)
     if (local.length > 0) commands.push({ enabled: true, phrases: local, target: 'script.alice_local_dictionary' })
     const revision = createHash('sha256').update(JSON.stringify(commands)).digest('hex').slice(0, 16)
-    response.json({ commands, revision })
+    response.json({ commands, device_names: deviceVoiceNames(allowed), revision, routing: await publishedRouting() })
   })
 
   /**

@@ -2,6 +2,8 @@ package home
 
 import (
  "context"
+ "crypto/sha256"
+ "encoding/json"
  "errors"
  "log/slog"
  "net/http"
@@ -16,10 +18,12 @@ type voicePhraseSnapshot struct {
  Phrases map[string]bool
  Revision string
  Active int
+ Names []string
 }
 type voicePhraseCache struct {
  snapshot atomic.Pointer[voicePhraseSnapshot]
  once sync.Once
+ routing atomic.Pointer[[sha256.Size]byte]
 }
 
 func normalizeVoicePhrase(text string) string {
@@ -31,7 +35,28 @@ func normalizeVoicePhrase(text string) string {
  },text)
  words:=strings.Fields(text)
  if len(words)>0 && words[0]=="алиса" {words=words[1:]}
- return strings.Join(words," ")
+ // Politeness never changes a command, and the server drops it the same way.
+ kept:=words[:0]
+ for _,word:=range words {if word!="пожалуйста" {kept=append(kept,word)}}
+ return strings.Join(kept," ")
+}
+
+var deviceVerbs=map[string]bool{"включи":true,"выключи":true,"отключи":true,"погаси":true,"зажги":true,"открой":true,"закрой":true,"запусти":true,"останови":true,"сделай":true,"прибавь":true,"убавь":true,"установи":true,"поставь":true,"переключи":true,"какая":true,"какой":true,"какое":true,"сколько":true,"горит":true,"работает":true}
+var mediaWords=[]string{"музык","песн","радио","трек","плейлист","альбом","подкаст","будильник","таймер","напоминан","мультик","фильм"}
+
+// MatchDevice sends a command that names a known device home before any rule can
+// hand it to Yandex. A name unknown to HA stays with Yandex, which may own it.
+func (f *Functions) MatchDevice(_ context.Context,text string) bool {
+ snapshot:=f.voice.snapshot.Load()
+ if snapshot==nil {return false}
+ phrase:=normalizeVoicePhrase(text)
+ hasVerb:=false
+ for _,word:=range strings.Fields(phrase) {hasVerb=hasVerb||deviceVerbs[word]}
+ if !hasVerb {return false}
+ for _,word:=range mediaWords {if strings.Contains(phrase,word) {return false}}
+ padded:=" "+phrase+" "
+ for _,name:=range snapshot.Names {if strings.Contains(padded," "+name+" ") {return true}}
+ return false
 }
 
 // MatchVoice performs no I/O, locks or waits on the request path.
@@ -49,6 +74,8 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  var response struct {
   Revision string `json:"revision"`
   Commands []struct {Enabled *bool `json:"enabled"`; Phrases []string `json:"phrases"`; Target string `json:"target"`} `json:"commands"`
+  DeviceNames []string `json:"device_names"`
+  Routing json.RawMessage `json:"routing"`
  }
  if err:=f.request(ctx,http.MethodGet,"/voice-phrases",nil,&response);err!=nil {return err}
  if response.Revision=="" {return errors.New("incomplete voice table")}
@@ -71,12 +98,27 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  if len(phrases)>5000 {return errors.New("voice table exceeds limit")}
  active:=0
  for phrase:=range phrases {if enabled[phrase] {active++}}
+ if len(response.DeviceNames)>2000 {return errors.New("voice table exceeds limit")}
+ names:=make([]string,0,len(response.DeviceNames))
+ for _,name:=range response.DeviceNames {if name=normalizeVoicePhrase(name);name!="" {names=append(names,name)}}
  previous:=f.voice.snapshot.Load()
- f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active})
+ f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names})
+ f.applyRouting(response.Routing)
  if previous==nil || previous.Revision!=response.Revision {
   slog.Info("voice_phrase_cache_updated","phrases",len(phrases),"revision",response.Revision)
  }
  return nil
+}
+
+// applyRouting tries each published table once. A rejected one leaves the working
+// routing in place, so a bad release cannot take the speaker's routes away.
+func (f *Functions) applyRouting(raw json.RawMessage) {
+ if len(raw)==0 || f.OnRouting==nil {return}
+ sum:=sha256.Sum256(raw)
+ if last:=f.voice.routing.Load();last!=nil && *last==sum {return}
+ f.voice.routing.Store(&sum)
+ if err:=f.OnRouting(raw);err!=nil {slog.Warn("routing_update_rejected","error",err);return}
+ slog.Info("routing_updated")
 }
 
 func (f *Functions) StartVoiceCache(ctx context.Context) {

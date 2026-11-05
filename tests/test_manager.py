@@ -223,6 +223,15 @@ class ManagerTests(unittest.TestCase):
         self.assertIn('Недостаточно места', str(full.exception))
         self.assertIn('свободно 0 МБ', str(full.exception))
 
+    def test_prune_keeps_only_this_jobs_backup_and_ignores_ssh_errors(self):
+        commands = []
+        fake = types.SimpleNamespace(ssh=lambda _speaker, command: commands.append(command))
+        Manager._prune_backups(fake, {}, 'abc')
+        self.assertIn('[ "$d" = manager-backup-abc ] || rm -rf', commands[0])
+        def fail(_speaker, _command):
+            raise Error('offline', 502)
+        Manager._prune_backups(types.SimpleNamespace(ssh=fail), {}, 'abc')
+
     def test_hardlink_failure_refuses_upgrade_before_candidate_upload(self):
         artifact = self.root / 'artifacts'
         artifact.mkdir()

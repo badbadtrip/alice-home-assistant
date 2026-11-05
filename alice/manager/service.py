@@ -895,7 +895,7 @@ class Manager:
             self.ssh(speaker, preflight + '-check-backends', timeout=90)
             unchanged()
         except Exception:
-            # Remove only this job's exact staging paths. Never prune backups.
+            # Remove only this job's exact staging paths; backups stay until the upgrade is verified.
             try:
                 self.ssh(speaker, 'rm -f ' + DEVICE + '/bin/quasar-bridge' + suffix + ' ' + DEVICE + '/runtime.env' + suffix)
             except Error:
@@ -932,7 +932,17 @@ class Manager:
         if adoption is not None:
             install.update(adopted=True, previous_speaker_id=old_id, state='awaiting_acceptance')
         self.store.metadata(speaker['id'], install=install)
+        if adoption is None:
+            self._prune_backups(speaker, job['id'])
         return {'state': install['state'], 'message': 'Колонка подключена к приложению. Проверьте голос; при проблеме нажмите «Вернуть прежний мост».' if adoption is not None else 'Мост обновлён, идентификатор и исправность проверены.', 'backup': backup}
+
+    def _prune_backups(self, speaker, job_id):
+        # Speaker flash is small: after a verified upgrade only this job's rollback copy stays.
+        keep = 'manager-backup-' + job_id
+        try:
+            self.ssh(speaker, 'cd ' + DEVICE + ' && for d in manager-backup-*; do [ "$d" = ' + keep + ' ] || rm -rf "./$d"; done')
+        except Error:
+            pass
 
     def _startup_ownership(self, speaker):
         install = self.store.speaker(speaker['id']).get('install', {})

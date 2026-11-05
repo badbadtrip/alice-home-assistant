@@ -1,7 +1,7 @@
 {
   ".dockerignore": "f5637e2b8658d025aaec96fc50343505ff3062c8501bddc101a0103376d642e7",
   "BRIDGE-SOURCE.json": "91ab3beccb0307ab1134fce34421728f4291d16dfdca79287ee1fd3e9c6bb0da",
-  "CHANGELOG.md": "a3cfa86879bac8544c5b21c89ca8c46c964c023bdb60b7dfc21871c348decd98",
+  "CHANGELOG.md": "e8e7c68e8216479e3861fa4915e109bba9f6de97e6ea286f7b64b3268628a9af",
   "DOCS.md": "c27e97ee868c4823e4bf8acaf43a40cacc20b4233964bc3f3129352cb9710e4c",
   "Dockerfile": "9ba980871643eb93d3bafa1974b8404a6728d6bf09716343d370ddfe5f6026d1",
   "LICENSE": "6d751d46c8061b82dfeef2a722e08c8cab6bb9d2353844d3529a69eecff63c74",
@@ -187,7 +187,7 @@
   "server/test/voice-commands.test.ts": "d4b2b1fe4ea6dbbc39358e80f1b2a7617d1e1c221497590181b74cd0ac814db7",
   "server/tsconfig.json": "ad31b28b95c97ed59e5a56701aba8bf2fe1ff1ebd2bfc7e5587d9e443b27ab7f",
   "ui/IMAGE_SOURCES.md": "33b7f29ba42d9e0086ca09ab0304837248d2faee3fcc84921ba10ef0e17d2992",
-  "ui/alice-voice-card.js": "405297f4daf3067a9a98c5268425bc36bc471042a199910d9c01b8d63b5e5ca3",
+  "ui/alice-voice-card.js": "43eb49f6077a8b1a0966e7ca200aabf871d7c38a990b47596935d976d481f3ab",
   "wiki/Bridge.md": "db623d124f1af961b5ccde94d3dfe40e2e0e613a51a4eb1f27b6c3ff6b7e94a5",
   "wiki/Commands.md": "2fdc4966dfa9f56fb66fe93110a88e4b5fea17644734c9b03659a598093c5280",
   "wiki/Compatibility.md": "a72432f2fdd8579554dcb87a2b0872e71468cad2e630c7efa9429c459d249720",

@@ -180,7 +180,7 @@ details[open]>summary:before{transform:rotate(45deg)}
 .admin-footer .actions{flex-wrap:nowrap;flex-shrink:0}
 .admin-code{font:13px/1.55 var(--ha-font-family-code,ui-monospace,monospace);tab-size:2}
 .admin-output{margin:0;padding:12px 14px;max-height:45dvh;overflow:auto;border-radius:var(--control);background:var(--tint);font:13px/1.55 var(--ha-font-family-code,ui-monospace,monospace);white-space:pre-wrap}
-.music-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}.music-card{padding:16px;border-radius:var(--radius);background:var(--surface);box-shadow:var(--lift)}.music-grid .group+.group{padding-top:16px;border-top:0}.pl-row{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;gap:12px;align-items:start;padding:12px;border-radius:16px;background:var(--tint)}.pl-mark{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}.pl-fields{display:grid;gap:8px;min-width:0}.pl-badge{justify-self:start;width:fit-content;padding:1px 8px;border-radius:999px;font-size:11px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--text)}.pl-empty{padding:16px;border-radius:16px;background:var(--tint);color:var(--muted);font-size:13px;text-align:center}
+.music-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}.music-side{display:grid;gap:16px;min-width:0}.music-card code{overflow-wrap:anywhere}.music-card{padding:16px;border-radius:var(--radius);background:var(--surface);box-shadow:var(--lift)}.music-grid .group+.group{padding-top:16px;border-top:0}.pl-row{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;gap:12px;align-items:start;padding:12px;border-radius:16px;background:var(--tint)}.pl-mark{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}.pl-fields{display:grid;gap:8px;min-width:0}.pl-badge{justify-self:start;width:fit-content;padding:1px 8px;border-radius:999px;font-size:11px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--text)}.pl-empty{padding:16px;border-radius:16px;background:var(--tint);color:var(--muted);font-size:13px;text-align:center}
 .group{display:grid;gap:12px}.group+.group{padding-top:16px;border-top:1px solid var(--line)}
 
 .access-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -347,6 +347,7 @@ button:active:not(:disabled){transform:scale(.97)}
         if(this._utility&&e.target.dataset.utilityField)this._utility[e.target.dataset.utilityField]=e.target.value;
       });
       this.shadowRoot.addEventListener('change', e => {
+        if(this._admin&&e.target.dataset?.spotifyAccount){this._admin[e.target.dataset.spotifyAccount]=e.target.value;return;}
         if(this._admin?.music&&e.target.dataset?.spotifyField){const list=[...(this._admin.music.spotify_playlists??[])],i=Number(e.target.dataset.index);list[i]={...list[i],[e.target.dataset.spotifyField]:e.target.value};this._admin.music={...this._admin.music,spotify_playlists:list};return;}
         if(this._admin?.music&&e.target.matches?.('[data-music-default]')){this._admin.music={...this._admin.music,default_media:e.target.value};return;}
         if(this._admin?.music&&e.target.dataset?.musicPlayer){const players={...this._admin.music.players};if(e.target.value)players[e.target.dataset.musicPlayer]=e.target.value;else delete players[e.target.dataset.musicPlayer];this._admin.music={...this._admin.music,players};return;}
@@ -745,8 +746,16 @@ button:active:not(:disabled){transform:scale(.97)}
     }
 
     _musicPage(blocked){
-      const source=this._musicGroup(blocked);
-      return this._admin.music?`<div class="music-grid">${this._spotifyGroup(blocked)}${source}</div>`:source;
+      const a=this._admin,source=this._musicGroup(blocked);
+      if(a.spotify===undefined){a.spotify=null;this._api('/api/spotify').then(value=>{if(this._admin!==a)return;a.spotify=value;a.spotifyClient=value.client_id;this._render();if(value.connected)this._adminAction('admin-spotify-sync');}).catch(()=>{if(this._admin===a){a.spotify=false;this._render();}});}
+      return a.music?`<div class="music-grid">${this._spotifyGroup(blocked)}<div class="music-side">${this._spotifyAccount(blocked)}${source}</div></div>`:source;
+    }
+    _spotifyAccount(blocked){
+      const a=this._admin,s=a.spotify;
+      if(s===null)return '<section class="group music-card"><h3>Аккаунт Spotify</h3><p class="help">Загрузка…</p></section>';
+      if(s===false)return '<section class="group music-card"><h3>Аккаунт Spotify</h3><p class="help">Статус недоступен.</p></section>';
+      if(s.connected)return `<section class="group music-card"><h3>Аккаунт Spotify</h3><p class="help">Подключён. Новые плейлисты появляются при открытии раздела.</p><div class="actions"><button type="button" class="secondary" data-action="admin-spotify-sync" ${blocked}>${icon('refresh')}Обновить</button></div></section>`;
+      return `<section class="group music-card"><h3>Аккаунт Spotify</h3><p class="help">Создайте приложение на developer.spotify.com и укажите Redirect URI <code>http://127.0.0.1:8888/callback</code>.</p><label>Client ID<input data-spotify-account="spotifyClient" value="${escape(a.spotifyClient??'')}" maxlength="32" spellcheck="false" autocomplete="off" ${blocked}></label><div class="actions"><button type="button" class="primary" data-action="admin-spotify-login" ${blocked}>Войти в Spotify</button></div>${a.spotifyLogin?`<p class="help">После входа браузер покажет ошибку загрузки страницы. Это нормально: скопируйте адрес из строки браузера.</p><label>Адрес после входа<input data-spotify-account="spotifyAddress" value="${escape(a.spotifyAddress??'')}" placeholder="http://127.0.0.1:8888/callback?code=…" spellcheck="false" autocomplete="off" ${blocked}></label><div class="actions"><button type="button" class="primary" data-action="admin-spotify-callback" ${blocked}>Подключить</button></div>`:''}</section>`;
     }
     _spotifyGroup(blocked){
       const list=this._admin.music.spotify_playlists??[];
@@ -816,6 +825,9 @@ button:active:not(:disabled){transform:scale(.97)}
         if(action==='admin-run'){const result=await this._api('/api/speakers/'+encodeURIComponent(a.speakerId)+'/console','POST',{command:a.command});a.output=result.output;a.message=result.truncated?'Вывод ограничен 48 КБ.':'Команда завершена. Код: '+result.exit_code;}
         if(action==='admin-restart-bridge'){const ok=await this._stationJob(a.speakerId,'restart');if(!ok)throw Error(this._stationMessages[a.speakerId]);a.message='Мост перезапущен, состояние проверено.';}
         if(action==='admin-music-source'){a.music={...a.music,source:button.dataset.source};if(button.dataset.source==='yandex'){a.music=await this._api('/api/music','PUT',a.music);a.message='Музыкой занимается Алиса.';}return;}
+        if(action==='admin-spotify-login'){const popup=window.open('about:blank','_blank');const result=await this._api('/api/spotify/login','POST',{client_id:a.spotifyClient??''});if(popup)popup.location=result.url;else window.open(result.url,'_blank');a.spotifyLogin=true;a.message='';return;}
+        if(action==='admin-spotify-callback'){a.spotify=await this._api('/api/spotify/callback','POST',{address:a.spotifyAddress??''});a.spotifyLogin=false;a.spotifyAddress='';a.music=await this._api('/api/spotify/sync','POST',{});a.message='Spotify подключён, плейлисты загружены.';return;}
+        if(action==='admin-spotify-sync'){a.music=await this._api('/api/spotify/sync','POST',{});a.message='';return;}
         if(action==='admin-spotify-add'){a.music={...a.music,spotify_playlists:[...(a.music.spotify_playlists??[]),{name:'',uri:''}]};return;}
         if(action==='admin-spotify-remove'){a.music={...a.music,spotify_playlists:(a.music.spotify_playlists??[]).filter((_,i)=>i!==Number(button.dataset.index))};return;}
         if(action==='admin-save-spotify'){a.music=await this._api('/api/music','PUT',a.music);a.message='Плейлисты сохранены. Колонка получит их в течение минуты.';return;}

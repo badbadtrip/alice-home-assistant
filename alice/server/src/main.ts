@@ -21,6 +21,7 @@ import { musicRules, MusicSettingsSchema, readMusicSettings, resolveMusic, write
 import { previewCommand } from './preview'
 import { callReadTool, READ_TOOLS } from './read-tools'
 import { isSpeakerAllowed, speakerDevices } from './speaker-access'
+import { ClientIdSchema, fetchPlaylists, finishLogin, loginRequest, mergePlaylists, readSpotify, refreshAccess, writeSpotify } from './spotify'
 
 const logger = getLogger()
 
@@ -242,6 +243,38 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
       await writeMusicSettings(process.env.ALICE_MUSIC_PATH, parsed.data)
       response.json(parsed.data)
     } catch { response.status(503).json({ error: 'Не удалось сохранить настройки музыки.' }) }
+  })
+  const spotifyPath = process.env.ALICE_SPOTIFY_PATH
+  const spotifyStatus = async (): Promise<{ client_id: string; connected: boolean }> => {
+    const state = await readSpotify(spotifyPath)
+    return { client_id: state.client_id, connected: state.refresh_token !== '' }
+  }
+  app.get('/spotify', async (_, response) => { response.json(await spotifyStatus()) })
+  app.post('/spotify/login', async (request, response) => {
+    const clientId = ClientIdSchema.safeParse((request.body as { client_id?: unknown }).client_id)
+    if (!clientId.success) { response.status(400).json({ error: 'Проверьте Client ID.' }); return }
+    const { state, url } = loginRequest(clientId.data)
+    await writeSpotify(spotifyPath, state)
+    response.json({ url })
+  })
+  app.post('/spotify/callback', async (request, response) => {
+    try {
+      const address = z.object({ address: z.string().max(2000) }).parse(request.body).address
+      await writeSpotify(spotifyPath, await finishLogin(await readSpotify(spotifyPath), address))
+      response.json(await spotifyStatus())
+    } catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : 'Не удалось войти.' }) }
+  })
+  // The manager forwards every write as POST, and this one also rotates the token.
+  app.post('/spotify/sync', async (_, response) => {
+    try {
+      const { access, state } = await refreshAccess(await readSpotify(spotifyPath))
+      await writeSpotify(spotifyPath, state)
+      const settings = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
+      const playlists = mergePlaylists(settings.spotify_playlists, await fetchPlaylists(access))
+      const merged = { ...settings, spotify_playlists: playlists }
+      await writeMusicSettings(process.env.ALICE_MUSIC_PATH, merged)
+      response.json(merged)
+    } catch { response.status(502).json({ error: 'Не удалось получить плейлисты из Spotify.' }) }
   })
   app.get('/voice-phrases', async (request, response) => {
     const commands = []

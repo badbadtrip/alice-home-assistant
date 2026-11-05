@@ -68,7 +68,8 @@ def main():
         env={**os.environ,'CONFIG_PATH':str(data/'functions.json'),'PORT':'18080','HOME_FUNCTIONS_TOKEN':token,
              'ALICE_ASSIGNMENTS_PATH':str(data/'state/assignments.json'),'ALICE_EVENTS_PATH':str(data/'state/activity/events.json'),
              'ALICE_ROUTING_PATH':str(data/'artifacts/config.json'),
-             'ALICE_MUSIC_PATH':str(data/'state/music.json')}
+             'ALICE_MUSIC_PATH':str(data/'state/music.json'),
+             'ALICE_SPOTIFY_PATH':str(data/'state/spotify.json')}
         timezone=home_timezone()
         if timezone:env['HOME_TIMEZONE']=timezone
         # Manager creates durable state before Home Functions starts reading it.

@@ -26,7 +26,8 @@ test('music commands reach the speaker player', async () => {
   assert.equal((await resolveMusic('Алиса, включи музыку', 'kitchen', settings, home))?.answer, 'Включаю.')
   await resolveMusic('включи группу кино', 'kitchen', settings, home)
   await resolveMusic('включи кино в спотифай', 'kitchen', settings, home)
-  assert.deepEqual(home.calls.map(call => [call[2].media_id, call[2].media_type, call[2].entity_id]), [
+  assert.deepEqual(home.calls[0]?.slice(0, 2), ['media_player', 'volume_set'])
+  assert.deepEqual(home.calls.filter(call => call[1] === 'play_media').map(call => [call[2].media_id, call[2].media_type, call[2].entity_id]), [
     ['Любимое', 'playlist', 'media_player.lite_2_airplay'],
     ['кино', 'artist', 'media_player.lite_2_airplay'],
     ['кино', undefined, 'media_player.lite_2_airplay']

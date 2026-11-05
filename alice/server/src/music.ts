@@ -95,6 +95,8 @@ export async function resolveMusic (text: string, speaker: string | undefined, s
   if (!request) return undefined
   if (!request.media_id) return spoken('Выберите в настройках, что включать по умолчанию.')
   try {
+    // AirPlay stays at full level, so the speaker's own volume is the only control.
+    await api.callService('media_player', 'volume_set', { entity_id: player, volume_level: 1 })
     await api.callService('music_assistant', 'play_media', { ...request, enqueue: 'replace', entity_id: player })
     return spoken('Включаю.')
   } catch {

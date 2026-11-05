@@ -234,7 +234,8 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
   app.get('/music', async (_, response) => {
     response.json(await readMusicSettings(process.env.ALICE_MUSIC_PATH))
   })
-  app.put('/music', async (request, response) => {
+  // The manager forwards every write as POST.
+  app.post('/music', async (request, response) => {
     const parsed = MusicSettingsSchema.safeParse(request.body)
     if (!parsed.success) { response.status(400).json({ error: 'Invalid music settings' }); return }
     try {

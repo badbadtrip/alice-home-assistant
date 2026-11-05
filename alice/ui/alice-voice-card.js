@@ -733,12 +733,19 @@ button:active:not(:disabled){transform:scale(.97)}
     }
 
 
+    async _loadPlaylists(){
+      const [entry]=await this._hass.callWS({type:'config_entries/get',domain:'music_assistant'});if(!entry)throw Error('Music Assistant не подключён.');
+      const result=await this._hass.callWS({type:'call_service',domain:'music_assistant',service:'get_library',service_data:{config_entry_id:entry.entry_id,media_type:'playlist',limit:500},return_response:true});
+      // Spotify DJ is listed but has no tracks Music Assistant can play.
+      return (result?.response?.items??[]).filter(item=>!item.image?.includes('DJ-Beta')).map(item=>({name:item.name,uri:item.uri}));
+    }
+
     _musicGroup(blocked){
       const a=this._admin;if(a.music===undefined){a.music=null;this._api('/api/music').then(value=>{if(this._admin===a){a.music=value;this._render();}}).catch(()=>{if(this._admin===a){a.music=false;this._render();}});}
       if(!a.music)return `<section class="group"><h3>Музыка</h3><p class="help">${a.music===false?'Настройки музыки недоступны.':'Загрузка…'}</p></section>`;
-      const m=a.music,on=m.source==='music_assistant',players=Object.keys(this._hass?.states??{}).filter(id=>id.startsWith('media_player.')&&/airplay/i.test(id)),name=id=>this._hass.states[id]?.attributes?.friendly_name??id;
+      const m=a.music,on=m.source==='music_assistant';if(on&&a.playlists===undefined){a.playlists=null;this._loadPlaylists().then(items=>{a.playlists=items;}).catch(()=>{a.playlists=false;}).finally(()=>{if(this._admin===a)this._render();});}const players=Object.keys(this._hass?.states??{}).filter(id=>id.startsWith('media_player.')&&/airplay/i.test(id)),name=id=>this._hass.states[id]?.attributes?.friendly_name??id;
       const rows=this._speakers.map(s=>`<label>${escape(s.name)}<select data-music-player="${escape(s.id)}" ${blocked}><option value="">Яндекс</option>${players.map(id=>`<option value="${escape(id)}" ${m.players?.[s.id]===id?'selected':''}>${escape(name(id))}</option>`).join('')}</select></label>`).join('');
-      return `<section class="group"><h3>Музыка</h3><div class="seg" role="group" aria-label="Источник музыки"><button type="button" data-action="admin-music-source" data-source="yandex" aria-selected="${!on}" ${blocked}>Алиса</button><button type="button" data-action="admin-music-source" data-source="music_assistant" aria-selected="${on}" ${blocked}>Music Assistant</button></div><p class="help">${on?'«Включи музыку», «включи группу Кино» и «включи … в спотифай» идут в Music Assistant. Просьбы «в яндексе» и обычное «включи …» остаются у Алисы.':'Музыкой занимается штатная Алиса.'}</p>${on?`<div class="fields"><label>Что включать по умолчанию<input data-music-default value="${escape(m.default_media??'')}" placeholder="Название плейлиста" autocomplete="off" ${blocked}></label>${rows}</div><div class="actions"><button type="button" class="primary" data-action="admin-save-music" ${blocked}>Сохранить музыку</button></div>`:''}</section>`;
+      return `<section class="group"><h3>Музыка</h3><div class="seg" role="group" aria-label="Источник музыки"><button type="button" data-action="admin-music-source" data-source="yandex" aria-selected="${!on}" ${blocked}>Алиса</button><button type="button" data-action="admin-music-source" data-source="music_assistant" aria-selected="${on}" ${blocked}>Music Assistant</button></div><p class="help">${on?'«Включи музыку», «включи группу Кино» и «включи … в спотифай» идут в Music Assistant. Просьбы «в яндексе» и обычное «включи …» остаются у Алисы.':'Музыкой занимается штатная Алиса.'}</p>${on?`<div class="fields"><label>Что включать по умолчанию<select data-music-default ${blocked}><option value="">Не выбрано</option>${(a.playlists??[]).map(p=>`<option value="${escape(p.uri)}" ${m.default_media===p.uri?'selected':''}>${escape(p.name)}</option>`).join('')}${m.default_media&&!(a.playlists??[]).some(p=>p.uri===m.default_media)?`<option value="${escape(m.default_media)}" selected>${escape(m.default_media)}</option>`:''}</select></label>${a.playlists===false?'<p class="help">Не удалось загрузить плейлисты из Music Assistant.</p>':''}${rows}</div><div class="actions"><button type="button" class="primary" data-action="admin-save-music" ${blocked}>Сохранить музыку</button></div>`:''}</section>`;
     }
 
     _adminDialog(){

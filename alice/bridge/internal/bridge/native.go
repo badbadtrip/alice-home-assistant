@@ -682,7 +682,7 @@ func (n *Native) reply(p *nativeRequest, text string) error {
 		requestID = p.id
 	}
 	answer := &response.TAliceResponseProto{Header: &response.TAliceResponseProto_THeader{RequestId: new(requestID), ResponseId: new(newID()), DialogId: new(p.request.GetHeader().GetDialogId()), SequenceNumber: new(p.request.GetHeader().GetSequenceNumber())}, VoiceResponse: &response.TAliceResponseProto_TVoiceResponse{OutputSpeech: &response.TAliceResponseProto_TVoiceResponse_TOutputSpeech{Text: new(text)}, HasVoiceResponse: true}, Response: &response.TAliceResponseProto_TResponse{Cards: []*response.TAliceResponseProto_TResponse_TCard{{Type: "simple_text", Text: new(text), CardId: new(newID())}}}}
-	silentPlayback := n.hasSilentPlayback(p) || (text == "" && n.hasQueuedSuccess(p))
+	silentPlayback := n.hasSilentPlayback(p) || (text == "" && (n.hasQueuedSuccess(p) || p.route == "playback"))
 	answer.VoiceResponse.ShouldListen = n.ShouldListen && !silentPlayback
 	if silentPlayback {
 		answer.VoiceResponse.HasVoiceResponse = false

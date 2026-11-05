@@ -115,7 +115,7 @@ func (c *Client) Control(ctx context.Context, action string) (string, error) {
 	if err := c.run(ctx, command); err != nil {
 		return "", err
 	}
-	return "Хорошо.", nil
+	return "", nil
 }
 
 // StartPlayback claims the speaker and resumes the last Spotify context.
@@ -123,5 +123,5 @@ func (c *Client) StartPlayback(ctx context.Context) (string, error) {
 	if err := c.run(ctx, "activate", "play"); err != nil {
 		return "", err
 	}
-	return "Включаю.", nil
+	return "", nil
 }

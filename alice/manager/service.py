@@ -20,6 +20,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlsplit
+from urllib.request import Request, urlopen
 
 NETWORKS = tuple(ipaddress.ip_network(n) for n in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'))
 DEVICE = '/data/opt/quasar-bridge'
@@ -27,6 +28,11 @@ STARTUP_FILES = ('start.sh', 'supervise.sh', 'rollback-bind.sh', 'S98quasarbridg
 ENTITY = re.compile(r'^(automation|script)\.[a-z0-9_]+$')
 MEDIA_ENTITY = re.compile(r'^media_player\.[a-z0-9_]+$')
 ID = re.compile(r'^[a-z0-9][a-z0-9_-]{0,63}$')
+AIRPLAY_ENTITY = re.compile(r'^media_player\.[a-z0-9_]*_airplay$')
+# Exit 3: no receiver on this speaker. Exit 4: it is playing, never interrupt that.
+AIRPLAY_REANNOUNCE = ('[ -x /data/airplay/ctl.sh ] || exit 3; '
+                      "netstat -tn 2>/dev/null | grep -q ':5000 .*ESTABLISHED' && exit 4; "
+                      '/data/airplay/ctl.sh restart')
 
 
 class Error(Exception):
@@ -187,6 +193,10 @@ class Manager:
         self.pending_delivery = {}
         self.monitor_stop = threading.Event()
         self.monitor_thread = None
+        self.airplay_next_check = 0.0
+        self.airplay_next_try = 0.0
+        self.airplay_lost_checks = 0
+        self.airplay_tries = 0
         self._setup_cache = None
         self.known_hosts = self.store.directory / 'known_hosts'
         if not self.known_hosts.exists():
@@ -212,6 +222,10 @@ class Manager:
                 self.monitor_cycle()
             except Exception:
                 # A registry read error must not kill the monitor or leak data.
+                pass
+            try:
+                self.airplay_cycle()
+            except Exception:
                 pass
             self.monitor_stop.wait(max(0.1, 15 - (time.monotonic() - began)))
 
@@ -242,6 +256,42 @@ class Manager:
                     connection['delivery'] = {**connection.get('delivery', {}), 'status': 'unknown', 'message': 'Статус колонки устарел.'}
                 result.append({**speaker, 'connection': connection})
             return result
+
+    def _airplay_lost(self):
+        token = os.environ.get('SUPERVISOR_TOKEN')
+        if not token:
+            return False
+        request = Request('http://supervisor/core/api/states', headers={'Authorization': 'Bearer ' + token})
+        with urlopen(request, timeout=10) as response:
+            states = json.load(response)
+        return any(AIRPLAY_ENTITY.fullmatch(item['entity_id']) and item['state'] == 'unavailable' for item in states)
+
+    # A speaker announces AirPlay only when the service starts and does not answer
+    # later queries, so a restarted Music Assistant loses it until it announces again.
+    def airplay_cycle(self):
+        now = time.monotonic()
+        if now < self.airplay_next_check:
+            return
+        self.airplay_next_check = now + 60
+        if not self._airplay_lost():
+            self.airplay_lost_checks = self.airplay_tries = 0
+            return
+        self.airplay_lost_checks += 1
+        # Two checks give Music Assistant time to finish starting; three tries
+        # keep a speaker without a working receiver from restarting forever.
+        if self.airplay_lost_checks < 2 or self.airplay_tries >= 3 or now < self.airplay_next_try:
+            return
+        self.airplay_tries += 1
+        self.airplay_next_try = now + 300
+        for speaker in self.store.read('speakers.json'):
+            if not speaker.get('trusted_fingerprint') or not self.operation_lock.acquire(blocking=False):
+                continue
+            try:
+                self.ssh(speaker, AIRPLAY_REANNOUNCE, timeout=25)
+            except Exception:
+                pass  # An offline speaker or one without a receiver is not an error here.
+            finally:
+                self.operation_lock.release()
 
     def monitor_cycle(self):
         records = self.store.read('speakers.json')

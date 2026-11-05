@@ -28,6 +28,22 @@ class ManagerTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def airplay_cycle(self, lost):
+        self.manager.airplay_next_check = self.manager.airplay_next_try = 0.0
+        with patch.object(self.manager, '_airplay_lost', return_value=lost), patch.object(self.manager, 'ssh') as ssh:
+            self.manager.airplay_cycle()
+        return ssh.call_count
+
+    def test_airplay_reannounce_waits_retries_and_gives_up(self):
+        self.manager.store.metadata(self.speaker['id'], trusted_fingerprint='SHA256:test')
+        self.assertEqual(self.airplay_cycle(True), 0)
+        self.assertEqual([self.airplay_cycle(True) for _ in range(4)], [1, 1, 1, 0])
+        self.assertEqual(self.airplay_cycle(False), 0)
+        self.assertEqual(self.manager.airplay_tries, 0)
+
+    def test_airplay_reannounce_skips_untrusted_speaker(self):
+        self.assertEqual([self.airplay_cycle(True) for _ in range(2)], [0, 0])
+
     def test_lan_address_rejects_public_loopback_hostname_and_shell(self):
         for value in ('127.0.0.1', '0.0.0.0', '8.8.8.8', 'alice-lite2', '192.168.1.1;reboot', '169.254.1.1', '::1'):
             with self.subTest(value=value), self.assertRaises(Error):

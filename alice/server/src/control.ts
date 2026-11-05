@@ -36,11 +36,11 @@ export function resolveLightCommand (text: string, speakerArea: string | undefin
   // point as a known phrase. It must not switch anything on that basis.
   const isQuestion = text.includes('?')
   const command = isVoiceOnly ? voicePhrase : normalizeCommand(text)
-  const lightCommand = command.replace(/^(включи|выключи|отключи|погаси|зажги) (здесь|тут) (свет|освещение)$/u, '$1 $3 $2')
+  const lightCommand = placeLast(command.replace(/^(включи|выключи|отключи|погаси|зажги) (здесь|тут) (свет|освещение)$/u, '$1 $3 $2'))
   const match = LIGHT_GRAMMAR.exec(lightCommand)
   const lights = match ? resolveLights(match, speakerArea, devices) : undefined
   const index = localIndex(devices)
-  const intent = lights ? undefined : index.get(voicePhrase) ?? speakerLight(match, speakerArea, index)
+  const intent = lights ? undefined : index.get(voicePhrase) ?? index.get(placeLast(voicePhrase)) ?? speakerLight(match, speakerArea, index)
   const hasCalls = (lights?.calls.length ?? 0) > 0 || intent?.state !== undefined
   if (isQuestion && hasCalls) {
     return isVoiceOnly ? { answer: 'Скажите команду ещё раз, без вопроса.', calls: [], matched: true } : { calls: [], matched: false }
@@ -54,6 +54,12 @@ export function resolveLightCommand (text: string, speakerArea: string | undefin
   if (reading) return resolveReading(reading, speakerArea, devices)
   // A dictionary phrase has no planner fallback on the speaker, so answer here.
   return isVoiceOnly && match ? { answer: 'Не нашла подходящий свет. Назовите комнату или объедините светильники в группу.', calls: [], matched: true } : { calls: [], matched: false }
+}
+
+// «Включи на кухне свет» means the same as «включи свет на кухне». Only the word
+// order changes: anything else in the phrase still fails the exact grammar.
+function placeLast (command: string): string {
+  return command.replace(/^(включи|выключи|отключи|погаси|зажги|открой|закрой) ((?:в|во|на) [а-яa-z0-9-]+) (.+)$/u, '$1 $3 $2')
 }
 
 const LIGHT_GRAMMAR = /^(включи|выключи|отключи|погаси|зажги) (свет|освещение)(?: (?:в|на) ([а-яa-z0-9 -]+)| (здесь|тут)| ([а-яa-z0-9-]+))?$/u

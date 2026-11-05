@@ -27,6 +27,21 @@ function fixture () {
     stopUpdates: () => { shouldUpdate = false } }
 }
 
+test('a place before the device means the same, and nothing else is guessed', async () => {
+  const { api } = fixture()
+  const devices = await buildDevices(api, { entities: {}, labels: ['alice'] })
+  for (const verb of ['включи', 'выключи']) {
+    const direct = resolveLightCommand(`${verb} свет на кухне`, 'Комната', devices)
+    assert.equal(direct.matched, true)
+    assert.deepEqual(resolveLightCommand(`${verb} на кухне свет`, 'Комната', devices), direct)
+  }
+  for (const text of ['не включи на кухне свет', 'включи на кухне свет через час',
+    'включи на кухне свет и компьютер']) {
+    assert.equal(resolveLightCommand(text, 'Комната', devices).matched, false, text)
+  }
+  assert.equal(resolveLightCommand('включи на кухне свет?', 'Комната', devices).calls.length, 0)
+})
+
 test('two speakers resolve here to their own room, explicit area overrides and plugs are excluded', async () => {
   const { api } = fixture()
   const devices = await buildDevices(api, { entities: {}, labels: ['alice'] })

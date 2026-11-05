@@ -177,7 +177,7 @@
   "server/src/preview.ts": "79c5f5e9e5e8cce1d6dcefc10cb624b6b91e790ca37a0d4cdfbaea54c34238f5",
   "server/src/read-tools.ts": "f8d2dcf35f693b574a097ec41d0e2f386994510d9ad2f9efb40b7b735f3a7988",
   "server/src/speaker-access.ts": "12b992f1eb6e5c376b13d5aac9880804b996e67077b7de23eb96242e7b0057f9",
-  "server/src/spotify.ts": "7a1c9584f52d107640ee7c2c4a292482827a5ddb9e5f767d5065436e82b93cc8",
+  "server/src/spotify.ts": "c6d0c6d69642fa3e98b5da66b76a75e699c3e516caadb9271a4b2a19f1d33af6",
   "server/src/translit.ts": "e37fe7e5f6252436d7cb69511bd6a832c6d6d22d0203e8499dd48732a94ecefd",
   "server/src/voice-commands.ts": "79f8d5a20acf968d1c531055725b38bc7f40312f6dc20db10ec417d74836fe2f",
   "server/test/access.test.ts": "6aa833174e866376f7eb7b75ce33f54194c8dcf4094dda235a554fdf4cf22bb7",

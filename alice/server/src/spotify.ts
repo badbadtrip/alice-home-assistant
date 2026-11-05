@@ -102,7 +102,8 @@ export async function refreshAccess (
 ): Promise<{ access: string; state: SpotifyState }> {
   const body = { client_id: state.client_id, grant_type: 'refresh_token', refresh_token: state.refresh_token }
   const result = await token(body, request)
-  return { access: result.access_token, state: { ...state, refresh_token: result.refresh_token ?? state.refresh_token } }
+  const refreshToken = result.refresh_token ?? state.refresh_token
+  return { access: result.access_token, state: { ...state, refresh_token: refreshToken } }
 }
 
 export async function writeSpotify (file: string | undefined, state: SpotifyState): Promise<void> {

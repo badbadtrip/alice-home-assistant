@@ -405,7 +405,7 @@ button:active:not(:disabled){transform:scale(.97)}
       this._config = config; if(config.view)this._tab=config.view; this._applyEmbeddedLayout(); this._render();
     }
     set hass(hass) {
-      this._hass = hass;this.toggleAttribute("dark",!!hass.themes?.darkMode);this._syncShellTheme();
+      const sidebar=this._hass?.dockedSidebar;this._hass = hass;if(sidebar!==hass.dockedSidebar)this._applyEmbeddedLayout();this.toggleAttribute("dark",!!hass.themes?.darkMode);this._syncShellTheme();
       const picker=this.shadowRoot.getElementById('target');if(picker)picker.hass=hass;
       this._refreshMedia();
       if(!this._snapshotChecked){this._snapshotChecked=true;if(this._restoreSnapshot())this._render();}
@@ -416,13 +416,13 @@ button:active:not(:disabled){transform:scale(.97)}
     _syncShellTheme(){if(!this._config?.app_embedded||window===window.top||typeof this._hass?.themes?.darkMode!=='boolean')return;try{window.parent.document.documentElement.style.colorScheme=this._hass.themes.darkMode?'dark':'light';}catch{}}
     _applyEmbeddedLayout() {
       this._embeddedStyle?.remove();this._embeddedStyle=undefined;
-      if(!this._config?.app_embedded)return;
+      /* HA's bar holds the only way back to a hidden sidebar, so it goes only when the sidebar is docked. */
+      if(!this._config?.app_embedded||this._hass?.dockedSidebar!=='docked')return;
       let node=this;
       while(node){
         if(node.localName==='hui-root'&&node.shadowRoot){
           const style=document.createElement('style');
           style.dataset.aliceEmbedded='true';
-          /* Phones keep HA's bar: it holds the only way to the sidebar. */
           style.textContent='@media(min-width:871px){:host{--header-height:0px!important;--app-header-height:0px!important}app-header,.header{display:none!important}#view{padding-top:0!important}}';
           node.shadowRoot.append(style);this._embeddedStyle=style;
         }

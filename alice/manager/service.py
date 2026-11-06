@@ -957,6 +957,12 @@ class Manager:
         except Error:
             pass
 
+    def drop_backups(self, speaker):
+        # A voice request proved the update, and the server keeps the package: flash stays free.
+        self._prune_backups(speaker, '')
+        install = self.store.speaker(speaker['id']).get('install', {})
+        self.store.metadata(speaker['id'], install={**install, 'backup': ''})
+
     def _startup_ownership(self, speaker):
         install = self.store.speaker(speaker['id']).get('install', {})
         receipt_job_id = install.get('startup_receipt_job_id')

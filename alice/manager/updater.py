@@ -110,6 +110,7 @@ def _advance(manager, speaker, update, now):
         try:
             if _heard(manager, speaker, update.get('at', now)):
                 _set(manager, speaker, version, 'current')
+                manager.drop_backups(speaker)
         except Exception:
             pass
         return False

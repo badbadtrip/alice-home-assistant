@@ -297,6 +297,15 @@ class ManagerTests(unittest.TestCase):
             raise Error('offline', 502)
         Manager._prune_backups(types.SimpleNamespace(ssh=fail), {}, 'abc')
 
+    def test_proved_update_drops_every_backup(self):
+        commands, saved = [], {}
+        store = types.SimpleNamespace(speaker=lambda _: {'install': {'backup': 'x', 'state': 'ready'}},
+                                      metadata=lambda _, **values: saved.update(values))
+        fake = types.SimpleNamespace(store=store, _prune_backups=lambda speaker, job: commands.append(job))
+        Manager.drop_backups(fake, {'id': 's'})
+        self.assertEqual(commands, [''])
+        self.assertEqual(saved['install'], {'backup': '', 'state': 'ready'})
+
     def test_hardlink_failure_refuses_upgrade_before_candidate_upload(self):
         artifact = self.root / 'artifacts'
         artifact.mkdir()

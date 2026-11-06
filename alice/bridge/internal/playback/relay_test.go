@@ -7,7 +7,7 @@ func TestRelay(t *testing.T) {
 	if !ok || RoomStem(room) != "кухн" || message != "скоро там кушать будет" {
 		t.Fatalf("got %q %q %v", room, message, ok)
 	}
-	if _, message, _ := Relay("передай в комнату что ужин готов"); message != "ужин готов" {
+	if _, message, _ := Relay("передай на кухню - что покушать"); message != "что покушать" {
 		t.Fatalf("got %q", message)
 	}
 	for _, text := range []string{"скажи анекдот", "скажи который час", "включи на кухне свет"} {

@@ -94,9 +94,10 @@ func Search(text string) (kind, query string, ok bool) {
 	return "", "", false
 }
 
-var relayAsk = regexp.MustCompile(`^(?:скажи|передай)(?: на| в| во) ([^ ]+) (?:что )?(.+)$`)
+var relayAsk = regexp.MustCompile(`^(?:скажи|передай)(?: на| в| во) ([^ ]+) (.+)$`)
 
 // Relay splits "скажи на кухню ужин готов" into the spoken room and the message.
+// The message stays word for word: "что покушать" loses its meaning without "что".
 func Relay(text string) (room, message string, ok bool) {
 	match := relayAsk.FindStringSubmatch(normalize(text))
 	if match == nil {

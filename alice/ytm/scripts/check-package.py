@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Exercise real YAM install/upgrade/remove without services or a real device."""
+import argparse
+import os
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from platforms import PLATFORMS
+import subprocess
+import struct
+import tempfile
+
+parser = argparse.ArgumentParser()
+parser.add_argument('package', type=Path)
+parser.add_argument('--yam', required=True)
+parser.add_argument('--runner')
+parser.add_argument('--platform', choices=PLATFORMS, default='yandexmicro')
+parser.add_argument('--profiles', required=True, type=Path)
+args = parser.parse_args()
+package = args.package.resolve()
+version = subprocess.check_output(['python3', str(Path(__file__).with_name('check-version.py'))], text=True).strip()
+with tempfile.TemporaryDirectory(prefix='ytm-package-check-') as directory:
+    temporary = Path(directory)
+    profiles = temporary/'profiles'
+    profiles.mkdir()
+    profile = (args.profiles/(args.platform+'.yaml')).read_text()
+    profile = profile.replace('/data/yam', str(temporary/'default')).replace('/tmp/yam', str(temporary/'run'))
+    (profiles/(args.platform+'.yaml')).write_text(profile)
+    prefix = ([args.runner] if args.runner else [])+[args.yam, '--platform', args.platform, '--profiles', str(profiles), '--root', str(temporary/'root')]
+    environment = {key:value for key,value in os.environ.items() if key not in ('YAM_ROOT','YAM_PLATFORM','YAM_PROFILES')}
+    def invoke(*arguments):
+        return subprocess.check_output(prefix+list(map(str, arguments)), env=environment, text=True)
+    invoke('install', '--yes', package)
+    assert invoke('list').split() == ['local/ytm-alice',version,args.platform]
+    root = temporary/'root'
+    for binary in ('ytm-alice','ytm-alice-player','ytm-alice-resolver','ytm-alice-player-armhf','ytm-alice-player-arm64','alice-media','bt-proxy'):
+        link = root/'bin'/binary
+        assert link.is_symlink() and link.resolve().is_file() and os.access(link, os.X_OK), binary
+    for binary, elf_class in [('ytm-alice-player-armhf', 1), ('ytm-alice-player-arm64', 2)]:
+        assert (root/'bin'/binary).read_bytes()[:5] == b'\x7fELF'+bytes([elf_class])
+    assert (root/'bin/ytm-alice-player').read_bytes().startswith(b'#!/bin/sh')
+    # The resolver is a self-contained ARM32 binary: no firmware loader or
+    # optional libatomic/libstdc++ may become a hidden installation requirement.
+    helper = (root/'bin/ytm-alice-resolver').read_bytes()
+    assert helper[:7] == b'\x7fELF\x01\x01\x01'
+    offset = struct.unpack_from('<I', helper, 28)[0]
+    entry_size, count = struct.unpack_from('<HH', helper, 42)
+    assert all(struct.unpack_from('<I', helper, offset+i*entry_size)[0] not in (2, 3)
+               for i in range(count)), 'resolver has dynamic dependencies'
+    for name in ('LICENSE','THIRD_PARTY_NOTICES.md','media/UPSTREAM-LICENSE','media/upstream/src/main.rs'):
+        assert (root/'share/local.ytm-alice'/name).is_file(), name
+    forbidden = {'youtube-session.json','state.json','settings.json','id_ed25519','cookies.sqlite','target','.git'}
+    assert not any(path.name in forbidden for path in (root/'pkgs').rglob('*'))
+    data = root/'var/local.ytm-alice'
+    data.mkdir(parents=True, exist_ok=True)
+    session = data/'youtube-session.json'
+    session.write_text('{"fixture":"session-preservation"}')
+    session.chmod(0o600)
+    settings = data/'settings.json'
+    settings.write_text('{"web_addr":":24721","radio":false}')
+    settings.chmod(0o600)
+    invoke('remove', 'local/ytm-alice')
+    assert not invoke('list').strip()
+    assert not (root/'bin/bt-proxy').exists()
+    # Synthetic old packages exercise the real conflicts/replaces upgrade path.
+    for name, binaries in [('ytm-alice', ('ytm-alice','ytm-alice-player')),
+                            ('alice-media', ('alice-media','bt-proxy'))]:
+        source = temporary/name
+        source.mkdir()
+        program = source/'program'
+        program.write_text('#!/bin/sh\nexit 0\n')
+        program.chmod(0o755)
+        (source/'yam.yaml').write_text('name: local/'+name+'\nversion: 0.0.1\nlicense: MIT\n'
+            'description: Upgrade fixture\ntargets: ['+args.platform+']\nfiles:\n'+
+            ''.join('  bin/'+binary+': program\n' for binary in binaries))
+        artifact = temporary/(name+'.yampkg')
+        invoke('pack', source, '--output', artifact)
+        invoke('install', '--yes', artifact)
+    invoke('install', '--yes', package)
+    assert invoke('list').split() == ['local/ytm-alice',version,args.platform]
+    assert not (root/'pkgs/local/alice-media').exists()
+    assert session.read_text() == '{"fixture":"session-preservation"}'
+    assert session.stat().st_mode & 0o777 == 0o600
+    assert settings.read_text() == '{"web_addr":":24721","radio":false}'
+    assert settings.stat().st_mode & 0o777 == 0o600
+    invoke('doctor')
+    print(args.platform+': seven executables, clean install, upgrade from two packages, removal, session preservation and doctor OK')

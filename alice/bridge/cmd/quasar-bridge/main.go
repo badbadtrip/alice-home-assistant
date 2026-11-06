@@ -28,6 +28,7 @@ import (
 	"quasarbridge/internal/indicator"
 	"quasarbridge/internal/llm"
 	"quasarbridge/internal/soloist"
+	"quasarbridge/internal/ytm"
 	"quasarbridge/internal/wire"
 )
 
@@ -216,6 +217,8 @@ func main() {
 	if local := (&soloist.Client{StateDir: "/data/soloist/state"}); engine.Playback == nil && local.Available() {
 		engine.Playback = local
 	}
+	youtube := ytm.New()
+	engine.YouTube = youtube
 	if err := engine.SetRouting(withoutModelFallback(cfg.Routing, llmDisabled)); err != nil {
 		slog.Error("routing rejected", "error", err)
 		os.Exit(1)
@@ -378,6 +381,7 @@ func main() {
 	server := &http.Server{Addr: cfg.Listen, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go youtube.Supervise(ctx)
 	if control, err := newAirPlayControl(ctx, os.Getenv("QUASAR_DATA_DIR"), os.Getenv("QUASAR_HOME_AREA")); err != nil {
 		slog.Warn("airplay_unavailable", "error", err)
 	} else {

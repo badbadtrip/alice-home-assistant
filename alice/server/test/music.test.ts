@@ -13,5 +13,5 @@ test('settings from the Music Assistant era keep playlists and fall back to stoc
   const parsed = MusicSettingsSchema.parse({ default_media: 'x', players: {}, source: 'music_assistant', spotify_playlists: [{ name: 'Утро', uri: 'spotify:playlist:a' }] })
   assert.equal(parsed.source, 'yandex')
   assert.equal(parsed.spotify_playlists.length, 1)
-  assert.equal(MusicSettingsSchema.parse({ source: 'spotify' }).source, 'spotify')
+  assert.equal(MusicSettingsSchema.parse({ source: 'spotify' }).source, 'alternative')
 })

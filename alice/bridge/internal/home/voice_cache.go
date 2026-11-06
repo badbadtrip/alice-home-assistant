@@ -24,6 +24,7 @@ type voicePhraseSnapshot struct {
  Playlists []playback.Playlist
  MusicSource string
  RelayRooms []string
+ MusicProvider string
 }
 type voicePhraseCache struct {
  snapshot atomic.Pointer[voicePhraseSnapshot]
@@ -104,7 +105,13 @@ func (f *Functions) FindSpotify(ctx context.Context,kind,query string) (string,[
  return found.URI,found.Next,err
 }
 
-// MusicSource returns the source picked in the panel: "spotify" or "yandex".
+// MusicProvider returns the alternative service used when the phrase names none.
+func (f *Functions) MusicProvider() string {
+ if snapshot:=f.voice.snapshot.Load();snapshot!=nil {return snapshot.MusicProvider}
+ return ""
+}
+
+// MusicSource returns the source picked in the panel: "alternative" or "yandex".
 func (f *Functions) MusicSource() string {
  if snapshot:=f.voice.snapshot.Load();snapshot!=nil {return snapshot.MusicSource}
  return ""
@@ -119,6 +126,7 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
   Routing json.RawMessage `json:"routing"`
   Playlists []playback.Playlist `json:"playlists"`
   MusicSource string `json:"music_source"`
+  MusicProvider string `json:"music_provider"`
   RelayRooms []string `json:"relay_rooms"`
  }
  if err:=f.request(ctx,http.MethodGet,"/voice-phrases",nil,&response);err!=nil {return err}
@@ -146,7 +154,7 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  names:=make([]string,0,len(response.DeviceNames))
  for _,name:=range response.DeviceNames {if name=normalizeVoicePhrase(name);name!="" {names=append(names,name)}}
  previous:=f.voice.snapshot.Load()
- f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names,Playlists:response.Playlists,MusicSource:response.MusicSource,RelayRooms:response.RelayRooms})
+ f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names,Playlists:response.Playlists,MusicSource:response.MusicSource,RelayRooms:response.RelayRooms,MusicProvider:response.MusicProvider})
  f.applyRouting(response.Routing)
  if previous==nil || previous.Revision!=response.Revision {
   slog.Info("voice_phrase_cache_updated","phrases",len(phrases),"revision",response.Revision)

@@ -64,34 +64,52 @@ func PickPlaylist(text string, playlists []Playlist) string {
 }
 
 var (
-	searchVerb  = `^(?:включи|поставь|запусти|сыграй|играй)(?: мне)?`
+	searchVerb  = `^(?:включи|поставь|запусти|сыграй|играй|найди)(?: мне)?`
 	namedSearch = regexp.MustCompile(searchVerb + `(?: мою| мой)? (песню|трек|композицию|группу|исполнителя|артиста|альбом|плейлист) (.+)$`)
 	likedSearch = regexp.MustCompile(searchVerb + ` (?:мои лайки|избранное|любимую музыку|мою любимую музыку|любимые (?:песни|треки)|понравившиеся(?: песни| треки)?)$`)
 	bareSearch  = regexp.MustCompile(searchVerb + ` (.+)$`)
-	spotifyTail = regexp.MustCompile(` (?:в|на|из) спотифа[йея]$`)
 	searchKinds = map[string]string{
 		"песню": "track", "трек": "track", "композицию": "track",
 		"группу": "artist", "исполнителя": "artist", "артиста": "artist",
 		"альбом": "album", "плейлист": "playlist",
 	}
+	serviceName = `(?:в|на|из|через|по) (?:(спотифа[йеяю]|спотик[еа]?|spotify)|(ют[ьу]+б[еау]?(?: музык[еау])?|youtube(?: music)?))`
+	serviceTail = regexp.MustCompile(` ` + serviceName + `$`)
+	serviceHead = regexp.MustCompile(searchVerb + ` ` + serviceName + ` `)
 )
 
+// service finds a spoken service at either end and returns the phrase without it.
+func service(text string) (string, string) {
+	provider := func(match []string) string {
+		if match[1] != "" {
+			return "spotify"
+		}
+		return "youtube"
+	}
+	if match := serviceTail.FindStringSubmatch(text); match != nil {
+		return serviceTail.ReplaceAllString(text, ""), provider(match)
+	}
+	if match := serviceHead.FindStringSubmatch(text); match != nil {
+		return strings.Fields(text)[0] + " " + strings.TrimPrefix(text, match[0]), provider(match)
+	}
+	return text, ""
+}
+
 // Search reads a request to find music. A bare "включи кино" may name a lamp or a
-// Yandex skill, so it counts only when the user said Spotify out loud.
-func Search(text string) (kind, query string, ok bool) {
-	text = normalize(text)
-	named := spotifyTail.MatchString(text)
-	text = spotifyTail.ReplaceAllString(text, "")
+// Yandex skill, so it counts only when a service was said out loud. The provider is
+// empty unless named.
+func Search(text string) (kind, query, provider string, ok bool) {
+	text, provider = service(normalize(text))
 	if likedSearch.MatchString(text) {
-		return "liked", "", true
+		return "liked", "", provider, true
 	}
 	if match := namedSearch.FindStringSubmatch(text); match != nil {
-		return searchKinds[match[1]], match[2], true
+		return searchKinds[match[1]], match[2], provider, true
 	}
-	if match := bareSearch.FindStringSubmatch(text); named && match != nil {
-		return "any", match[1], true
+	if match := bareSearch.FindStringSubmatch(text); provider != "" && match != nil {
+		return "any", match[1], provider, true
 	}
-	return "", "", false
+	return "", "", "", false
 }
 
 var relayAsk = regexp.MustCompile(`^(?:скажи|передай)(?: на| в| во) ([^ ]+) (.+)$`)

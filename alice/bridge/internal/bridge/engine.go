@@ -33,6 +33,12 @@ type MusicResumer interface {
 type PlaylistPlayer interface {
 	PlayURI(context.Context, string) (string, error)
 }
+type YouTubePlayer interface {
+	Available() bool
+	Active(context.Context) bool
+	Play(context.Context, string) error
+	Control(context.Context, string) (string, error)
+}
 type SpeakerRelay interface {
 	RelayRoom(string) bool
 	Relay(context.Context, string, string) error
@@ -58,6 +64,7 @@ type Engine struct {
 	Home         HomeHandler
 	Playback     PlaybackController
 	Music        MusicStarter
+	YouTube      YouTubePlayer
 	Dialogue     *dialogue.Store
 	dialogueOnce sync.Once
 	routing      atomic.Pointer[RoutingPolicy]
@@ -142,15 +149,41 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 			}
 			return result, nil
 		}
+		if decision.Source == "youtube_control" {
+			answer, err := e.YouTube.Control(ctx, playback.Command(text))
+			result.Answer = answer
+			return result, err
+		}
+		if decision.Source == "playback_youtube" {
+			if e.YouTube == nil || !e.YouTube.Available() {
+				result.Answer = "YouTube Music на этой колонке не установлен."
+				return result, nil
+			}
+			if e.Playback != nil && e.Playback.Active(ctx) {
+				_, _ = e.Playback.Control(ctx, "pause")
+			}
+			kind, query, _, _ := playback.Search(text)
+			if kind == "liked" {
+				query = "мои лайки"
+			}
+			if err := e.YouTube.Play(ctx, query); err != nil {
+				result.Answer = "Не нашла это в YouTube Music."
+			}
+			return result, nil
+		}
 		if e.Playback == nil {
 			return Resolution{Route: "yandex"}, nil
+		}
+		if e.YouTube != nil && e.YouTube.Active(ctx) {
+			// Two players must not sound at once.
+			_, _ = e.YouTube.Control(ctx, "stop")
 		}
 		if decision.Source == "playback_missing" {
 			result.Answer = "Не нашла такой плейлист в Spotify."
 			return result, nil
 		}
 		if player, ok := e.Playback.(PlaylistPlayer); ok && decision.Source == "playback_search" {
-			kind, query, _ := playback.Search(text)
+			kind, query, _, _ := playback.Search(text)
 			uri, next, err := e.Home.(SpotifyFinder).FindSpotify(ctx, kind, query)
 			if err != nil {
 				result.Answer = "Spotify сейчас не отвечает."
@@ -290,6 +323,18 @@ func (e *Engine) musicSource() string {
 	}
 	return ""
 }
+// wantsYouTube follows the service named in the phrase, then the panel's default.
+func (e *Engine) wantsYouTube(text string) bool {
+	_, _, provider, found := playback.Search(text)
+	if found && provider != "" {
+		return provider == "youtube"
+	}
+	if !found && !playback.Start(text) {
+		return false
+	}
+	source, ok := e.Home.(interface{ MusicProvider() string })
+	return ok && source.MusicProvider() == "youtube"
+}
 func (e *Engine) canSearch() bool {
 	_, ok := e.Home.(SpotifyFinder)
 	return ok
@@ -351,6 +396,16 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 			return RouteDecision{Route: "playback", Source: "relay"}
 		}
 	}
+	if e.YouTube != nil && playback.Command(text) != "" && e.YouTube.Active(ctx) {
+		return RouteDecision{Route: "playback", Source: "youtube_control"}
+	}
+	if e.musicSource() == "yandex" {
+		if e.YouTube != nil && playback.MusicAsk(text) && e.YouTube.Active(ctx) {
+			_, _ = e.YouTube.Control(ctx, "stop")
+		}
+	} else if e.wantsYouTube(text) {
+		return RouteDecision{Route: "playback", Source: "playback_youtube"}
+	}
 	if e.Playback != nil && playback.Command(text) != "" && e.Playback.Active(ctx) {
 		return RouteDecision{Route: "playback", Source: "playback"}
 	}
@@ -364,7 +419,7 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 			return RouteDecision{Route: "playback", Source: "playback_playlist"}
 		} else if playback.Start(text) {
 			return RouteDecision{Route: "playback", Source: "playback_start"}
-		} else if _, _, found := playback.Search(text); found && e.canSearch() {
+		} else if _, _, _, found := playback.Search(text); found && e.canSearch() {
 			return RouteDecision{Route: "playback", Source: "playback_search"}
 		} else if playback.MusicAsk(text) {
 			return RouteDecision{Route: "playback", Source: "playback_missing"}

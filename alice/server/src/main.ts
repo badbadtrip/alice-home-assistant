@@ -328,6 +328,7 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     response.json({
       commands,
       device_names: deviceVoiceNames(allowed),
+      music_provider: music.provider,
       music_source: music.source,
       playlists: music.spotify_playlists,
       relay_rooms: relayRooms(await readSpeakers(process.env.ALICE_SPEAKERS_PATH)),

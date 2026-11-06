@@ -154,7 +154,10 @@ def station(manager, speaker_id, operation, payload):
             if len(fields) < 4 or not fields[-3].isdigit() or int(fields[-3]) < YTM_FREE_KB:
                 raise Error('На колонке мало места: для плеера нужно 40 МБ свободных.', 409)
             # The bridge notices the file and starts the player by itself.
-            bundle = (Path(manager.config['artifact_dir']) / 'ytm-alice.tar.gz').read_bytes()
+            try:
+                bundle = (Path(manager.config['artifact_dir']) / 'ytm-alice.tar.gz').read_bytes()
+            except OSError:
+                raise Error('Плеера нет в этой версии приложения. Обновите приложение.', 503) from None
             manager.ssh(speaker, 'mkdir -p /data/opt/ytm-alice/var && cd /data/opt/ytm-alice && gzip -dc | tar -xf - '
                         '&& chmod 755 bin/*', bundle, timeout=120)
             manager.store.metadata(speaker_id, ytm_installed=True)

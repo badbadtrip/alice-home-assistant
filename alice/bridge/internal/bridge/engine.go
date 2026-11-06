@@ -335,6 +335,23 @@ func (e *Engine) wantsYouTube(text string) bool {
 	source, ok := e.Home.(interface{ MusicProvider() string })
 	return ok && source.MusicProvider() == "youtube"
 }
+// PlayerControl serves the panel: the player that owns the speaker takes the action.
+func (e *Engine) PlayerControl(ctx context.Context, action string) error {
+	switch action {
+	case "pause", "resume", "next", "previous":
+	default:
+		return errors.New("unknown player action")
+	}
+	if e.YouTube != nil && e.YouTube.Active(ctx) {
+		_, err := e.YouTube.Control(ctx, action)
+		return err
+	}
+	if e.Playback != nil && e.Playback.Active(ctx) {
+		_, err := e.Playback.Control(ctx, action)
+		return err
+	}
+	return errors.New("nothing is playing")
+}
 func (e *Engine) canSearch() bool {
 	_, ok := e.Home.(SpotifyFinder)
 	return ok

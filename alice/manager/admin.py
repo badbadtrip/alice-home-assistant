@@ -144,6 +144,12 @@ def station(manager, speaker_id, operation, payload):
             manager.store.metadata(speaker_id, airplay_off=action == 'off')
             state = json.loads(output.decode().strip().splitlines()[0])
             return {'enabled': state.get('enabled') is True, 'connected': state.get('connected') is True, 'playing': state.get('playing') is True, 'error': bool(state.get('error'))}
+        if operation == 'player':
+            action = payload.get('action')
+            if action not in ('pause', 'resume', 'next', 'previous'):
+                raise Error('Неизвестная команда плеера.')
+            manager.ssh(speaker, 'wget -T 4 -q -O - "http://127.0.0.1:18861/player?action=' + action + '"', timeout=10)
+            return {'ok': True}
         if operation == 'ytm':
             # Other people's speakers differ: say why before anything is written.
             check = manager.ssh(speaker, 'if [ -f /system/vendor/quasar/libquasar_gstreamer.so ] || [ -f /system/vendor/quasar/libs/libquasar_gstreamer.so ]; '

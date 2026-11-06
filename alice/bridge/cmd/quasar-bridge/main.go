@@ -367,6 +367,13 @@ func main() {
 		_, _ = w.Write(data)
 	})
 	mux.HandleFunc("GET /volume", proxy.VolumeHandler)
+	mux.HandleFunc("GET /player", func(w http.ResponseWriter, r *http.Request) {
+		if err := engine.PlayerControl(r.Context(), r.URL.Query().Get("action")); err != nil {
+			http.Error(w, "player unavailable", http.StatusConflict)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
 	mux.HandleFunc("GET /music-state", func(w http.ResponseWriter, r *http.Request) {
 		if ring != nil {
 			ring.SetMusic(r.URL.Query().Get("playing") == "1")

@@ -20,6 +20,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlsplit
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 NETWORKS = tuple(ipaddress.ip_network(n) for n in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'))
@@ -1033,6 +1034,33 @@ class Manager:
         return {'state': 'rolled_back', 'message': 'Мост отключён, исходная конфигурация восстановлена. Перезагрузите колонку для сброса кешированного маршрута.'}
 
 
+def ai_check(payload, options=Path('/data/options.json'), opener=urlopen):
+    """Tries the provider from the server: a browser is blocked by CORS and has no saved key."""
+    base = str(payload.get('base_url', '')).strip().rstrip('/')
+    key = str(payload.get('api_key', '')).strip()
+    model = str(payload.get('model', '')).strip()
+    if urlsplit(base).scheme not in ('http', 'https') or not urlsplit(base).hostname:
+        return {'ok': False, 'message': 'Укажите Base URL вида https://…/v1.'}
+    if not key:
+        try:
+            key = json.loads(options.read_text()).get('llm_api_key', '')
+        except (OSError, ValueError):
+            key = ''
+    headers = {'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'}
+    try:
+        with opener(Request(base + '/models', headers=headers), timeout=10) as response:
+            data = json.loads(response.read(2 * 1024 * 1024))
+        models = sorted(str(item['id']) for item in data.get('data', []) if isinstance(item, dict) and item.get('id'))[:300]
+    except HTTPError as error:
+        message = 'Провайдер отклонил ключ.' if error.code in (401, 403) else f'Провайдер ответил ошибкой {error.code}.'
+        return {'ok': False, 'message': message}
+    except (OSError, ValueError, AttributeError):
+        return {'ok': False, 'message': 'Адрес недоступен из Home Assistant или это не OpenAI-совместимый API.'}
+    if model and models and model not in models:
+        return {'ok': False, 'message': 'Такой модели у провайдера нет.', 'models': models}
+    return {'ok': True, 'message': f'Подключение работает, моделей: {len(models)}.', 'models': models}
+
+
 def authenticate(ha_url, token):
     """HA has WS auth/current_user, not a documented REST current_user endpoint."""
     from websockets.sync.client import connect
@@ -1136,6 +1164,8 @@ class Handler(BaseHTTPRequestHandler):
             return 200, manager._hf_request('/spotify')
         if len(path) == 3 and path[:2] == ['api', 'spotify'] and path[2] in ('login', 'callback', 'sync') and method == 'POST':
             return 200, manager._hf_request('/spotify/' + path[2], None, payload or {})
+        if path == ['api', 'ai-check'] and method == 'POST':
+            return 200, ai_check(payload)
         if path == ['api', 'music'] and method == 'GET':
             return 200, manager._hf_request('/music')
         if path == ['api', 'music'] and method == 'PUT':

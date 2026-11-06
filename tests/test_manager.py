@@ -582,5 +582,27 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(json.loads(call.kwargs['body'])['area'], 'Kitchen')
 
 
+
+class AiCheckTests(unittest.TestCase):
+    def check(self, payload, body=b'{"data":[{"id":"m1"}]}', error=None):
+        import io
+        import service
+
+        def opener(request, timeout):
+            if error:
+                raise error
+            return io.BytesIO(body)
+        return service.ai_check(payload, Path('/nonexistent'), opener)
+
+    def test_lists_models_and_finds_a_wrong_name(self):
+        self.assertEqual(self.check({'base_url': 'http://x/v1', 'api_key': 'k'})['models'], ['m1'])
+        self.assertFalse(self.check({'base_url': 'http://x/v1', 'api_key': 'k', 'model': 'no'})['ok'])
+
+    def test_explains_key_and_address_problems(self):
+        from urllib.error import HTTPError
+        self.assertIn('ключ', self.check({'base_url': 'http://x/v1'}, error=HTTPError('u', 401, '', {}, None))['message'])
+        self.assertFalse(self.check({'base_url': 'ftp://x'})['ok'])
+        self.assertFalse(self.check({'base_url': 'http://x/v1'}, error=OSError())['ok'])
+
 if __name__ == '__main__':
     unittest.main()

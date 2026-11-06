@@ -167,7 +167,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(502,{'error':'Сервис колонок ещё запускается или недоступен'})
 
     def shell(self,body,base):
-        overview='data-alice-overview' in body or '<iframe' in body
+        overview='data-alice-overview' in body
         def tab(href,label,active):
             return '<a href="'+href+'"'+(' aria-current="page"' if active else '')+'>'+label+'</a>'
         navigation=tab('./','Обзор',overview)+tab('wiki/Home','Руководство',not overview)
@@ -189,7 +189,7 @@ class Handler(BaseHTTPRequestHandler):
         target='/'+dashboard+'/speakers'
         body=notice+('<div data-alice-overview><div class="notice mobile-launch" hidden><strong>Открываем ваши колонки</strong>'
                      '<p>Панель откроется в текущем Home Assistant.</p><a id="open-dashboard" target="_top" href="'+target+'">Открыть панель →</a></div>'
-                     '<iframe title="Колонки и голосовые команды" data-dashboard="'+target+'"></iframe></div>')
+                     '</div>')
         body+='<script>'+MOBILE_OVERVIEW_SCRIPT+'</script>'
         return self.shell(body,prefix.rstrip('/')+'/')
 
@@ -203,6 +203,6 @@ def serve(status,root=Path('/app'),address='172.30.32.2'):
     return server
 
 
-# Use the authenticated outer HA router on phones; Companion app auth is not
-# necessarily available to a second, nested HA bootstrap in an iframe.
-MOBILE_OVERVIEW_SCRIPT=r"""(()=>{const frame=document.querySelector('iframe[data-dashboard]'),path=frame.dataset.dashboard,launch=document.querySelector('.mobile-launch');const mobile=matchMedia('(max-width:760px)').matches||/iPhone|iPad|Android/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);if(mobile){frame.remove();launch.hidden=false;try{const outer=window.top;if(outer!==window&&outer.document.querySelector('home-assistant')){outer.history.replaceState(outer.history.state,'',path);outer.dispatchEvent(new outer.CustomEvent('location-changed',{detail:{replace:true}}));}}catch{}return;}frame.src=path;setTimeout(()=>{try{if(!frame.contentWindow.document.querySelector('home-assistant')?.hass)launch.hidden=false;}catch{launch.hidden=false;}},12000);})();"""
+# The panel is a dashboard of the HA already open around this page. A nested iframe
+# would boot a second HA with all its cards, and phones may not authenticate it.
+MOBILE_OVERVIEW_SCRIPT=r"""(()=>{const link=document.getElementById('open-dashboard'),path=link.getAttribute('href'),launch=document.querySelector('.mobile-launch');try{const outer=window.top;if(outer!==window&&outer.document.querySelector('home-assistant')){outer.history.replaceState(outer.history.state,'',path);outer.dispatchEvent(new outer.CustomEvent('location-changed',{detail:{replace:true}}));}}catch{}setTimeout(()=>{launch.hidden=false;},1500);})();"""

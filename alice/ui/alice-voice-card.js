@@ -416,21 +416,15 @@ button:active:not(:disabled){transform:scale(.97)}
     _syncShellTheme(){if(!this._config?.app_embedded||window===window.top||typeof this._hass?.themes?.darkMode!=='boolean')return;try{window.parent.document.documentElement.style.colorScheme=this._hass.themes.darkMode?'dark':'light';}catch{}}
     _applyEmbeddedLayout() {
       this._embeddedStyle?.remove();this._embeddedStyle=undefined;
-      this._embeddedDrawerStyle?.remove();this._embeddedDrawerStyle=undefined;
-      if(!this._config?.app_embedded||window===window.top)return;
+      if(!this._config?.app_embedded)return;
       let node=this;
       while(node){
         if(node.localName==='hui-root'&&node.shadowRoot){
           const style=document.createElement('style');
           style.dataset.aliceEmbedded='true';
-          style.textContent=':host{--header-height:0px!important;--app-header-height:0px!important}app-header,.header{display:none!important}#view{padding-top:0!important;min-height:100dvh;background:var(--primary-background-color)}hui-view-background{display:none!important}';
+          /* Phones keep HA's bar: it holds the only way to the sidebar. */
+          style.textContent='@media(min-width:871px){:host{--header-height:0px!important;--app-header-height:0px!important}app-header,.header{display:none!important}#view{padding-top:0!important}}';
           node.shadowRoot.append(style);this._embeddedStyle=style;
-        }
-        if(node.localName==='ha-drawer'&&node.shadowRoot){
-          const style=document.createElement('style');
-          style.dataset.aliceEmbedded='true';
-          style.textContent='.sidebar-shell{display:none!important}.app-content{padding:0!important;margin:0!important}.scrim{display:none!important}';
-          node.shadowRoot.append(style);this._embeddedDrawerStyle=style;
         }
         node=node.parentNode??node.getRootNode()?.host;
       }
@@ -460,7 +454,6 @@ button:active:not(:disabled){transform:scale(.97)}
       try{this._resumeTop?.removeEventListener('focus',this._resumeHandler);}catch{}this._resumeTop=undefined;
       this._stopAdminHA();
       this._embeddedStyle?.remove();this._embeddedStyle=undefined;
-      this._embeddedDrawerStyle?.remove();this._embeddedDrawerStyle=undefined;
       this._unsubscribe?.(); this._unsubscribe = undefined;
       clearTimeout(this._refreshTimer);clearInterval(this._connectionTimer);
     }

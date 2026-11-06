@@ -1,0 +1,45 @@
+name: Promote
+on:
+  workflow_run:
+    workflows: [Check, Image]
+    types: [completed]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: promote
+  cancel-in-progress: false
+jobs:
+  main:
+    # Each finished workflow lands here; the later one of the pair does the merge.
+    if: github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'claude/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Require both workflows
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SHA" \
+            --jq '[.workflow_runs[] | select((.name=="Check" or .name=="Image") and .conclusion=="success") | .name] | unique | length')
+          echo "ready=$([ "$passed" = 2 ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+      - name: Fast-forward main
+        if: steps.gate.outputs.ready == 'yes'
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git fetch origin main
+          # Only a branch built on the current main may ship; others need a rebase.
+          if git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "Already on main"
+          elif git merge-base --is-ancestor origin/main "$SHA"; then
+            git push origin "$SHA:refs/heads/main"
+          else
+            echo "::error::Branch is behind main: update it and push again"
+            exit 1
+          fi

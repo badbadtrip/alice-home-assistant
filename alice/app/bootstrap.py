@@ -23,6 +23,17 @@ def write_private(path, data):
     os.replace(temp, path)
 
 
+def local_url(network, port):
+    """The address a speaker can reach, read from Supervisor network info, or ''."""
+    interfaces=[item for item in network.get('interfaces',[]) if item.get('enabled',True) and item.get('connected',True)]
+    for item in sorted(interfaces,key=lambda item:not item.get('primary')):
+        for address in (item.get('ipv4') or {}).get('address') or []:
+            host=ipaddress.ip_interface(address).ip
+            if host.is_private and not host.is_loopback and port:
+                return 'http://'+str(host)+':'+str(port)
+    return ''
+
+
 def options(raw):
     result = {**raw}
     label = result.get('voice_command_label', 'alice_voice_commands')

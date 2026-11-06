@@ -130,4 +130,16 @@ class AppTests(unittest.TestCase):
         finally:server.shutdown();server.server_close();thread.join()
 
 
+
+class LocalUrlTest(unittest.TestCase):
+    def test_primary_private_address_with_the_published_port(self):
+        from bootstrap import local_url
+        network={'interfaces':[{'primary':False,'ipv4':{'address':['10.0.0.5/24']}},{'primary':True,'ipv4':{'address':['192.168.1.9/24']}}]}
+        self.assertEqual(local_url(network,18080),'http://192.168.1.9:18080')
+
+    def test_no_port_or_address_leaves_the_field_empty(self):
+        from bootstrap import local_url
+        self.assertEqual(local_url({'interfaces':[{'ipv4':{'address':['192.168.1.9/24']}}]},None),'')
+        self.assertEqual(local_url({'interfaces':[]},18080),'')
+
 if __name__=='__main__':unittest.main()

@@ -8,7 +8,7 @@ import sys
 import threading
 import time
 from urllib.request import Request,urlopen
-from bootstrap import configure
+from bootstrap import configure,local_url
 from provision import provision,dashboard_path
 from gateway import serve
 from import_state import import_state
@@ -18,6 +18,17 @@ def self_info():
     req=Request('http://supervisor/addons/self/info',headers={'Authorization':'Bearer '+os.environ['SUPERVISOR_TOKEN']})
     with urlopen(req,timeout=15) as response:
         return json.load(response)['data']
+
+
+def detected_url(info):
+    # A first start needs no typed address; a saved one always wins.
+    req=Request('http://supervisor/network/info',headers={'Authorization':'Bearer '+os.environ['SUPERVISOR_TOKEN']})
+    try:
+        with urlopen(req,timeout=15) as response:
+            network=json.load(response)['data']
+        return local_url(network,(info.get('network') or {}).get('18080/tcp'))
+    except (OSError,ValueError,KeyError):
+        return ''
 
 
 def home_timezone():
@@ -45,8 +56,10 @@ def main():
     os.umask(0o077)
     root=Path('/app');data=Path('/data')
     if import_state(data=data):print('Приватная миграция реестра и ключей выполнена.',flush=True)
-    value,token=configure(data,root,json.loads((data/'options.json').read_text()))
     info=self_info()
+    raw=json.loads((data/'options.json').read_text())
+    if not raw.get('advertised_url'):raw['advertised_url']=detected_url(info)
+    value,token=configure(data,root,raw)
     status={'configured':bool(value['advertised_url']),'dashboard_ready':False,'dashboard_path':dashboard_path(info['slug'])}
     server=serve(status)
     threading.Thread(target=server.serve_forever,daemon=True).start()

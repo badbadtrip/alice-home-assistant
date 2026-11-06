@@ -33,6 +33,9 @@ type MusicResumer interface {
 type PlaylistPlayer interface {
 	PlayURI(context.Context, string) (string, error)
 }
+type SpotifyFinder interface {
+	FindSpotify(context.Context, string, string) (string, error)
+}
 type PlaylistSource interface {
 	Playlists() []playback.Playlist
 }
@@ -130,6 +133,21 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 		if decision.Source == "playback_missing" {
 			result.Answer = "Не нашла такой плейлист в Spotify."
 			return result, nil
+		}
+		if player, ok := e.Playback.(PlaylistPlayer); ok && decision.Source == "playback_search" {
+			kind, query, _ := playback.Search(text)
+			uri, err := e.Home.(SpotifyFinder).FindSpotify(ctx, kind, query)
+			if err != nil {
+				result.Answer = "Spotify сейчас не отвечает."
+				return result, nil
+			}
+			if uri == "" {
+				result.Answer = "Не нашла это в Spotify."
+				return result, nil
+			}
+			answer, err := player.PlayURI(ctx, uri)
+			result.Answer = answer
+			return result, err
 		}
 		if player, ok := e.Playback.(PlaylistPlayer); ok && decision.Source == "playback_playlist" {
 			answer, err := player.PlayURI(ctx, e.playlistURI(text))
@@ -253,6 +271,10 @@ func (e *Engine) musicSource() string {
 	}
 	return ""
 }
+func (e *Engine) canSearch() bool {
+	_, ok := e.Home.(SpotifyFinder)
+	return ok
+}
 func (e *Engine) playlistURI(text string) string {
 	source, ok := e.Home.(PlaylistSource)
 	if !ok {
@@ -317,6 +339,8 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 			return RouteDecision{Route: "playback", Source: "playback_playlist"}
 		} else if playback.Start(text) {
 			return RouteDecision{Route: "playback", Source: "playback_start"}
+		} else if _, _, found := playback.Search(text); found && e.canSearch() {
+			return RouteDecision{Route: "playback", Source: "playback_search"}
 		} else if playback.MusicAsk(text) {
 			return RouteDecision{Route: "playback", Source: "playback_missing"}
 		}

@@ -63,6 +63,37 @@ func PickPlaylist(text string, playlists []Playlist) string {
 	return ""
 }
 
+var (
+	searchVerb  = `^(?:включи|поставь|запусти|сыграй|играй)(?: мне)?`
+	namedSearch = regexp.MustCompile(searchVerb + `(?: мою| мой)? (песню|трек|композицию|группу|исполнителя|артиста|альбом|плейлист) (.+)$`)
+	likedSearch = regexp.MustCompile(searchVerb + ` (?:мои лайки|избранное|любимую музыку|мою любимую музыку|любимые (?:песни|треки)|понравившиеся(?: песни| треки)?)$`)
+	bareSearch  = regexp.MustCompile(searchVerb + ` (.+)$`)
+	spotifyTail = regexp.MustCompile(` (?:в|на|из) спотифа[йея]$`)
+	searchKinds = map[string]string{
+		"песню": "track", "трек": "track", "композицию": "track",
+		"группу": "artist", "исполнителя": "artist", "артиста": "artist",
+		"альбом": "album", "плейлист": "playlist",
+	}
+)
+
+// Search reads a request to find music. A bare "включи кино" may name a lamp or a
+// Yandex skill, so it counts only when the user said Spotify out loud.
+func Search(text string) (kind, query string, ok bool) {
+	text = normalize(text)
+	named := spotifyTail.MatchString(text)
+	text = spotifyTail.ReplaceAllString(text, "")
+	if likedSearch.MatchString(text) {
+		return "liked", "", true
+	}
+	if match := namedSearch.FindStringSubmatch(text); match != nil {
+		return searchKinds[match[1]], match[2], true
+	}
+	if match := bareSearch.FindStringSubmatch(text); named && match != nil {
+		return "any", match[1], true
+	}
+	return "", "", false
+}
+
 var spokenDigits = strings.NewReplacer("один", "1", "первый", "1", "два", "2", "второй", "2", "три", "3", "третий", "3", "четыре", "4", "пять", "5")
 
 // playlistName compares what was said with a panel name: "плейлист номер 1" equals "номер один".

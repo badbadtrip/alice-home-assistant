@@ -21,7 +21,7 @@ import { MusicSettingsSchema, readMusicSettings, writeMusicSettings } from './mu
 import { previewCommand } from './preview'
 import { callReadTool, READ_TOOLS } from './read-tools'
 import { isSpeakerAllowed, speakerDevices } from './speaker-access'
-import { ClientIdSchema, fetchPlaylists, finishLogin, loginRequest, mergePlaylists, readSpotify, refreshAccess, writeSpotify } from './spotify'
+import { ClientIdSchema, fetchPlaylists, finishLogin, loginRequest, mergePlaylists, readSpotify, refreshAccess, SearchRequestSchema, searchSpotify, writeSpotify } from './spotify'
 
 const logger = getLogger()
 
@@ -262,11 +262,33 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
       response.json(await spotifyStatus())
     } catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : 'Не удалось войти.' }) }
   })
+  // Refresh tokens are single use, so two speakers must never refresh at the same time.
+  let spotifyToken: undefined | { access: string; expires: number }
+  let spotifyRefresh: Promise<string> | undefined
+  const spotifyAccess = (): Promise<string> => {
+    if (spotifyToken && spotifyToken.expires > Date.now()) return Promise.resolve(spotifyToken.access)
+    spotifyRefresh ??= (async () => {
+      try {
+        const { access, state } = await refreshAccess(await readSpotify(spotifyPath))
+        await writeSpotify(spotifyPath, state)
+        spotifyToken = { access, expires: Date.now() + 45 * 60_000 }
+        return access
+      } finally { spotifyRefresh = undefined }
+    })()
+    return spotifyRefresh
+  }
+  app.post('/spotify/search', async (request, response) => {
+    const parsed = SearchRequestSchema.safeParse(request.body)
+    if (!parsed.success) { response.status(400).json({ error: 'Invalid search' }); return }
+    try {
+      const found = await searchSpotify(await spotifyAccess(), parsed.data)
+      response.json(found ?? { name: '', uri: '' })
+    } catch { response.status(502).json({ error: 'Spotify не ответил.' }) }
+  })
   // The manager forwards every write as POST, and this one also rotates the token.
   app.post('/spotify/sync', async (_, response) => {
     try {
-      const { access, state } = await refreshAccess(await readSpotify(spotifyPath))
-      await writeSpotify(spotifyPath, state)
+      const access = await spotifyAccess()
       const settings = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
       const playlists = mergePlaylists(settings.spotify_playlists, await fetchPlaylists(access))
       const merged = { ...settings, spotify_playlists: playlists }

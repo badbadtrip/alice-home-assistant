@@ -6,7 +6,8 @@ import z from 'zod'
 // Spotify allows plain HTTP redirects only on loopback, so the user pastes the final address back.
 export const REDIRECT_URI = 'http://127.0.0.1:8888/callback'
 const ACCOUNTS = 'https://accounts.spotify.com'
-const PLAYLISTS = 'https://api.spotify.com/v1/me/playlists?limit=50'
+const API = 'https://api.spotify.com/v1'
+const PLAYLISTS = `${API}/me/playlists?limit=50`
 const SCOPES = 'playlist-read-private playlist-read-collaborative'
 const MAX_PAGES = 10
 
@@ -25,6 +26,18 @@ const PageSchema = z.object({
   items: z.array(ItemSchema.nullable()),
   next: z.string().nullable().optional()
 })
+
+const FoundSchema = z.object({ items: z.array(ItemSchema.nullable()) }).optional()
+const SearchSchema = z.object({
+  albums: FoundSchema, artists: FoundSchema, playlists: FoundSchema, tracks: FoundSchema
+})
+
+export const SearchRequestSchema = z.object({
+  kind: z.enum(['album', 'any', 'artist', 'liked', 'playlist', 'track']),
+  query: z.string().trim().max(200).default('')
+}).strict()
+export type SearchRequest = z.infer<typeof SearchRequestSchema>
+type Found = z.infer<typeof ItemSchema>
 
 export const ClientIdSchema = z.string().trim().regex(/^[a-f0-9]{32}$/u)
 
@@ -104,6 +117,35 @@ export async function refreshAccess (
   const result = await token(body, request)
   const refreshToken = result.refresh_token ?? state.refresh_token
   return { access: result.access_token, state: { ...state, refresh_token: refreshToken } }
+}
+
+// Finds what to play. Spotify ranks the results, so the first item of the asked kind wins.
+export async function searchSpotify (
+  access: string, { kind, query }: SearchRequest, request: Fetch = fetch
+): Promise<Found | null> {
+  const headers = { Authorization: `Bearer ${access}` }
+  const signal = AbortSignal.timeout(4000)
+  if (kind === 'liked') {
+    const response = await request(`${API}/me`, { headers, signal })
+    if (!response.ok) throw new Error('Spotify не отдал профиль.')
+    const { id } = z.object({ id: z.string() }).parse(await response.json())
+    return { name: 'Мои лайки', uri: `spotify:user:${id}:collection` }
+  }
+  if (query === '') return null
+  const type = kind === 'any' ? 'artist,track' : kind
+  const address = `${API}/search?${new URLSearchParams({ limit: '5', q: query, type }).toString()}`
+  const response = await request(address, { headers, signal })
+  if (!response.ok) throw new Error('Spotify не ответил на поиск.')
+  const data = SearchSchema.parse(await response.json())
+  const first = (found: z.infer<typeof FoundSchema>): Found | null => found?.items.find(item => item !== null) ?? null
+  if (kind === 'album') return first(data.albums)
+  if (kind === 'artist') return first(data.artists)
+  if (kind === 'playlist') return first(data.playlists)
+  if (kind === 'track') return first(data.tracks)
+  // "Кино" must start the band, not a song that merely has the word in its title.
+  const wanted = query.toLowerCase()
+  const artist = data.artists?.items.find(item => item?.name.toLowerCase() === wanted)
+  return artist ?? first(data.tracks) ?? first(data.artists)
 }
 
 export async function writeSpotify (file: string | undefined, state: SpotifyState): Promise<void> {

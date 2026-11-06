@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { fetchPlaylists, finishLogin, loginRequest, mergePlaylists, refreshAccess, REDIRECT_URI } from '../src/spotify'
+import { fetchPlaylists, finishLogin, loginRequest, mergePlaylists, refreshAccess, REDIRECT_URI, searchSpotify } from '../src/spotify'
 
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status })
 
@@ -41,4 +41,26 @@ test('playlists follow pages and skip empty entries', async () => {
 test('merge keeps user names and order', () => {
   const merged = mergePlaylists([{ name: 'Моё', uri: 'u1' }], [{ name: 'Their', uri: 'u1' }, { name: 'Новый', uri: 'u2' }])
   assert.deepEqual(merged, [{ name: 'Моё', uri: 'u1' }, { name: 'Новый', uri: 'u2' }])
+})
+
+test('search prefers the exact artist, then a track', async () => {
+  const body = {
+    artists: { items: [{ name: 'Кино', uri: 'spotify:artist:a' }] },
+    tracks: { items: [null, { name: 'Кино', uri: 'spotify:track:t' }] }
+  }
+  const request = (): Promise<Response> => Promise.resolve(json(body))
+  assert.equal((await searchSpotify('x', { kind: 'any', query: 'кино' }, request))?.uri, 'spotify:artist:a')
+  assert.equal((await searchSpotify('x', { kind: 'any', query: 'кино группа' }, request))?.uri, 'spotify:track:t')
+  assert.equal((await searchSpotify('x', { kind: 'track', query: 'кино' }, request))?.uri, 'spotify:track:t')
+})
+
+test('search reports nothing found and failures apart', async () => {
+  const empty = (): Promise<Response> => Promise.resolve(json({ playlists: { items: [] } }))
+  assert.equal(await searchSpotify('x', { kind: 'playlist', query: 'нет' }, empty), null)
+  await assert.rejects(searchSpotify('x', { kind: 'track', query: 'a' }, () => Promise.resolve(json({}, 403))))
+})
+
+test('liked songs use the account collection', async () => {
+  const found = await searchSpotify('x', { kind: 'liked', query: '' }, () => Promise.resolve(json({ id: 'me' })))
+  assert.equal(found?.uri, 'spotify:user:me:collection')
 })

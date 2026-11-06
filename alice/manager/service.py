@@ -1100,6 +1100,9 @@ def ai_check(payload, options=Path('/data/options.json'), opener=urlopen):
     except (OSError, ValueError, AttributeError, HTTPException):
         if not model:
             return {'ok': False, 'message': 'Адрес недоступен из Home Assistant или это не OpenAI-совместимый API.'}
+    # A router such as OmniRoute shows one combo and picks the real model behind it.
+    if not model and len(models) == 1:
+        model = models[0]
     if not model:
         if models:
             return {'ok': True, 'message': f'Подключение работает, моделей: {len(models)}. Выберите модель и проверьте ещё раз.', 'models': models}
@@ -1117,7 +1120,7 @@ def ai_check(payload, options=Path('/data/options.json'), opener=urlopen):
         return {'ok': False, 'message': reason.get(error.code, f'Провайдер ответил ошибкой {error.code}.'), 'models': models}
     except (OSError, ValueError, AttributeError, HTTPException):
         return {'ok': False, 'message': 'Модель не ответила: таймаут или неверный формат ответа.', 'models': models}
-    return {'ok': True, 'message': f'Модель ответила за {time.monotonic() - began:.1f} с.', 'models': models}
+    return {'ok': True, 'message': f'{model} ответила за {time.monotonic() - began:.1f} с.', 'models': models, 'model': model}
 
 
 def authenticate(ha_url, token):

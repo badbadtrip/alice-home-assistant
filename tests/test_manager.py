@@ -595,10 +595,14 @@ class AiCheckTests(unittest.TestCase):
         return service.ai_check(payload, Path('/nonexistent'), opener)
 
     def test_lists_models_then_asks_the_model(self):
-        self.assertEqual(self.check({'base_url': 'http://x/v1', 'api_key': 'k'})['models'], ['m1'])
+        self.assertEqual(self.check({'base_url': 'http://x/v1', 'api_key': 'k'}, b'{"data":[{"id":"m1"},{"id":"m2"}]}')['models'], ['m1', 'm2'])
         body = b'{"data":[{"id":"m1"}],"choices":[{}]}'
         self.assertTrue(self.check({'base_url': 'http://x/v1', 'api_key': 'k', 'model': 'm1'}, body)['ok'])
         self.assertFalse(self.check({'base_url': 'http://x/v1', 'api_key': 'k', 'model': 'm1'})['ok'])
+
+    def test_a_single_model_is_picked_for_the_router(self):
+        body = b'{"data":[{"id":"m1"}],"choices":[{}]}'
+        self.assertEqual(self.check({'base_url': 'http://x/v1', 'api_key': 'k'}, body)['model'], 'm1')
 
     def test_runtime_swaps_only_the_provider(self):
         import service

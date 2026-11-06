@@ -611,6 +611,7 @@ class AiCheckTests(unittest.TestCase):
         from urllib.error import HTTPError
         self.assertIn('ключ', self.check({'base_url': 'http://x/v1'}, error=HTTPError('u', 401, '', {}, None))['message'])
         self.assertFalse(self.check({'base_url': 'ftp://x'})['ok'])
+        self.assertIn('Base URL', self.check({'base_url': 'http://IP:ПОРТ/v1'})['message'])
         self.assertFalse(self.check({'base_url': 'http://x/v1'}, error=OSError())['ok'])
 
 if __name__ == '__main__':

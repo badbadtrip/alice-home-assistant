@@ -20,6 +20,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlsplit
+from http.client import HTTPException
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -1080,7 +1081,7 @@ def ai_check(payload, options=Path('/data/options.json'), opener=urlopen):
     base = str(payload.get('base_url', '')).strip().rstrip('/')
     key = str(payload.get('api_key', '')).strip()
     model = str(payload.get('model', '')).strip()
-    if urlsplit(base).scheme not in ('http', 'https') or not urlsplit(base).hostname:
+    if not base.isascii() or urlsplit(base).scheme not in ('http', 'https') or not urlsplit(base).hostname:
         return {'ok': False, 'message': 'Укажите Base URL вида https://…/v1.'}
     if not key:
         try:
@@ -1096,7 +1097,7 @@ def ai_check(payload, options=Path('/data/options.json'), opener=urlopen):
     except HTTPError as error:
         if error.code in (401, 403):
             return {'ok': False, 'message': 'Провайдер отклонил ключ.'}
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError, AttributeError, HTTPException):
         if not model:
             return {'ok': False, 'message': 'Адрес недоступен из Home Assistant или это не OpenAI-совместимый API.'}
     if not model:
@@ -1114,7 +1115,7 @@ def ai_check(payload, options=Path('/data/options.json'), opener=urlopen):
     except HTTPError as error:
         reason = {401: 'Провайдер отклонил ключ.', 403: 'Провайдер отклонил ключ.', 404: 'Такой модели у провайдера нет.', 429: 'Лимит провайдера исчерпан.'}
         return {'ok': False, 'message': reason.get(error.code, f'Провайдер ответил ошибкой {error.code}.'), 'models': models}
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError, AttributeError, HTTPException):
         return {'ok': False, 'message': 'Модель не ответила: таймаут или неверный формат ответа.', 'models': models}
     return {'ok': True, 'message': f'Модель ответила за {time.monotonic() - began:.1f} с.', 'models': models}
 

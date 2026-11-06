@@ -20,6 +20,7 @@ import { getLogger } from './logger'
 import { MusicSettingsSchema, readMusicSettings, writeMusicSettings } from './music'
 import { previewCommand } from './preview'
 import { callReadTool, READ_TOOLS } from './read-tools'
+import { readSpeakers, RelayRequestSchema, relayRooms, relaySpeaker, relayText } from './relay'
 import { isSpeakerAllowed, speakerDevices } from './speaker-access'
 import { ClientIdSchema, fetchPlaylists, finishLogin, loginRequest, mergePlaylists, readSpotify, refreshAccess, SearchRequestSchema, searchSpotify, writeSpotify } from './spotify'
 
@@ -277,6 +278,21 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     })()
     return spotifyRefresh
   }
+  app.post('/relay', async (request, response) => {
+    const parsed = RelayRequestSchema.safeParse(request.body)
+    if (!parsed.success) { response.status(400).json({ error: 'Invalid relay' }); return }
+    const speaker = relaySpeaker(await readSpeakers(process.env.ALICE_SPEAKERS_PATH), parsed.data.room)
+    if (!speaker) { response.status(404).json({ error: 'Unknown room' }); return }
+    const { relay_intro: intro } = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
+    try {
+      await homeAssistant.callService('media_player', 'play_media', {
+        entity_id: speaker.media_entity,
+        media_content_id: relayText(intro, parsed.data.message),
+        media_content_type: 'text'
+      })
+      response.json({ ok: true })
+    } catch { response.status(502).json({ error: 'Speaker did not answer' }) }
+  })
   app.post('/spotify/search', async (request, response) => {
     const parsed = SearchRequestSchema.safeParse(request.body)
     if (!parsed.success) { response.status(400).json({ error: 'Invalid search' }); return }
@@ -314,6 +330,7 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
       device_names: deviceVoiceNames(allowed),
       music_source: music.source,
       playlists: music.spotify_playlists,
+      relay_rooms: relayRooms(await readSpeakers(process.env.ALICE_SPEAKERS_PATH)),
       revision,
       routing: await publishedRouting()
     })

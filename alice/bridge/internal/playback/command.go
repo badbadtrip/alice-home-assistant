@@ -94,6 +94,22 @@ func Search(text string) (kind, query string, ok bool) {
 	return "", "", false
 }
 
+var relayAsk = regexp.MustCompile(`^(?:скажи|передай)(?: на| в| во) ([^ ]+) (?:что )?(.+)$`)
+
+// Relay splits "скажи на кухню ужин готов" into the spoken room and the message.
+func Relay(text string) (room, message string, ok bool) {
+	match := relayAsk.FindStringSubmatch(normalize(text))
+	if match == nil {
+		return "", "", false
+	}
+	return match[1], match[2], true
+}
+
+// RoomStem drops the case ending, the same way the server does.
+func RoomStem(room string) string {
+	return strings.TrimRight(room, "аеиоуыюя")
+}
+
 var spokenDigits = strings.NewReplacer("один", "1", "первый", "1", "два", "2", "второй", "2", "три", "3", "третий", "3", "четыре", "4", "пять", "5")
 
 // playlistName compares what was said with a panel name: "плейлист номер 1" equals "номер один".

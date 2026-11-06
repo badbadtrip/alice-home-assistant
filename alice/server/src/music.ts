@@ -14,6 +14,7 @@ const SpotifyPlaylist = z.object({ name: z.string().trim().min(1).max(80), uri: 
 
 // Older files may name a removed source or extra fields: both fall back to stock music.
 export const MusicSettingsSchema = z.object({
+  relay_intro: z.string().trim().max(100).default(''),
   source: z.preprocess(value => value === 'spotify' ? value : 'yandex', z.enum(['spotify', 'yandex'])),
   spotify_playlists: z.array(SpotifyPlaylist).max(50).default([])
 })

@@ -23,6 +23,7 @@ type voicePhraseSnapshot struct {
  Names []string
  Playlists []playback.Playlist
  MusicSource string
+ RelayRooms []string
 }
 type voicePhraseCache struct {
  snapshot atomic.Pointer[voicePhraseSnapshot]
@@ -79,6 +80,22 @@ func (f *Functions) Playlists() []playback.Playlist {
  return nil
 }
 
+// RelayRoom reports whether a spoken room has a speaker that can talk.
+func (f *Functions) RelayRoom(room string) bool {
+ snapshot:=f.voice.snapshot.Load()
+ if snapshot==nil {return false}
+ stem:=playback.RoomStem(room)
+ for _,known:=range snapshot.RelayRooms {if known==stem {return true}}
+ return false
+}
+
+// Relay has the server speak a message on the speaker of another room.
+func (f *Functions) Relay(ctx context.Context,room,message string) error {
+ ctx,cancel:=context.WithTimeout(ctx,5*time.Second);defer cancel()
+ var done struct {OK bool `json:"ok"`}
+ return f.request(ctx,http.MethodPost,"/relay",map[string]string{"room":room,"message":message},&done)
+}
+
 // FindSpotify asks the server, which holds the account, for something to play.
 func (f *Functions) FindSpotify(ctx context.Context,kind,query string) (string,[]string,error) {
  ctx,cancel:=context.WithTimeout(ctx,5*time.Second);defer cancel()
@@ -102,6 +119,7 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
   Routing json.RawMessage `json:"routing"`
   Playlists []playback.Playlist `json:"playlists"`
   MusicSource string `json:"music_source"`
+  RelayRooms []string `json:"relay_rooms"`
  }
  if err:=f.request(ctx,http.MethodGet,"/voice-phrases",nil,&response);err!=nil {return err}
  if response.Revision=="" {return errors.New("incomplete voice table")}
@@ -128,7 +146,7 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  names:=make([]string,0,len(response.DeviceNames))
  for _,name:=range response.DeviceNames {if name=normalizeVoicePhrase(name);name!="" {names=append(names,name)}}
  previous:=f.voice.snapshot.Load()
- f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names,Playlists:response.Playlists,MusicSource:response.MusicSource})
+ f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names,Playlists:response.Playlists,MusicSource:response.MusicSource,RelayRooms:response.RelayRooms})
  f.applyRouting(response.Routing)
  if previous==nil || previous.Revision!=response.Revision {
   slog.Info("voice_phrase_cache_updated","phrases",len(phrases),"revision",response.Revision)

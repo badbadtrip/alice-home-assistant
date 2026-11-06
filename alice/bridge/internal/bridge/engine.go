@@ -33,6 +33,10 @@ type MusicResumer interface {
 type PlaylistPlayer interface {
 	PlayURI(context.Context, string) (string, error)
 }
+type SpeakerRelay interface {
+	RelayRoom(string) bool
+	Relay(context.Context, string, string) error
+}
 type SpotifyFinder interface {
 	FindSpotify(context.Context, string, string) (string, []string, error)
 }
@@ -130,6 +134,14 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 		result.Answer = answer
 		return result, err
 	case "playback":
+		if decision.Source == "relay" {
+			room, message, _ := playback.Relay(text)
+			result.Answer = "Передала."
+			if err := e.Home.(SpeakerRelay).Relay(ctx, room, message); err != nil {
+				result.Answer = "Не получилось передать: колонка не отвечает."
+			}
+			return result, nil
+		}
 		if e.Playback == nil {
 			return Resolution{Route: "yandex"}, nil
 		}
@@ -332,6 +344,12 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 			h.ResetPending(ctx)
 		}
 		return RouteDecision{Route: "llm", Source: "dialogue_reset"}
+	}
+	if relay, ok := e.Home.(SpeakerRelay); ok {
+		// Only a known room counts: "скажи в двух словах" stays with Alice.
+		if room, _, found := playback.Relay(text); found && relay.RelayRoom(room) {
+			return RouteDecision{Route: "playback", Source: "relay"}
+		}
 	}
 	if e.Playback != nil && playback.Command(text) != "" && e.Playback.Active(ctx) {
 		return RouteDecision{Route: "playback", Source: "playback"}

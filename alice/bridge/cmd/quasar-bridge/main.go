@@ -27,6 +27,7 @@ import (
 	"quasarbridge/internal/journal"
 	"quasarbridge/internal/indicator"
 	"quasarbridge/internal/llm"
+	"quasarbridge/internal/nowplaying"
 	"quasarbridge/internal/soloist"
 	"quasarbridge/internal/ytm"
 	"quasarbridge/internal/wire"
@@ -350,6 +351,18 @@ func main() {
 				return airPlay.health()
 			}
 			return nil
+		}(), "now_playing": func() *nowplaying.Info {
+			var sources []nowplaying.Source
+			if airPlay != nil {
+				sources = append(sources, airPlay.now)
+			}
+			if local := (&soloist.Client{StateDir: "/data/soloist/state"}); local.Available() {
+				sources = append(sources, local.Now)
+			}
+			if youtube.Available() {
+				sources = append(sources, youtube.Now)
+			}
+			return nowplaying.Pick(r.Context(), sources...)
 		}()})
 		_, _ = w.Write(data)
 	})

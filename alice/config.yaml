@@ -1,5 +1,5 @@
 name: Алиса
-version: "0.38.2"
+version: "0.39.0"
 image: ghcr.io/badbadtrip/alice-home-assistant-{arch}
 slug: alice
 description: Колонки Алисы, голосовые команды, установка мостов и встроенная Wiki

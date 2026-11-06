@@ -11,6 +11,8 @@ import (
 	"time"
 
 	airplay "github.com/skrashevich/station-airplay"
+
+	"quasarbridge/internal/nowplaying"
 )
 
 const airPlayStartAttempts = 5
@@ -98,6 +100,19 @@ func (c *airPlayControl) shutdown() {
 func (c *airPlayControl) health() map[string]any {
 	state := c.receiver.Status()
 	return map[string]any{"enabled": c.enabled(), "state": string(state.State), "name": state.Name, "connected": state.Connected, "playing": state.Playing, "error": state.Error}
+}
+
+// now gives only the source and status: the receiver reads no track data from the
+// sender and does not know the sender's name.
+func (c *airPlayControl) now(context.Context) (*nowplaying.Info, error) {
+	state := c.receiver.Status()
+	switch {
+	case state.Playing:
+		return &nowplaying.Info{Source: "airplay", Status: nowplaying.Playing}, nil
+	case state.Connected:
+		return &nowplaying.Info{Source: "airplay", Status: nowplaying.Paused}, nil
+	}
+	return nil, nil
 }
 
 // ServeHTTP handles GET /airplay?action=start|stop|status. It is GET because

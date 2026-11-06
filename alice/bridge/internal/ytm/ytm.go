@@ -10,7 +10,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"quasarbridge/internal/nowplaying"
 )
 
 const (
@@ -52,8 +55,17 @@ func (c *Client) Supervise(ctx context.Context) {
 	}
 }
 
+type track struct {
+	Title      string `json:"title"`
+	Artists    string `json:"artists"`
+	DurationMS int64  `json:"duration_ms"`
+	Thumbnail  string `json:"thumbnail_url"`
+}
 type state struct {
-	Status string `json:"status"`
+	Status     string  `json:"status"`
+	Queue      []track `json:"queue"`
+	Index      int     `json:"index"`
+	PositionMS int64   `json:"position_ms"`
 }
 type reply struct {
 	State *state `json:"state"`
@@ -96,6 +108,29 @@ func (c *Client) Active(ctx context.Context) bool {
 		return true
 	}
 	return false
+}
+
+// Now reports the current track. A stopped player keeps its queue, which is not playing.
+func (c *Client) Now(ctx context.Context) (*nowplaying.Info, error) {
+	answer, err := c.call(ctx, time.Second, map[string]string{"action": "status"})
+	if err != nil || answer.State == nil {
+		return nil, err
+	}
+	return current(*answer.State), nil
+}
+
+func current(s state) *nowplaying.Info {
+	if s.Status != nowplaying.Playing && s.Status != nowplaying.Paused && s.Status != nowplaying.Buffering {
+		return nil
+	}
+	info := &nowplaying.Info{Source: "youtube_music", Status: s.Status, PositionMS: s.PositionMS}
+	if s.Index >= 0 && s.Index < len(s.Queue) {
+		item := s.Queue[s.Index]
+		// Video results append view and like counts after the channel name.
+		artist, _, _ := strings.Cut(item.Artists, " • ")
+		info.Title, info.Artist, info.Cover, info.DurationMS = item.Title, strings.TrimSpace(artist), item.Thumbnail, item.DurationMS
+	}
+	return info
 }
 
 // Play searches and starts. An empty query asks for the account's recommendations.

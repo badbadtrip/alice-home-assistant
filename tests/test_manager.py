@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'alice/manager'))
+import service
 from service import Error, Handler, Manager, Store, STARTUP_FILES, authenticate, atomic_json, lan_ip
 
 
@@ -581,6 +582,36 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(call.kwargs['headers']['Authorization'], 'Bearer server-test-token')
         self.assertEqual(json.loads(call.kwargs['body'])['area'], 'Kitchen')
 
+
+
+class NowPlayingTests(unittest.TestCase):
+    def test_drops_unknown_source_and_unsafe_cover(self):
+        self.assertIsNone(service.now_playing_state({'source': 'radio', 'status': 'playing'}))
+        self.assertIsNone(service.now_playing_state({'source': 'spotify', 'status': 'stopped'}))
+        value = service.now_playing_state({'source': 'spotify', 'status': 'playing', 'title': ' a ', 'cover': 'http://x/y.jpg', 'position_ms': -1, 'duration_ms': 5})
+        self.assertEqual(value, {'source': 'spotify', 'status': 'playing', 'title': 'a', 'artist': None, 'album': None, 'cover': None, 'position_ms': None, 'duration_ms': 5})
+
+    def test_airplay_has_source_only(self):
+        value = service.now_playing_state({'source': 'airplay', 'status': 'playing'})
+        self.assertEqual((value['source'], value['title'], value['cover']), ('airplay', None, None))
+
+    def test_yandex_reads_media_player(self):
+        value = service.yandex_now_playing({'state': 'playing', 'attributes': {'media_title': 'T', 'media_artist': 'A', 'entity_picture': '/api/media_player_proxy/m?token=1', 'media_position': 2.5, 'media_duration': 10}})
+        self.assertEqual((value['source'], value['title'], value['artist'], value['position_ms'], value['duration_ms']), ('yandex_music', 'T', 'A', 2500, 10000))
+        self.assertEqual(value['cover'], '/api/media_player_proxy/m?token=1')
+        self.assertIsNone(service.yandex_now_playing({'state': 'idle', 'attributes': {'media_title': 'T'}}))
+
+    def test_bridge_sound_wins_and_stock_fills_gap(self):
+        speaker = {'media_entity': 'media_player.midi'}
+        bridge = {'source': 'spotify', 'status': 'playing'}
+        with patch('updater._ha', side_effect=AssertionError):
+            self.assertEqual(service.Manager._now_playing(speaker, bridge)['source'], 'spotify')
+        stock = {'state': 'playing', 'attributes': {'media_title': 'T'}}
+        with patch('updater._ha', return_value=stock):
+            self.assertEqual(service.Manager._now_playing(speaker, None)['source'], 'yandex_music')
+            self.assertEqual(service.Manager._now_playing(speaker, {'source': 'spotify', 'status': 'paused'})['source'], 'yandex_music')
+        with patch('updater._ha', side_effect=OSError):
+            self.assertEqual(service.Manager._now_playing(speaker, {'source': 'spotify', 'status': 'paused'})['source'], 'spotify')
 
 
 class AiCheckTests(unittest.TestCase):

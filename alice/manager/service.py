@@ -36,6 +36,43 @@ def airplay_state(value):
     return {key: value.get(key) is True for key in ('enabled', 'connected', 'playing')} | {'error': bool(value.get('error'))}
 
 
+NOW_SOURCES = ('airplay', 'spotify', 'youtube_music', 'yandex_music')
+NOW_STATUSES = ('playing', 'paused', 'buffering')
+
+
+def now_playing_state(value):
+    """Keeps only what the panel may show; a speaker's answer is not trusted as is."""
+    if not isinstance(value, dict) or value.get('source') not in NOW_SOURCES or value.get('status') not in NOW_STATUSES:
+        return None
+    result = {'source': value['source'], 'status': value['status']}
+    for key in ('title', 'artist', 'album'):
+        item = value.get(key)
+        result[key] = (item.strip()[:300] or None) if isinstance(item, str) else None
+    cover = value.get('cover')
+    # The panel loads this address, so only a secure one or HA's own image proxy passes.
+    usable = isinstance(cover, str) and len(cover) <= 2048 and cover.startswith(('https://', '/api/media_player_proxy/'))
+    result['cover'] = cover if usable else None
+    for key in ('position_ms', 'duration_ms'):
+        item = value.get(key)
+        result[key] = item if type(item) is int and 0 <= item <= 86400000 else None
+    return result
+
+
+def yandex_now_playing(state):
+    """Stock Yandex Music is visible only through the speaker's HA media_player."""
+    if not isinstance(state, dict) or state.get('state') not in ('playing', 'paused'):
+        return None
+    attributes = state.get('attributes') or {}
+
+    def milliseconds(key):
+        item = attributes.get(key)
+        return int(item * 1000) if type(item) in (int, float) else None
+    return now_playing_state({'source': 'yandex_music', 'status': state['state'], 'title': attributes.get('media_title'),
+                              'artist': attributes.get('media_artist'), 'album': attributes.get('media_album_name'),
+                              'cover': attributes.get('entity_picture'), 'position_ms': milliseconds('media_position'),
+                              'duration_ms': milliseconds('media_duration')})
+
+
 AIRPLAY_ENTITY = re.compile(r'^media_player\.[a-z0-9_]*_airplay$')
 # Exit 3: no receiver on this speaker. Exit 4: it is playing, never interrupt that.
 AIRPLAY_REANNOUNCE = ('[ -x /data/airplay/ctl.sh ] || exit 3; '
@@ -248,7 +285,7 @@ class Manager:
     @staticmethod
     def _connection_default():
         return {'status': 'unknown', 'last_seen': None, 'checked_at': None, 'error': None,
-                'speaker_id': None, 'voice_phrase_count': None, 'voice_phrase_revision': None, 'latency_ms': None, 'volume_push': False, 'airplay': None,
+                'speaker_id': None, 'voice_phrase_count': None, 'voice_phrase_revision': None, 'latency_ms': None, 'volume_push': False, 'airplay': None, 'now_playing': None,
                 'delivery': {'status': 'unknown', 'expected_revision': None, 'actual_revision': None, 'message': 'Ожидается проверка колонки.'}}
 
     @staticmethod
@@ -270,6 +307,7 @@ class Manager:
                     connection = self._connection_default()
                 elif connection['status'] == 'online' and now - (connection['checked_at'] or 0) > 45:
                     connection['status'] = 'unknown'
+                    connection['now_playing'] = None
                     connection['error'] = 'Статус устарел. Ожидается следующая проверка.'
                     connection['delivery'] = {**connection.get('delivery', {}), 'status': 'unknown', 'message': 'Статус колонки устарел.'}
                 result.append({**speaker, 'connection': connection, 'auto_update': auto_update})
@@ -333,6 +371,19 @@ class Manager:
             finally:
                 self.operation_lock.release()
 
+    @staticmethod
+    def _now_playing(speaker, reported):
+        current = now_playing_state(reported)
+        entity = speaker.get('media_entity')
+        if not entity or (current and current['status'] == 'playing'):
+            return current
+        import updater
+        try:
+            stock = yandex_now_playing(updater._ha('states/' + entity))
+        except Exception:
+            return current  # HA being away must not mark the speaker offline.
+        return stock if stock and (not current or stock['status'] == 'playing') else current
+
     def _monitor_speaker(self, speaker):
         identity = self._connection_identity(speaker)
         with self.connection_lock:
@@ -349,13 +400,14 @@ class Manager:
             revision = health.get('voice_phrase_revision')
             value.update(status='online', last_seen=int(time.time()), error=None,
                          speaker_id=speaker['id'], volume_push=health.get('volume_push') is True, airplay=airplay_state(health.get('airplay')),
+                         now_playing=self._now_playing(speaker, health.get('now_playing')),
                          voice_phrase_count=count if type(count) is int and 0 <= count <= 100000 else None,
                          voice_phrase_revision=revision if isinstance(revision, str) and re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', revision) else None)
         except Error as error:
             message = str(error) if error.status == 409 else 'Нет связи с мостом. Проверьте питание и подключение колонки.'
-            value.update(status='offline', error=message)
+            value.update(status='offline', error=message, now_playing=None)
         except Exception:
-            value.update(status='offline', error='Мост не вернул корректный статус.')
+            value.update(status='offline', error='Мост не вернул корректный статус.', now_playing=None)
         value['delivery'] = self._delivery(speaker, value)
         value.update(checked_at=int(time.time()), latency_ms=round((time.monotonic() - began) * 1000, 1))
         # A successful answer from a previous address must not mark an edited

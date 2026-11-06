@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"quasarbridge/internal/nowplaying"
 )
 
 const (
@@ -64,30 +66,106 @@ func send(ctx context.Context, conn *websocket.Conn, command string) error {
 	return conn.Write(ctx, websocket.MessageText, data)
 }
 
-func (c *Client) status(ctx context.Context) (string, error) {
+type entity struct {
+	Decorations struct {
+		Identity struct {
+			Name string `json:"name"`
+		} `json:"identity"`
+	} `json:"decorations"`
+}
+
+type playback struct {
+	Type   string `json:"type"`
+	Status string `json:"status"`
+	Item   *struct {
+		Decorations struct {
+			Identity struct {
+				Name string `json:"name"`
+			} `json:"identity"`
+			VisualIdentity struct {
+				Cover []struct {
+					URL  string `json:"url"`
+					Size string `json:"size"`
+				} `json:"cover"`
+			} `json:"visual_identity"`
+			Parent struct {
+				Entity entity `json:"entity"`
+			} `json:"parent"`
+			Creators []struct {
+				Entity entity `json:"entity"`
+			} `json:"creators"`
+			Playback struct {
+				DurationMS int64 `json:"duration_ms"`
+			} `json:"playback"`
+		} `json:"decorations"`
+	} `json:"item"`
+	Position struct {
+		PositionMS int64 `json:"position_ms"`
+	} `json:"position"`
+}
+
+func (c *Client) state(ctx context.Context) (playback, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	conn, err := c.dial(ctx)
 	if err != nil {
-		return "", err
+		return playback{}, err
 	}
 	defer conn.CloseNow()
 	if err := send(ctx, conn, "get_state"); err != nil {
-		return "", err
+		return playback{}, err
 	}
 	for {
 		_, data, err := conn.Read(ctx)
 		if err != nil {
-			return "", err
+			return playback{}, err
 		}
-		var event struct {
-			Type   string `json:"type"`
-			Status string `json:"status"`
-		}
+		var event playback
 		if json.Unmarshal(data, &event) == nil && event.Type == "playback_state" {
-			return strings.ToLower(event.Status), nil
+			return event, nil
 		}
 	}
+}
+
+func (c *Client) status(ctx context.Context) (string, error) {
+	event, err := c.state(ctx)
+	return strings.ToLower(event.Status), err
+}
+
+// Now reports the current track.
+func (c *Client) Now(ctx context.Context) (*nowplaying.Info, error) {
+	event, err := c.state(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return current(event), nil
+}
+
+func current(event playback) *nowplaying.Info {
+	status := strings.ToLower(event.Status)
+	if status != nowplaying.Playing && status != nowplaying.Paused {
+		return nil
+	}
+	info := &nowplaying.Info{Source: "spotify", Status: status, PositionMS: event.Position.PositionMS}
+	if event.Item == nil {
+		return info
+	}
+	item := event.Item.Decorations
+	info.Title, info.Album, info.DurationMS = item.Identity.Name, item.Parent.Entity.Decorations.Identity.Name, item.Playback.DurationMS
+	var names []string
+	for _, creator := range item.Creators {
+		names = append(names, creator.Entity.Decorations.Identity.Name)
+	}
+	info.Artist = strings.Join(names, ", ")
+	for _, cover := range item.VisualIdentity.Cover {
+		if info.Cover == "" || cover.Size == "large" {
+			info.Cover = cover.URL
+		}
+		if cover.Size == "large" {
+			break
+		}
+	}
+	return info
 }
 
 // Playing is true only while sound is actually coming out.

@@ -64,3 +64,22 @@ test('liked songs use the account collection', async () => {
   const found = await searchSpotify('x', { kind: 'liked', query: '' }, () => Promise.resolve(json({ id: 'me' })))
   assert.equal(found?.uri, 'spotify:user:me:collection')
 })
+
+test('a found track brings the artist tracks that follow it', async () => {
+  const track = { artists: [{ name: 'Кино' }], name: 'Звезда', uri: 'spotify:track:t' }
+  const other = { artists: [{ name: 'Кино' }], name: 'Кукушка', uri: 'spotify:track:o' }
+  const request = (address: unknown): Promise<Response> => Promise.resolve(json({
+    tracks: { items: String(address).includes('artist') ? [track, other] : [track] }
+  }))
+  const found = await searchSpotify('x', { kind: 'track', query: 'звезда' }, request as typeof fetch)
+  assert.deepEqual(found?.next, ['spotify:track:o'])
+})
+
+test('a failed following search keeps the found track', async () => {
+  const track = { artists: [{ name: 'Кино' }], name: 'Звезда', uri: 'spotify:track:t' }
+  const request = (address: unknown): Promise<Response> => Promise.resolve(
+    String(address).includes('artist') ? json({}, 500) : json({ tracks: { items: [track] } }))
+  const found = await searchSpotify('x', { kind: 'track', query: 'звезда' }, request as typeof fetch)
+  assert.equal(found?.uri, 'spotify:track:t')
+  assert.deepEqual(found?.next, [])
+})

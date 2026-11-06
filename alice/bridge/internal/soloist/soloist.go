@@ -14,7 +14,12 @@ import (
 	"github.com/coder/websocket"
 )
 
-const timeout = 3 * time.Second
+const (
+	timeout   = 3 * time.Second
+	queueWait = 700 * time.Millisecond
+	maxQueued = 5
+	skipGap   = 300 * time.Millisecond
+)
 
 type Client struct{ StateDir string }
 
@@ -125,8 +130,68 @@ func (c *Client) Control(ctx context.Context, action string) (string, error) {
 	return "", nil
 }
 
-// PlayURI claims the speaker and starts a Spotify playlist or album from its beginning.
+// queued counts tracks added to the queue that are still waiting. No answer within
+// the wait means none are known.
+func (c *Client) queued(ctx context.Context) int {
+	ctx, cancel := context.WithTimeout(ctx, queueWait)
+	defer cancel()
+	conn, err := c.dial(ctx)
+	if err != nil {
+		return 0
+	}
+	defer conn.CloseNow()
+	if send(ctx, conn, "get_queue") != nil {
+		return 0
+	}
+	for {
+		_, data, err := conn.Read(ctx)
+		if err != nil {
+			return 0
+		}
+		var event struct {
+			Type     string `json:"type"`
+			Upcoming []struct {
+				Source string `json:"source"`
+			} `json:"upcoming"`
+		}
+		if json.Unmarshal(data, &event) != nil || event.Type != "queue_changed" {
+			continue
+		}
+		count := 0
+		for _, item := range event.Upcoming {
+			if item.Source == "queue" {
+				count++
+			}
+		}
+		return min(count, maxQueued)
+	}
+}
+
+// Queue adds tracks after the current one.
+func (c *Client) Queue(ctx context.Context, uris []string) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	conn, err := c.dial(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.CloseNow()
+	for _, uri := range uris {
+		data, err := json.Marshal(map[string]string{"type": "command", "command": "add_to_queue", "uri": uri})
+		if err != nil {
+			return err
+		}
+		if err := conn.Write(ctx, websocket.MessageText, data); err != nil {
+			return err
+		}
+	}
+	return conn.Close(websocket.StatusNormalClosure, "")
+}
+
+// PlayURI claims the speaker and starts a Spotify source from its beginning. Queued
+// tracks outlive a new play and would cut in, and Soloist can only skip them.
 func (c *Client) PlayURI(ctx context.Context, uri string) (string, error) {
+	leftover := c.queued(ctx)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	conn, err := c.dial(ctx)
@@ -136,6 +201,13 @@ func (c *Client) PlayURI(ctx context.Context, uri string) (string, error) {
 	defer conn.CloseNow()
 	if err := send(ctx, conn, "activate"); err != nil {
 		return "", err
+	}
+	for range leftover {
+		if err := send(ctx, conn, "skip_next"); err != nil {
+			return "", err
+		}
+		// Soloist drops a skip that arrives before the last one has finished.
+		time.Sleep(skipGap)
 	}
 	data, err := json.Marshal(map[string]string{"type": "command", "command": "play", "uri": uri})
 	if err != nil {

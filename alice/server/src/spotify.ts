@@ -28,8 +28,11 @@ const PageSchema = z.object({
 })
 
 const FoundSchema = z.object({ items: z.array(ItemSchema.nullable()) }).optional()
+const ArtistSchema = z.object({ name: z.string() })
+const TrackSchema = ItemSchema.extend({ artists: z.array(ArtistSchema).default([]) })
+const TracksSchema = z.object({ items: z.array(TrackSchema.nullable()) }).optional()
 const SearchSchema = z.object({
-  albums: FoundSchema, artists: FoundSchema, playlists: FoundSchema, tracks: FoundSchema
+  albums: FoundSchema, artists: FoundSchema, playlists: FoundSchema, tracks: TracksSchema
 })
 
 export const SearchRequestSchema = z.object({
@@ -37,7 +40,8 @@ export const SearchRequestSchema = z.object({
   query: z.string().trim().max(200).default('')
 }).strict()
 export type SearchRequest = z.infer<typeof SearchRequestSchema>
-type Found = z.infer<typeof ItemSchema>
+type Found = z.infer<typeof ItemSchema> & { next?: string[] }
+const FOLLOWING = 5
 
 export const ClientIdSchema = z.string().trim().regex(/^[a-f0-9]{32}$/u)
 
@@ -119,6 +123,8 @@ export async function refreshAccess (
   return { access: result.access_token, state: { ...state, refresh_token: refreshToken } }
 }
 
+const first = <T>(found?: { items: (null | T)[] }): null | T => found?.items.find(item => item !== null) ?? null
+
 // Finds what to play. Spotify ranks the results, so the first item of the asked kind wins.
 export async function searchSpotify (
   access: string, { kind, query }: SearchRequest, request: Fetch = fetch
@@ -137,15 +143,14 @@ export async function searchSpotify (
   const response = await request(address, { headers, signal })
   if (!response.ok) throw new Error('Spotify не ответил на поиск.')
   const data = SearchSchema.parse(await response.json())
-  const first = (found: z.infer<typeof FoundSchema>): Found | null => found?.items.find(item => item !== null) ?? null
   if (kind === 'album') return first(data.albums)
   if (kind === 'artist') return first(data.artists)
   if (kind === 'playlist') return first(data.playlists)
-  if (kind === 'track') return first(data.tracks)
+  if (kind === 'track') return withFollowing(access, first(data.tracks), request)
   // "Кино" must start the band, not a song that merely has the word in its title.
   const wanted = query.toLowerCase()
   const artist = data.artists?.items.find(item => item?.name.toLowerCase() === wanted)
-  return artist ?? first(data.tracks) ?? first(data.artists)
+  return artist ?? await withFollowing(access, first(data.tracks), request) ?? first(data.artists)
 }
 
 export async function writeSpotify (file: string | undefined, state: SpotifyState): Promise<void> {
@@ -154,6 +159,23 @@ export async function writeSpotify (file: string | undefined, state: SpotifyStat
   const temporary = file + '.tmp'
   await writeFile(temporary, JSON.stringify(state), { mode: 0o600 })
   await rename(temporary, file)
+}
+
+// Best effort: the found track must still play if this second search fails.
+async function following (
+  access: string, artist: string | undefined, played: string, request: Fetch
+): Promise<string[]> {
+  if (!artist) return []
+  try {
+    const query = new URLSearchParams({ limit: '10', q: `artist:"${artist}"`, type: 'track' })
+    const headers = { Authorization: `Bearer ${access}` }
+    const response = await request(`${API}/search?${query.toString()}`, { headers, signal: AbortSignal.timeout(4000) })
+    if (!response.ok) return []
+    const items = SearchSchema.parse(await response.json()).tracks?.items ?? []
+    return items.map(item => item?.uri ?? played).filter(uri => uri !== played).slice(0, FOLLOWING)
+  } catch {
+    return []
+  }
 }
 
 async function token (body: Record<string, string>, request: Fetch): Promise<z.infer<typeof TokenSchema>> {
@@ -165,4 +187,13 @@ async function token (body: Record<string, string>, request: Fetch): Promise<z.i
   })
   if (!response.ok) throw new Error('Spotify отклонил вход.')
   return TokenSchema.parse(await response.json())
+}
+
+// A lone track has no context, so the speaker would fall silent after it.
+async function withFollowing (
+  access: string, track: null | z.infer<typeof TrackSchema>, request: Fetch
+): Promise<Found | null> {
+  if (!track) return null
+  const next = await following(access, track.artists[0]?.name, track.uri, request)
+  return { name: track.name, next, uri: track.uri }
 }

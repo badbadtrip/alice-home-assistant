@@ -80,11 +80,11 @@ func (f *Functions) Playlists() []playback.Playlist {
 }
 
 // FindSpotify asks the server, which holds the account, for something to play.
-func (f *Functions) FindSpotify(ctx context.Context,kind,query string) (string,error) {
+func (f *Functions) FindSpotify(ctx context.Context,kind,query string) (string,[]string,error) {
  ctx,cancel:=context.WithTimeout(ctx,5*time.Second);defer cancel()
- var found struct {URI string `json:"uri"`}
+ var found struct {URI string `json:"uri"`; Next []string `json:"next"`}
  err:=f.request(ctx,http.MethodPost,"/spotify/search",map[string]string{"kind":kind,"query":query},&found)
- return found.URI,err
+ return found.URI,found.Next,err
 }
 
 // MusicSource returns the source picked in the panel: "spotify" or "yandex".

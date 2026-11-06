@@ -27,6 +27,9 @@ func server(t *testing.T, status string, seen chan<- string) *Client {
 				return
 			}
 			seen <- string(data)
+			if strings.Contains(string(data), "get_queue") && status == "queued" {
+				_ = conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"queue_changed","upcoming":[{"source":"queue"},{"source":"context"}]}`))
+			}
 			if strings.Contains(string(data), "get_state") {
 				_ = conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"playback_state","status":"`+status+`"}`))
 			}
@@ -74,15 +77,30 @@ func TestRemoteEndpointRejected(t *testing.T) {
 }
 
 func TestPlayURISendsPlaylist(t *testing.T) {
-	seen := make(chan string, 2)
+	seen := make(chan string, 8)
 	if _, err := server(t, "stopped", seen).PlayURI(context.Background(), "spotify:playlist:abc"); err != nil {
 		t.Fatal(err)
+	}
+	if got := <-seen; !strings.Contains(got, "get_queue") {
+		t.Fatalf("queue check: %s", got)
 	}
 	if got := <-seen; !strings.Contains(got, "activate") {
 		t.Fatalf("first command: %s", got)
 	}
 	if got := <-seen; !strings.Contains(got, `"uri":"spotify:playlist:abc"`) || !strings.Contains(got, `"command":"play"`) {
 		t.Fatalf("play command: %s", got)
+	}
+}
+
+func TestPlayURISkipsLeftoverQueue(t *testing.T) {
+	seen := make(chan string, 8)
+	if _, err := server(t, "queued", seen).PlayURI(context.Background(), "spotify:artist:abc"); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"get_queue", "activate", "skip_next", `"command":"play"`} {
+		if got := <-seen; !strings.Contains(got, want) {
+			t.Fatalf("want %s, got %s", want, got)
+		}
 	}
 }
 

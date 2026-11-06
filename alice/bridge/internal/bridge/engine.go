@@ -34,7 +34,10 @@ type PlaylistPlayer interface {
 	PlayURI(context.Context, string) (string, error)
 }
 type SpotifyFinder interface {
-	FindSpotify(context.Context, string, string) (string, error)
+	FindSpotify(context.Context, string, string) (string, []string, error)
+}
+type TrackQueue interface {
+	Queue(context.Context, []string) error
 }
 type PlaylistSource interface {
 	Playlists() []playback.Playlist
@@ -136,7 +139,7 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 		}
 		if player, ok := e.Playback.(PlaylistPlayer); ok && decision.Source == "playback_search" {
 			kind, query, _ := playback.Search(text)
-			uri, err := e.Home.(SpotifyFinder).FindSpotify(ctx, kind, query)
+			uri, next, err := e.Home.(SpotifyFinder).FindSpotify(ctx, kind, query)
 			if err != nil {
 				result.Answer = "Spotify сейчас не отвечает."
 				return result, nil
@@ -147,6 +150,10 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 			}
 			answer, err := player.PlayURI(ctx, uri)
 			result.Answer = answer
+			if queue, ok := e.Playback.(TrackQueue); ok && err == nil && len(next) > 0 {
+				// The track already plays, so a lost queue only ends the music sooner.
+				_ = queue.Queue(ctx, next)
+			}
 			return result, err
 		}
 		if player, ok := e.Playback.(PlaylistPlayer); ok && decision.Source == "playback_playlist" {

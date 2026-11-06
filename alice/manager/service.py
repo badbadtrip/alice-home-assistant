@@ -42,6 +42,9 @@ AIRPLAY_REANNOUNCE = ('[ -x /data/airplay/ctl.sh ] || exit 3; '
                       '/data/airplay/ctl.sh restart')
 
 
+AI_RUNTIME = ('QUASAR_LLM_BASE_URL=', 'QUASAR_LLM_MODEL=', 'QUASAR_LLM_API_KEY=', 'QUASAR_LLM_DISABLED=')
+
+
 class Error(Exception):
     def __init__(self, message, status=400):
         super().__init__(message)
@@ -555,7 +558,7 @@ class Manager:
             return self.store.metadata(speaker_id, trusted_fingerprint=pending['fingerprint'])
 
     def job(self, speaker_id, operation, params=None):
-        if operation not in ('check', 'install', 'adopt', 'reboot', 'confirm', 'rollback', 'restart', 'configure'):
+        if operation not in ('check', 'install', 'adopt', 'reboot', 'confirm', 'rollback', 'restart', 'configure', 'ai'):
             raise Error('Неизвестная операция.')
         speaker = self.store.speaker(speaker_id)
         if not speaker.get('trusted_fingerprint'):
@@ -587,7 +590,9 @@ class Manager:
         try:
             # Serializes provisioning and protects server-side backup/output paths.
             with self.operation_lock:
-                if job['operation'] == 'configure':
+                if job['operation'] == 'ai':
+                    result = self._apply_ai(speaker, job)
+                elif job['operation'] == 'configure':
                     result = self._configure(speaker, job, params or {})
                 else:
                     result = getattr(self, '_' + job['operation'])(speaker, job)
@@ -839,6 +844,32 @@ class Manager:
         self._monitor_speaker(item)
         return {'state': 'ready', 'message': 'Комната применена и проверена.', 'speaker': item}
 
+    def _apply_ai(self, speaker, job, options=Path('/data/options.json')):
+        # An update keeps the speaker's secrets, so the provider goes through runtime.env.
+        values = json.loads(options.read_text())
+        original = self.ssh(speaker, 'cat ' + DEVICE + '/runtime.env').decode()
+        updated = ai_runtime(original, values)
+        stage = DEVICE + '/runtime.env.ai-' + job['id']
+        backup = DEVICE + '/runtime.env.backup-' + job['id']
+        self.ssh(speaker, 'umask 077; cat > ' + stage, updated.encode())
+        try:
+            self.ssh(speaker, 'set -a; . ' + stage + '; set +a; ' + DEVICE + '/bin/quasar-bridge -config ' + DEVICE + '/config.json -check-config')
+        except Error:
+            self.ssh(speaker, 'rm -f ' + stage)
+            raise
+        self.ssh(speaker, 'cp -p ' + DEVICE + '/runtime.env ' + backup + ' && mv ' + stage + ' ' + DEVICE + '/runtime.env')
+        try:
+            job['stage'] = 'Применение AI и проверка моста'
+            self._restart_process(speaker)
+            self._verified_health(speaker)
+        except Exception:
+            self.ssh(speaker, 'mv ' + backup + ' ' + DEVICE + '/runtime.env')
+            self._restart_process(speaker)
+            self._verified_health(speaker)
+            raise Error('Мост не запустился с новыми настройками. Прежние настройки возвращены.', 502) from None
+        self.ssh(speaker, 'rm -f ' + backup)
+        return {'state': 'ready', 'message': 'Настройки AI применены.'}
+
     def _upgrade(self, speaker, job, adoption=None):
         # Existing installations are recognized by server-pinned startup hashes,
         # their own current manifest and an unchanged, exactly owned init hook.
@@ -1034,6 +1065,16 @@ class Manager:
         return {'state': 'rolled_back', 'message': 'Мост отключён, исходная конфигурация восстановлена. Перезагрузите колонку для сброса кешированного маршрута.'}
 
 
+def ai_runtime(original, values):
+    kept = [line for line in original.splitlines() if not line.startswith(AI_RUNTIME)]
+    if values.get('llm_base_url'):
+        kept += ['QUASAR_LLM_BASE_URL=' + shlex.quote(values['llm_base_url']), 'QUASAR_LLM_MODEL=' + shlex.quote(values['llm_model']),
+                 'QUASAR_LLM_API_KEY=' + shlex.quote(values['llm_api_key'])]
+    else:
+        kept.append('QUASAR_LLM_DISABLED=1')
+    return '\n'.join(kept) + '\n'
+
+
 def ai_check(payload, options=Path('/data/options.json'), opener=urlopen):
     """Tries the provider from the server: a browser is blocked by CORS and has no saved key."""
     base = str(payload.get('base_url', '')).strip().rstrip('/')
@@ -1047,18 +1088,35 @@ def ai_check(payload, options=Path('/data/options.json'), opener=urlopen):
         except (OSError, ValueError):
             key = ''
     headers = {'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'}
+    models = []
     try:
         with opener(Request(base + '/models', headers=headers), timeout=10) as response:
             data = json.loads(response.read(2 * 1024 * 1024))
         models = sorted(str(item['id']) for item in data.get('data', []) if isinstance(item, dict) and item.get('id'))[:300]
     except HTTPError as error:
-        message = 'Провайдер отклонил ключ.' if error.code in (401, 403) else f'Провайдер ответил ошибкой {error.code}.'
-        return {'ok': False, 'message': message}
+        if error.code in (401, 403):
+            return {'ok': False, 'message': 'Провайдер отклонил ключ.'}
     except (OSError, ValueError, AttributeError):
-        return {'ok': False, 'message': 'Адрес недоступен из Home Assistant или это не OpenAI-совместимый API.'}
-    if model and models and model not in models:
-        return {'ok': False, 'message': 'Такой модели у провайдера нет.', 'models': models}
-    return {'ok': True, 'message': f'Подключение работает, моделей: {len(models)}.', 'models': models}
+        if not model:
+            return {'ok': False, 'message': 'Адрес недоступен из Home Assistant или это не OpenAI-совместимый API.'}
+    if not model:
+        if models:
+            return {'ok': True, 'message': f'Подключение работает, моделей: {len(models)}. Выберите модель и проверьте ещё раз.', 'models': models}
+        return {'ok': False, 'message': 'Провайдер не отдал список моделей. Укажите модель вручную и проверьте ещё раз.'}
+    # The list is optional in many providers; only a real answer proves the model.
+    body = json.dumps({'model': model, 'messages': [{'role': 'user', 'content': 'ping'}], 'max_tokens': 8}).encode()
+    began = time.monotonic()
+    try:
+        with opener(Request(base + '/chat/completions', data=body, headers=headers, method='POST'), timeout=30) as response:
+            answer = json.loads(response.read(2 * 1024 * 1024))
+        if not answer.get('choices'):
+            raise ValueError()
+    except HTTPError as error:
+        reason = {401: 'Провайдер отклонил ключ.', 403: 'Провайдер отклонил ключ.', 404: 'Такой модели у провайдера нет.', 429: 'Лимит провайдера исчерпан.'}
+        return {'ok': False, 'message': reason.get(error.code, f'Провайдер ответил ошибкой {error.code}.'), 'models': models}
+    except (OSError, ValueError, AttributeError):
+        return {'ok': False, 'message': 'Модель не ответила: таймаут или неверный формат ответа.', 'models': models}
+    return {'ok': True, 'message': f'Модель ответила за {time.monotonic() - began:.1f} с.', 'models': models}
 
 
 def authenticate(ha_url, token):

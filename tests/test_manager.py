@@ -594,9 +594,18 @@ class AiCheckTests(unittest.TestCase):
             return io.BytesIO(body)
         return service.ai_check(payload, Path('/nonexistent'), opener)
 
-    def test_lists_models_and_finds_a_wrong_name(self):
+    def test_lists_models_then_asks_the_model(self):
         self.assertEqual(self.check({'base_url': 'http://x/v1', 'api_key': 'k'})['models'], ['m1'])
-        self.assertFalse(self.check({'base_url': 'http://x/v1', 'api_key': 'k', 'model': 'no'})['ok'])
+        body = b'{"data":[{"id":"m1"}],"choices":[{}]}'
+        self.assertTrue(self.check({'base_url': 'http://x/v1', 'api_key': 'k', 'model': 'm1'}, body)['ok'])
+        self.assertFalse(self.check({'base_url': 'http://x/v1', 'api_key': 'k', 'model': 'm1'})['ok'])
+
+    def test_runtime_swaps_only_the_provider(self):
+        import service
+        result = service.ai_runtime("A=1\nQUASAR_LLM_DISABLED=1\n", {'llm_base_url': 'http://x/v1', 'llm_model': 'm', 'llm_api_key': 'k'})
+        self.assertIn('A=1', result)
+        self.assertNotIn('DISABLED', result)
+        self.assertIn('QUASAR_LLM_API_KEY=k', result)
 
     def test_explains_key_and_address_problems(self):
         from urllib.error import HTTPError

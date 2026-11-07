@@ -65,6 +65,7 @@ type Engine struct {
 	Playback     PlaybackController
 	Music        MusicStarter
 	YouTube      YouTubePlayer
+	Silencer     interface{ Silence(context.Context) error }
 	Dialogue     *dialogue.Store
 	dialogueOnce sync.Once
 	routing      atomic.Pointer[RoutingPolicy]
@@ -339,6 +340,18 @@ func (e *Engine) wantsYouTube(text string) bool {
 func (e *Engine) PlayerControl(ctx context.Context, action string) error {
 	switch action {
 	case "pause", "resume", "next", "previous":
+	case "silence":
+		// One button stops whatever sounds: every player and Alice herself.
+		if e.YouTube != nil && e.YouTube.Active(ctx) {
+			_, _ = e.YouTube.Control(ctx, "stop")
+		}
+		if e.Playback != nil && e.Playback.Active(ctx) {
+			_, _ = e.Playback.Control(ctx, "pause")
+		}
+		if e.Silencer == nil {
+			return nil
+		}
+		return e.Silencer.Silence(ctx)
 	default:
 		return errors.New("unknown player action")
 	}

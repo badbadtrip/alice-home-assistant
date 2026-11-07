@@ -218,6 +218,7 @@ func main() {
 	if local := (&soloist.Client{StateDir: "/data/soloist/state"}); engine.Playback == nil && local.Available() {
 		engine.Playback = local
 	}
+	engine.Silencer = proxy
 	youtube := ytm.New()
 	engine.YouTube = youtube
 	if err := engine.SetRouting(withoutModelFallback(cfg.Routing, llmDisabled)); err != nil {

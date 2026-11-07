@@ -146,7 +146,7 @@ def station(manager, speaker_id, operation, payload):
             return {'enabled': state.get('enabled') is True, 'connected': state.get('connected') is True, 'playing': state.get('playing') is True, 'error': bool(state.get('error'))}
         if operation == 'player':
             action = payload.get('action')
-            if action not in ('pause', 'resume', 'next', 'previous'):
+            if action not in ('pause', 'resume', 'next', 'previous', 'silence'):
                 raise Error('Неизвестная команда плеера.')
             manager.ssh(speaker, 'wget -T 4 -q -O - "http://127.0.0.1:18861/player?action=' + action + '"', timeout=10)
             return {'ok': True}

@@ -1016,6 +1016,12 @@ button:active:not(:disabled){transform:scale(.97)}
       const title=now.title||label,paused=now.status==='paused';
       return `<span class="now-line" data-source="${escape(now.source??'')}" data-paused="${paused}" title="${escape([title,now.artist,label,paused?'пауза':''].filter(Boolean).join(' · '))}"><span class="now-svc" role="img" aria-label="${escape(label)}">${icon(glyph)}</span><b>${escape(title)}</b>${now.artist?`<span>${escape(now.artist)}</span>`:''}${paused?icon('pause'):''}</span>`;
     }
+    /* The round button means quiet now: music from any service and Alice's reply. */
+    async _silence(id,service){
+      const s=this._speakers.find(item=>item.id===id);if(!s||this._stationBusy.has(id))return;
+      if(service==='media_play'||s.connection?.status!=='online')return this._mediaAction(id,service);
+      this._stationBusy.add(id);try{await this._api('/api/speakers/'+encodeURIComponent(id)+'/player','POST',{action:'silence'});if(s.connection?.now_playing)s.connection.now_playing.status='paused';}catch(error){this._stationMessages[id]=error.message;}finally{this._stationBusy.delete(id);this._refreshMedia();}
+    }
     async _playerAction(id,action){
       const s=this._speakers.find(item=>item.id===id),now=s?.connection?.now_playing;if(!now)return;
       if(action==='pause'||action==='resume'){now.status=action==='pause'?'paused':'playing';this._refreshMedia();}
@@ -1210,7 +1216,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(action==='copy-key')return this._copyPublicKey();
       if(action==='copy-key-command')return this._copyPublicKey(this._keyCommand());
       if(action==='close-utility'){if(!this._utility?.busy){try{sessionStorage.removeItem(this._addressResumeKey());}catch{}this._utility=null;this._render();}return;}
-      if(action==='media')return this._mediaAction(id,button.dataset.service);
+      if(action==='media')return this._silence(id,button.dataset.service);
       if(action==='airplay'){await this._airplayToggle(id);return;}
       if(action==='auto-update'){await this._autoUpdateToggle();return;}
       if(action==='test-sound'){const s=this._speakers.find(item=>item.id===id);const ok=await this._mediaAction(id,'play_media',{media_content_id:'Проверка звука. Колонка '+s.name+' готова к работе.',media_content_type:'text'});if(this._utility){this._utility.message=ok?'Тестовая фраза отправлена. Подтвердите звучание на слух.':'Не удалось отправить тестовую фразу.';this._utilityMessage();}return;}

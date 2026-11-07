@@ -77,6 +77,20 @@ func volumeDirective(level int) (*directives.TDirective, error) {
 	return &directives.TDirective{Type: "client_action", Name: "sound_set_level", AnalyticsType: "sound_set_level", IsLedSilent: true, PayloadType: &directives.TDirective_Payload{Payload: payload}}, nil
 }
 
+// Silence stops the Station's own audio: Alice's reply and stock music alike.
+func (p *Proxy) Silence(ctx context.Context) error {
+	empty, _ := structpb.NewStruct(map[string]any{})
+	payload := &directives.TDirective_Payload{Payload: empty}
+	frame, err := pushFrame(
+		&directives.TDirective{Type: "client_action", Name: "audio_stop", AnalyticsType: "audio_stop", IsLedSilent: true, PayloadType: payload},
+		&directives.TDirective{Type: "client_action", Name: "player_pause", AnalyticsType: "player_pause", IsLedSilent: true, PayloadType: payload},
+	)
+	if err != nil {
+		return err
+	}
+	return p.station.write(ctx, frame)
+}
+
 // SetVolume sets the Station volume on its 0-10 scale.
 func (p *Proxy) SetVolume(ctx context.Context, level int) error {
 	directive, err := volumeDirective(level)

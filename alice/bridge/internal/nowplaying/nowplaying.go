@@ -3,6 +3,7 @@ package nowplaying
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 )
@@ -96,4 +97,26 @@ func (t *Tracker) Pick(ctx context.Context, sources ...Source) *Info {
 		}
 	}
 	return nil
+}
+
+// Watch looks at the players every second and reports a change at once. The same
+// state is sent again every 30 seconds, so the server never keeps a stale track for long.
+func Watch(ctx context.Context, tracker *Tracker, sources func() []Source, report func(context.Context, *Info) error) {
+	var last []byte
+	var sent time.Time
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		info := tracker.Pick(ctx, sources()...)
+		if data, _ := json.Marshal(info); string(data) != string(last) || time.Since(sent) > 30*time.Second {
+			if report(ctx, info) == nil {
+				last, sent = data, time.Now()
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }

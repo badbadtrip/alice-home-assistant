@@ -293,6 +293,19 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
       response.json({ ok: true })
     } catch { response.status(502).json({ error: 'Speaker did not answer' }) }
   })
+  // Speakers report their player as it changes; the manager reads it for the panel.
+  const nowPlaying = new Map<string, { at: number; value: unknown }>()
+  const PlayerField = z.union([z.string().max(2048), z.number()])
+  const NowPlayingSchema = z.object({ now_playing: z.record(z.string(), PlayerField).nullable() })
+  app.post('/now-playing', (request, response) => {
+    const parsed = NowPlayingSchema.safeParse(request.body); const speaker = request.get('x-alice-speaker')
+    if (!speaker || speaker.length > 64 || !parsed.success) { response.status(400).json({ error: 'Invalid player state' }); return }
+    nowPlaying.set(speaker, { at: Date.now(), value: parsed.data.now_playing })
+    response.json({ ok: true })
+  })
+  app.get('/now-playing', (_, response) => {
+    response.json(Object.fromEntries([...nowPlaying].map(([speaker, entry]) => [speaker, entry])))
+  })
   app.post('/spotify/search', async (request, response) => {
     const parsed = SearchRequestSchema.safeParse(request.body)
     if (!parsed.success) { response.status(400).json({ error: 'Invalid search' }); return }

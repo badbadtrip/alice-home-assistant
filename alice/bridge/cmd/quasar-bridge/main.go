@@ -27,6 +27,7 @@ import (
 	"quasarbridge/internal/journal"
 	"quasarbridge/internal/indicator"
 	"quasarbridge/internal/llm"
+	"quasarbridge/internal/metrics"
 	"quasarbridge/internal/nowplaying"
 	"quasarbridge/internal/soloist"
 	"quasarbridge/internal/ytm"
@@ -323,6 +324,19 @@ func main() {
 		}
 	}
 	var airPlay *airPlayControl
+	playerSources := func() []nowplaying.Source {
+		var sources []nowplaying.Source
+		if airPlay != nil {
+			sources = append(sources, airPlay.now)
+		}
+		if local := (&soloist.Client{StateDir: "/data/soloist/state"}); local.Available() {
+			sources = append(sources, local.Now)
+		}
+		if youtube.Available() {
+			sources = append(sources, youtube.Now)
+		}
+		return sources
+	}
 	mux := http.NewServeMux()
 	if musicQueue != nil {
 		mux.Handle("/music-stream/", musicQueue)
@@ -353,19 +367,7 @@ func main() {
 				return airPlay.health()
 			}
 			return nil
-		}(), "now_playing": func() *nowplaying.Info {
-			var sources []nowplaying.Source
-			if airPlay != nil {
-				sources = append(sources, airPlay.now)
-			}
-			if local := (&soloist.Client{StateDir: "/data/soloist/state"}); local.Available() {
-				sources = append(sources, local.Now)
-			}
-			if youtube.Available() {
-				sources = append(sources, youtube.Now)
-			}
-			return playing.Pick(r.Context(), sources...)
-		}()})
+		}(), "now_playing": playing.Pick(r.Context(), playerSources()...)})
 		_, _ = w.Write(data)
 	})
 	mux.HandleFunc("GET /volume", proxy.VolumeHandler)
@@ -415,7 +417,28 @@ func main() {
 		defer control.shutdown()
 		go control.resume()
 	}
+	started := time.Now()
+	snapshot := func(ctx context.Context) metrics.Snapshot {
+		players := map[string]nowplaying.Source{}
+		if airPlay != nil {
+			players["airplay"] = airPlay.now
+		}
+		if local := (&soloist.Client{StateDir: "/data/soloist/state"}); local.Available() {
+			players["spotify"] = local.Now
+		}
+		if youtube.Available() {
+			players["youtube_music"] = youtube.Now
+		}
+		return metrics.Snapshot{Status: "ok", SpeakerID: os.Getenv("QUASAR_HOME_SPEAKER_ID"), BridgeUptimeS: int64(time.Since(started).Seconds()),
+			System: metrics.Device.System(), NowPlaying: playing.Pick(ctx, playerSources()...), Players: metrics.Players(ctx, players)}
+	}
+	mux.Handle("GET /metrics", metrics.Handler("", snapshot))
+	if token := os.Getenv("QUASAR_HOME_FUNCTIONS_TOKEN"); token != "" {
+		go serveMetrics(ctx, token, snapshot)
+	}
 	if hf != nil {
+		// The panel learns of a new track within a second instead of waiting for the next health check.
+		go nowplaying.Watch(ctx, &playing, playerSources, hf.ReportNowPlaying)
 		hf.StartVoiceCache(ctx)
   hf.StartActivity(ctx)
   engine.Activity=hf.RecordActivity

@@ -40,6 +40,18 @@ NOW_SOURCES = ('airplay', 'spotify', 'youtube_music', 'yandex_music')
 NOW_STATUSES = ('playing', 'paused', 'buffering')
 
 
+def metrics_state(value, speaker_id):
+    """Only numbers from the speaker's own report reach the panel."""
+    if not isinstance(value, dict) or value.get('speaker_id') != speaker_id or not isinstance(value.get('system'), dict):
+        return None
+    system = value['system']
+    number = lambda key, top: system[key] if type(system.get(key)) in (int, float) and 0 <= system[key] <= top else None
+    return {'uptime_s': number('uptime_s', 10**9), 'load_1m': number('load_1m', 1000), 'cpus': number('cpus', 256),
+            'mem_total_kb': number('mem_total_kb', 10**9), 'mem_available_kb': number('mem_available_kb', 10**9),
+            'data_total_kb': number('data_total_kb', 10**10), 'data_free_kb': number('data_free_kb', 10**10),
+            'temp_c': number('temp_c', 200)}
+
+
 def now_playing_state(value):
     """Keeps only what the panel may show; a speaker's answer is not trusted as is."""
     if not isinstance(value, dict) or value.get('source') not in NOW_SOURCES or value.get('status') not in NOW_STATUSES:
@@ -311,7 +323,33 @@ class Manager:
                     connection['error'] = 'Статус устарел. Ожидается следующая проверка.'
                     connection['delivery'] = {**connection.get('delivery', {}), 'status': 'unknown', 'message': 'Статус колонки устарел.'}
                 result.append({**speaker, 'connection': connection, 'auto_update': auto_update})
+        return self._fresh_now_playing(result, now)
+
+    def _fresh_now_playing(self, result, now):
+        # Bridges push track changes to Home Functions; it is local and answers fast.
+        try:
+            reported = self._hf_request('/now-playing')
+        except Exception:
             return result
+        for item in result:
+            entry = reported.get(item['id']) if isinstance(reported, dict) else None
+            connection = item['connection']
+            if not isinstance(entry, dict) or connection.get('status') != 'online' or now * 1000 - entry.get('at', 0) > 45000:
+                continue
+            current = connection.get('now_playing')
+            value = now_playing_state(entry.get('value')) if entry.get('value') else None
+            # Stock Yandex music is seen by HA, not by the bridge.
+            connection['now_playing'] = value or (current if isinstance(current, dict) and current.get('source') == 'yandex_music' else None)
+        return result
+
+    def _metrics(self, speaker):
+        # Plain HTTP on the home network: a wrong token or an old bridge just gives none.
+        try:
+            request = Request('http://' + lan_ip(speaker['host']) + ':18862/metrics', headers={'Authorization': 'Bearer ' + self._hf_token()})
+            with urlopen(request, timeout=2) as response:
+                return metrics_state(json.loads(response.read(64 * 1024)), speaker['id'])
+        except Exception:
+            return None
 
     def _airplay_lost(self):
         token = os.environ.get('SUPERVISOR_TOKEN')
@@ -402,7 +440,8 @@ class Manager:
                          speaker_id=speaker['id'], volume_push=health.get('volume_push') is True, airplay=airplay_state(health.get('airplay')),
                          now_playing=self._now_playing(speaker, health.get('now_playing')),
                          voice_phrase_count=count if type(count) is int and 0 <= count <= 100000 else None,
-                         voice_phrase_revision=revision if isinstance(revision, str) and re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', revision) else None)
+                         voice_phrase_revision=revision if isinstance(revision, str) and re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', revision) else None,
+                         metrics=self._metrics(speaker))
         except Error as error:
             message = str(error) if error.status == 409 else 'Нет связи с мостом. Проверьте питание и подключение колонки.'
             value.update(status='offline', error=message, now_playing=None)
@@ -421,14 +460,7 @@ class Manager:
         with self.connection_lock:
             self.connections[speaker['id']] = {'identity': identity, 'value': value}
 
-    def _hf_request(self, path, speaker=None, payload=None):
-        if path not in ('/voice-phrases', '/preview', '/events', '/inventory', '/dictionary', '/dictionary/alias', '/music', '/spotify', '/spotify/login', '/spotify/callback', '/spotify/sync'):
-            raise Error('Неизвестный внутренний маршрут.', 500)
-        parsed = urlsplit(self.config.get('home_functions_url', ''))
-        if parsed.scheme not in ('http', 'https') or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ('', '/'):
-            raise Error('Некорректный серверный адрес Home Functions.', 503)
-        if not (self.config.get('home_functions_local') is True and parsed.hostname == '127.0.0.1'):
-            lan_ip(parsed.hostname)
+    def _hf_token(self):
         env_path = Path(self.config.get('home_functions_env', '/nonexistent/alice-functions.env'))
         if env_path.is_symlink() or not env_path.is_file() or env_path.stat().st_mode & 0o077:
             raise Error('Серверные реквизиты Home Functions недоступны.', 503)
@@ -443,6 +475,17 @@ class Manager:
                     token = None
         if not token or any(ord(c) < 33 or ord(c) > 126 for c in token):
             raise Error('Серверные реквизиты Home Functions недоступны.', 503)
+        return token
+
+    def _hf_request(self, path, speaker=None, payload=None):
+        if path not in ('/now-playing', '/voice-phrases', '/preview', '/events', '/inventory', '/dictionary', '/dictionary/alias', '/music', '/spotify', '/spotify/login', '/spotify/callback', '/spotify/sync'):
+            raise Error('Неизвестный внутренний маршрут.', 500)
+        parsed = urlsplit(self.config.get('home_functions_url', ''))
+        if parsed.scheme not in ('http', 'https') or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ('', '/'):
+            raise Error('Некорректный серверный адрес Home Functions.', 503)
+        if not (self.config.get('home_functions_local') is True and parsed.hostname == '127.0.0.1'):
+            lan_ip(parsed.hostname)
+        token = self._hf_token()
         headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/json'}
         if speaker:
             headers['X-Alice-Speaker'] = speaker['id']

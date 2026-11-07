@@ -651,3 +651,14 @@ class AiCheckTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class MetricsStateTests(unittest.TestCase):
+    def test_keeps_numbers_of_the_right_speaker(self):
+        import service
+        value = {'speaker_id': 's', 'system': {'temp_c': 52.7, 'data_free_kb': 30000, 'load_1m': 'x', 'cpus': 4}}
+        state = service.metrics_state(value, 's')
+        self.assertEqual(state['temp_c'], 52.7)
+        self.assertEqual(state['cpus'], 4)
+        self.assertIsNone(state['load_1m'])
+        self.assertIsNone(service.metrics_state(value, 'other'))

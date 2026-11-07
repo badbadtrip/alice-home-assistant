@@ -462,7 +462,7 @@ button:active:not(:disabled){transform:scale(.97)}
           for(const speaker of this._speakers){const region=this.shadowRoot.querySelector('[data-connection="'+speaker.id+'"]');if(region)this._patch(region,this._speakerStatus(speaker));}this._fitNowPills();
           const summary=this.shadowRoot.getElementById('speaker-summary');if(summary)summary.textContent=this._speakerSummary();const setup=this.shadowRoot.getElementById('setup-notice-region');if(setup){const markup=this._setupNotice();if(setup.innerHTML!==markup)setup.innerHTML=markup;}
         }
-      },3000);
+      },2000);
     }
     disconnectedCallback() {
       this.ownerDocument.removeEventListener('keydown',this._adminKeyHandler,true);
@@ -1006,7 +1006,8 @@ button:active:not(:disabled){transform:scale(.97)}
       if(this._needsSetup(s))return `<span class="is-warn"><span class="dot"></span>${s.install?.state==='awaiting_acceptance'?'Проверьте голос':s.install?.state==='awaiting_reboot'?'Нужна перезагрузка':'Мост не настроен'}</span><button data-action="setup" data-id="${escape(s.id)}" ${this._speakersStale?'disabled':''}>Настроить</button>`;
       const c=s.connection??{},status=this._managerError?'unknown':c.status??'unknown',delivery=this._managerError?'unknown':c.delivery?.status??'unknown';
       const line=status==='online'?'':status==='offline'?'Не в сети':'Статус уточняется',extra={pending:'команды обновляются',error:'ошибка синхронизации'}[delivery],update={updating:'мост обновляется',verifying:'мост обновляется',rolling_back:'возврат версии моста',failed:'обновление моста не прошло'}[s.bridge_update?.state],airplayText=c.airplay?.enabled?(c.airplay.error?'AirPlay: ошибка приёмника':c.airplay.playing?'AirPlay играет':c.airplay.connected?'AirPlay подключён':'AirPlay готов'):'',airplay=airplayText?`<span class="air ${c.airplay.playing||c.airplay.connected?'on':''}" role="img" aria-label="${airplayText}" title="${airplayText}">${icon('cast-audio')}</span>`:'';
-      const alerts=[[line,status==='offline'?'':'soft',c.error],[extra,delivery==='error'?'':'soft',c.delivery?.message],[update,s.bridge_update?.state==='failed'?'':'soft','']].filter(([text])=>text);
+      const m=c.metrics??{},health=[[m.temp_c>=75,`Перегрев ${Math.round(m.temp_c)} °C`,''],[m.data_free_kb!=null&&m.data_free_kb<15360,'Мало места на колонке',''],[m.mem_available_kb!=null&&m.mem_available_kb<20480,'Мало памяти','']].filter(([bad])=>bad).map(([,text,tone])=>[text,tone,'']);
+      const alerts=[...health,[line,status==='offline'?'':'soft',c.error],[extra,delivery==='error'?'':'soft',c.delivery?.message],[update,s.bridge_update?.state==='failed'?'':'soft','']].filter(([text])=>text);
       return `${this._nowLine(s)}${alerts.map(([text,tone,hint])=>`<span class="spk-alert ${tone}" title="${escape(hint??'')}">${escape(text[0].toUpperCase()+text.slice(1))}</span>`).join('')}`;
     }
     _speakerFacts(s){

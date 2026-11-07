@@ -124,6 +124,29 @@ def text(value, field, maximum=100):
     return value.strip()
 
 
+LOOK_DEFAULT = {'layout': 'tile', 'style': 'pastel', 'tools': True,
+                'colors': {'play': '#f2b7d3', 'idle': '#b9c7f5', 'talk': '#cfe8a6', 'off': '#f6a98f'}}
+
+
+def look_state(value):
+    """How the speaker cards look, shared by everyone who opens the panel."""
+    look = {**LOOK_DEFAULT, 'colors': dict(LOOK_DEFAULT['colors'])}
+    if not isinstance(value, dict):
+        return look
+    if value.get('layout') in ('tile', 'wide', 'classic'):
+        look['layout'] = value['layout']
+    if value.get('style') in ('pastel', 'dark', 'gradient'):
+        look['style'] = value['style']
+    if isinstance(value.get('tools'), bool):
+        look['tools'] = value['tools']
+    colors = value.get('colors')
+    if isinstance(colors, dict):
+        for key in look['colors']:
+            if isinstance(colors.get(key), str) and re.fullmatch(r'#[0-9a-fA-F]{6}', colors[key]):
+                look['colors'][key] = colors[key].lower()
+    return look
+
+
 def atomic_json(path, value):
     path = Path(path)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -1464,6 +1487,17 @@ class Handler(BaseHTTPRequestHandler):
             return 200, manager._hf_request('/music', None, payload)
         if path == ['api', 'phrase-check'] and method == 'POST':
             return 200, manager.phrase_check(payload)
+        if path == ['api', 'look']:
+            target = manager.store.directory / 'look.json'
+            if method == 'GET':
+                try:
+                    return 200, look_state(json.loads(target.read_text(encoding='utf-8')))
+                except (OSError, ValueError):
+                    return 200, look_state(None)
+            if method == 'PUT':
+                look = look_state(payload)
+                atomic_json(target, look)
+                return 200, look
         if path == ['api', 'metrics'] and method == 'GET':
             return 200, manager.metrics_history()
         if path == ['api', 'activity'] and method == 'GET':

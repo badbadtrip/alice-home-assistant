@@ -302,6 +302,80 @@ main{max-width:1360px;padding:0 24px 48px}
 @media(min-width:1100px){.stage{grid-template-columns:minmax(0,1fr) 380px;gap:32px;align-items:start}}
 .page-narrow{max-width:820px;margin:0 auto}
 .page-wide{max-width:1280px;margin:0 auto}
+.spk-mood{display:none}
+.look-tile,.look-wide{--ink:#151515;--ink-soft:rgb(0 0 0/.66);--well:rgb(0 0 0/.12);--well-fill:rgb(0 0 0/.28)}
+.look-tile .spk,.look-wide .spk{--mood:var(--c-idle);position:relative;gap:10px;padding:18px;border-radius:26px;box-shadow:none;overflow:hidden}
+:is(.look-tile,.look-wide) .spk[data-mood=play]{--mood:var(--c-play)}:is(.look-tile,.look-wide) .spk[data-mood=talk]{--mood:var(--c-talk)}:is(.look-tile,.look-wide) .spk[data-mood=off]{--mood:var(--c-off)}
+:is(.look-tile,.look-wide) .spk-mood{display:block;margin-top:10px;font-size:28px;font-weight:500;line-height:1.05;letter-spacing:-.01em}
+:is(.look-tile,.look-wide) .spk-name h3{font-size:16px;font-weight:600}
+:is(.look-tile,.look-wide) .spk-name .help{font-size:12.5px}
+:is(.look-tile,.look-wide) .spk-head{padding-right:70px}
+:is(.look-tile,.look-wide) .art{position:absolute;top:14px;right:14px;display:grid;place-items:center;width:58px;height:58px;border-radius:50%;background:rgb(0 0 0/.3);box-shadow:0 0 0 1.5px rgb(255 255 255/.35);filter:drop-shadow(0 2px 4px rgb(0 0 0/.45))}
+:is(.look-tile,.look-wide) .art .indicator-photo{width:44px;margin:0;background:none}
+:is(.look-tile,.look-wide) .art .indicator-photo-light{display:none}
+:is(.look-tile,.look-wide) .spk[data-mood=off] .art img{filter:grayscale(1) opacity(.7)}
+:is(.look-tile,.look-wide) .state{font-size:12.5px}
+:is(.look-tile,.look-wide) .now-pill{margin-top:6px;background:var(--well)}
+:is(.look-tile,.look-wide) .deck-volume{gap:8px}
+:is(.look-tile,.look-wide) .deck-volume .range{height:42px;border-radius:14px;background:var(--well)}
+:is(.look-tile,.look-wide) .deck-volume .range-fill{border-radius:14px;background:var(--well-fill)}
+:is(.look-tile,.look-wide) .deck-volume .range-fill:after{top:12px;bottom:12px}
+:is(.look-tile,.look-wide) .deck-volume button.icon{width:42px;height:42px;background:var(--well);color:var(--ink)}
+:is(.look-tile,.look-wide) .deck-volume output{min-width:44px;font-size:14px}
+:is(.look-tile,.look-wide) .tools{display:flex;gap:6px;margin-top:2px}
+:is(.look-tile,.look-wide) .tool{flex:none;width:40px;height:40px;min-height:40px;padding:0;border-radius:50%;background:var(--well);color:var(--ink)}
+:is(.look-tile,.look-wide) .tool span{display:none}
+:is(.look-tile,.look-wide) .tool:hover:not(:disabled){background:var(--well-fill);color:var(--ink)}
+:is(.look-tile,.look-wide).no-tools .tools{display:none}
+:is(.look-tile,.look-wide) .now{margin:0;color:var(--ink-soft)}:is(.look-tile,.look-wide) .now ha-icon{color:inherit}:is(.look-tile,.look-wide) .spk:has(.now-pill) .now{display:none}
+:is(.look-tile,.look-wide) .deck-volume button.icon+button.icon{display:none}
+.speakers.look-tile{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.look-tile .spk{min-height:250px}
+.look-tile .spk>[data-media]{margin-top:auto}
+.speakers.look-wide{grid-template-columns:repeat(auto-fill,minmax(400px,1fr))}
+.look-wide .art{width:66px;height:66px}.look-wide .art .indicator-photo{width:50px}
+.look-wide .spk>[data-media]{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;margin-top:auto}
+.look-wide .spk>[data-media]>:not(.deck-volume,.tools){grid-column:1/-1}
+.look-wide .tools{margin:0}
+/* pastel: the tile is the state colour */
+.style-pastel .spk,.style-gradient .spk{background:var(--mood);color:var(--ink)}
+:is(.style-pastel,.style-gradient) .spk :is(.help,.state,.state>span,.media-note,.spk-alert.soft){color:var(--ink-soft)}
+:is(.style-pastel,.style-gradient) .spk h3,:is(.style-pastel,.style-gradient) .spk output,:is(.style-pastel,.style-gradient) .now-pill{color:var(--ink)}
+:is(.style-pastel,.style-gradient) .deck-volume .range-fill:after{background:rgb(255 255 255/.95)}
+/* gradient: softer light glass controls */
+.style-gradient .spk{background:linear-gradient(150deg,color-mix(in srgb,var(--mood) 70%,#fff),var(--mood))}
+.style-gradient{--well:rgb(255 255 255/.36);--well-fill:rgb(255 255 255/.62)}
+.style-gradient .deck-volume .range-fill:after{background:#151515}
+/* dark: calm surface, colour only on the word, the ring and the slider */
+.style-dark{--ink:var(--text);--ink-soft:var(--muted);--well:var(--tint);--well-fill:color-mix(in srgb,var(--mood) 70%,transparent)}
+.style-dark .spk{background:var(--surface);color:var(--text)}
+.style-dark .spk{--well-fill:color-mix(in srgb,var(--mood) 70%,transparent)}
+.style-dark .spk-mood{color:var(--mood)}
+:host(:not([dark])) .style-dark .spk-mood{color:color-mix(in srgb,var(--mood) 55%,#000)}
+.style-dark .art{background:color-mix(in srgb,var(--mood) 30%,#000);box-shadow:0 0 0 1.5px color-mix(in srgb,var(--mood) 75%,transparent)}
+.style-dark .deck-volume button.icon{background:var(--mood);color:#151515}
+.style-dark .tool{background:var(--tint);color:var(--text)}
+/* customisation page */
+.look-presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
+.look-preset{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-height:0;padding:10px;border:2px solid transparent;border-radius:16px;background:var(--tint);color:var(--text);white-space:normal}
+.look-preset[aria-pressed=true]{border-color:var(--accent)}
+.look-preset b{font-weight:500;text-align:left}
+.look-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;height:46px}
+.look-mini.look-wide{grid-template-columns:1fr}.look-mini.look-classic{grid-template-columns:1fr 1fr}
+.look-mini i{border-radius:8px;background:var(--c-idle)}.look-mini i[data-mood=play]{background:var(--c-play)}.look-mini i[data-mood=off]{background:var(--c-off)}
+.look-mini.style-gradient i{background:linear-gradient(150deg,#fff,var(--c-idle))}.look-mini.style-gradient i[data-mood=play]{background:linear-gradient(150deg,#fff,var(--c-play))}.look-mini.style-gradient i[data-mood=off]{background:linear-gradient(150deg,#fff,var(--c-off))}
+.look-mini.style-dark i{background:var(--surface);box-shadow:inset 0 -6px 0 var(--c-idle)}.look-mini.style-dark i[data-mood=play]{box-shadow:inset 0 -6px 0 var(--c-play)}.look-mini.style-dark i[data-mood=off]{box-shadow:inset 0 -6px 0 var(--c-off)}
+.look-mini.look-classic i{background:var(--surface);box-shadow:none}
+.look-preview .speakers{margin-top:10px;pointer-events:none}
+.look-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}
+.look-row:first-of-type{border-top:0}.look-row.top{align-items:flex-start}.look-row>span{font-weight:500}
+.look-row .seg{margin:0}.look-row .seg button[aria-pressed=true]{background:var(--dialog);color:var(--text);box-shadow:0 1px 2px rgb(0 0 0/.2)}
+.look-colors{display:grid;grid-template-columns:repeat(2,minmax(150px,1fr));gap:8px}
+.look-color{display:flex;align-items:center;gap:10px;padding:6px 10px 6px 6px;border-radius:12px;background:var(--tint);cursor:pointer}
+.look-color input{width:36px;height:36px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
+.look-color input::-webkit-color-swatch-wrapper{padding:0}.look-color input::-webkit-color-swatch{border:0;border-radius:50%;box-shadow:0 0 0 1.5px rgb(255 255 255/.35)}
+.look-color span{display:flex;flex-direction:column}.look-color b{font-weight:500;font-size:13px}.look-color small{color:var(--muted);font-size:12px;font-family:var(--ha-font-family-code,ui-monospace,monospace)}
+@media(max-width:700px){.speakers.look-tile{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.look-tile .spk{min-height:220px;padding:14px;border-radius:22px}.look-tile .spk-mood{font-size:22px}.look-tile .spk-head{padding-right:54px}.look-tile .art{width:46px;height:46px;top:12px;right:12px}.look-tile .art .indicator-photo{width:34px}.look-tile .deck-volume output{display:none}.look-tile .tools{gap:4px}.look-tile .tool{width:34px;height:34px;min-height:34px}.speakers.look-wide{grid-template-columns:minmax(0,1fr)}.look-colors{grid-template-columns:minmax(0,1fr)}}
 .badge{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;border-radius:50%;background:rgb(0 0 0/.3);color:var(--text);box-shadow:0 0 0 1.5px rgb(255 255 255/.25);filter:drop-shadow(0 2px 4px rgb(0 0 0/.5))}
 :host(:not([dark])) .badge{background:color-mix(in srgb,var(--text) 8%,transparent);box-shadow:0 0 0 1.5px rgb(255 255 255/.9);filter:drop-shadow(0 2px 4px rgb(0 0 0/.16))}
 .badge ha-icon{--mdc-icon-size:20px}
@@ -488,7 +562,7 @@ button:active:not(:disabled){transform:scale(.97)}
       });
       this.shadowRoot.addEventListener('change', e => {
         if(this._admin&&e.target.dataset?.spotifyAccount){this._admin[e.target.dataset.spotifyAccount]=e.target.value;return;}
-        if(this._admin?.music&&e.target.dataset?.relayIntro!==undefined){this._admin.music={...this._admin.music,relay_intro:e.target.value};clearTimeout(this._relaySave);this._relaySave=setTimeout(()=>this._saveMusic(),500);return;}
+        if(this._admin?.look&&e.target.dataset?.lookColor){this._saveLook({colors:{[e.target.dataset.lookColor]:e.target.value}});return;}if(this._admin?.music&&e.target.dataset?.relayIntro!==undefined){this._admin.music={...this._admin.music,relay_intro:e.target.value};clearTimeout(this._relaySave);this._relaySave=setTimeout(()=>this._saveMusic(),500);return;}
         if(this._admin&&e.target.dataset?.relaySpeaker!==undefined){this._admin.relaySpeaker=e.target.value;return;}
         if(this._admin?.music&&e.target.dataset?.spotifyField){const list=[...(this._admin.music.spotify_playlists??[])],i=Number(e.target.dataset.index);list[i]={...list[i],[e.target.dataset.spotifyField]:e.target.value};this._admin.music={...this._admin.music,spotify_playlists:list};if(list.every(p=>p.name?.trim()&&p.uri?.trim()))this._saveMusic();return;}
         if(e.target.dataset.adminField==='speakerId'&&this._admin?.tab==='indicator'){this._adminAction('admin-indicator-load');return;}
@@ -566,7 +640,7 @@ button:active:not(:disabled){transform:scale(.97)}
       clearTimeout(this._refreshTimer);clearInterval(this._connectionTimer);clearTimeout(this._metricsTimer);this._watchToken=(this._watchToken??0)+1;
     }
     _patchSpeakers(){
-      this._renderEditorStatus();this._repairSpeakerView();
+      this._renderEditorStatus();this._repairSpeakerView();this._applyMoods();
       if(!this._onSpeakers()||this._speakerDialog)return;
       for(const speaker of this._speakers){const region=this.shadowRoot.querySelector('[data-connection="'+speaker.id+'"]');if(region)this._patch(region,this._speakerStatus(speaker));}this._fitNowPills();
       const summary=this.shadowRoot.getElementById('speaker-summary');if(summary)summary.textContent=this._speakerSummary();const setup=this.shadowRoot.getElementById('setup-notice-region');if(setup){const markup=this._setupNotice();if(setup.innerHTML!==markup)setup.innerHTML=markup;}
@@ -710,7 +784,7 @@ button:active:not(:disabled){transform:scale(.97)}
     }
     async _readManager() {
       if(!this._config.manager_url&&!this._config.manager_app)return;
-      try {const [data,assign]=await Promise.all([this._api('/api/speakers'),this._api('/api/assignments')]);this._speakers=data.speakers??[];this._speakerRevision=data.revision;this._key=data.public_key;this._installationReady=data.installation_ready;this._advertisedUrl=data.advertised_url;this._adoptionEnabled=data.adoption_enabled===true;this._assignments=assign.assignments??{};this._managerError='';await Promise.all(this._speakers.filter(s=>s.media_entity&&!(s.media_entity in this._mediaPlatforms)).map(async speaker=>{try{const entry=await this._hass.callWS({type:'config/entity_registry/get',entity_id:speaker.media_entity});this._mediaPlatforms[speaker.media_entity]=entry?.platform??null;}catch{this._mediaPlatforms[speaker.media_entity]=null;}}));this._speakersStale=false;this._renderIdle();this._loadSpeakerPreviews().then(()=>{this._saveSnapshot();this._renderIdle();});}
+      try {const [data,assign,look]=await Promise.all([this._api('/api/speakers'),this._api('/api/assignments'),this._api('/api/look').catch(()=>null)]);if(look)this._look=look;this._speakers=data.speakers??[];this._speakerRevision=data.revision;this._key=data.public_key;this._installationReady=data.installation_ready;this._advertisedUrl=data.advertised_url;this._adoptionEnabled=data.adoption_enabled===true;this._assignments=assign.assignments??{};this._managerError='';await Promise.all(this._speakers.filter(s=>s.media_entity&&!(s.media_entity in this._mediaPlatforms)).map(async speaker=>{try{const entry=await this._hass.callWS({type:'config/entity_registry/get',entity_id:speaker.media_entity});this._mediaPlatforms[speaker.media_entity]=entry?.platform??null;}catch{this._mediaPlatforms[speaker.media_entity]=null;}}));this._speakersStale=false;this._renderIdle();this._loadSpeakerPreviews().then(()=>{this._saveSnapshot();this._renderIdle();});}
       catch(error){this._managerError=error.message;this._speakersStale=false;}
       this._resumeAddressSetup();
     }
@@ -934,6 +1008,49 @@ button:active:not(:disabled){transform:scale(.97)}
 
 
     _saveMusic(){const a=this._admin;this._api('/api/music','PUT',a.music).then(value=>{if(this._admin===a){a.music={...a.music,spotify_playlists:value.spotify_playlists};a.message='';}}).catch(()=>{if(this._admin===a){a.message='Не сохранилось. Проверьте ссылку.';this._render();}});}
+    _lookDefault(){return {layout:'tile',style:'pastel',tools:true,colors:{play:'#f2b7d3',idle:'#b9c7f5',talk:'#cfe8a6',off:'#f6a98f'}};}
+    _currentLook(){const base=this._lookDefault(),value=this._look??{};return {...base,...value,colors:{...base.colors,...(value.colors??{})}};}
+    _lookClass(look=this._currentLook()){const c=look.colors;return {cls:`look-${look.layout} style-${look.style}${look.tools?'':' no-tools'}`,style:`--c-play:${c.play};--c-idle:${c.idle};--c-talk:${c.talk};--c-off:${c.off}`};}
+    /* One word for what the speaker is doing; the tile colour follows it. */
+    _mood(s){
+      const c=s.connection??{},state=this._hass?.states?.[s.media_entity],alice=String(state?.attributes?.alice_state??'').toUpperCase(),np=c.now_playing;
+      if(c.status==='offline')return ['off','Нет связи'];
+      if(['LISTENING','SPEAKING','BUSY'].includes(alice))return ['talk',alice==='LISTENING'?'Слушает':alice==='BUSY'?'Думает':'Отвечает'];
+      if(state?.state==='playing'||np?.status==='playing')return ['play','Играет'];
+      if(state?.state==='paused'||np?.status==='paused')return ['play','Пауза'];
+      return ['idle',c.status==='online'||state?'Тихо':'Проверяется'];
+    }
+    _applyMoods(){for(const s of this._speakers??[]){const card=this.shadowRoot?.querySelector('[data-spk="'+s.id+'"]');if(!card)continue;const [mood,label]=this._mood(s);if(card.dataset.mood!==mood)card.dataset.mood=mood;const text=card.querySelector('.spk-mood');if(text&&text.textContent!==label)text.textContent=label;}}
+    _lookPage(blocked){
+      const a=this._admin;
+      if(a.look===undefined){a.look=null;this._api('/api/look').then(value=>{if(this._admin===a){a.look=value;this._look=value;this._render();}}).catch(()=>{if(this._admin===a){a.look=this._currentLook();this._render();}});}
+      if(!a.look)return '<p class="help">Загрузка…</p>';
+      const look={...this._currentLook(),...a.look,colors:{...this._currentLook().colors,...a.look.colors}};
+      const presets=[['pastel','Пастель','tile','pastel'],['dark','Тёмная','tile','dark'],['gradient','Градиент','tile','gradient'],['wide','Широкая','wide','pastel'],['wide-dark','Широкая тёмная','wide','dark'],['classic','Классика','classic','pastel']];
+      const sample=(layout,style)=>{const {cls,style:vars}=this._lookClass({...look,layout,style});return `<span class="look-mini ${cls}" style="${vars}"><i data-mood="play"></i><i data-mood="idle"></i>${layout==='wide'?'':'<i data-mood="off"></i>'}</span>`;};
+      const preset=([id,label,layout,style])=>`<button type="button" class="look-preset" data-action="admin-look" data-layout="${layout}" data-style="${style}" aria-pressed="${look.layout===layout&&(layout==='classic'||look.style===style)}" ${blocked}>${sample(layout,style)}<b>${label}</b></button>`;
+      const seg=(key,items)=>`<div class="seg" role="group">${items.map(([value,label])=>`<button type="button" data-action="admin-look" data-${key}="${value}" aria-pressed="${look[key]===value}" ${blocked}>${label}</button>`).join('')}</div>`;
+      const color=(key,label)=>`<label class="look-color"><input type="color" data-look-color="${key}" value="${escape(look.colors[key])}" ${blocked}><span><b>${label}</b><small>${escape(look.colors[key])}</small></span></label>`;
+      const {cls,style}=this._lookClass(look);
+      const demo=[{id:'demo-a',name:'Гостиная',area:'Комната',model:'midi',mood:['play','Играет'],track:'Кино — Группа крови',volume:30},{id:'demo-b',name:'Кухня',area:'Кухня',model:'lite2',mood:['idle','Тихо'],volume:60},{id:'demo-c',name:'Детская',area:'Детская',model:'lite2',mood:['off','Нет связи'],volume:0}];
+      const tool=(glyph,label)=>`<button type="button" class="tool" tabindex="-1">${icon(glyph)}<span>${label}</span></button>`;
+      const card=d=>`<article class="spk" data-mood="${d.mood[0]}"><div class="spk-head"><div class="spk-name"><h3>${d.name}</h3><p class="help">${d.area}</p><div class="spk-mood">${d.mood[1]}</div><div class="state">${d.track?`<span class="now-pill" data-source="youtube_music"><span class="now-svc">${icon('youtube')}</span><span class="now-track"><span>${d.track}</span></span></span>`:''}</div></div><div class="art">${this._devicePhoto(d.model,d.id)}</div></div><div data-media><div class="deck-volume"><button type="button" class="icon" tabindex="-1">${icon(d.track?'pause':'stop')}</button><div class="range" style="--fill:${d.volume}%"><span class="range-fill"></span></div><output>${d.volume} %</output></div><div class="tools">${tool('message-text-outline','Сказать')}${tool('volume-high','Звук')}${tool('chart-areaspline','Метрики')}${tool('cog-outline','Настройки')}</div></div></article>`;
+      return `<div class="music-page look-page"><div class="page-intro"><div><h3>Кастомизация</h3><p class="help">Как выглядят карточки колонок. Настройка общая для всех, кто открывает панель.</p></div></div>
+        <section class="group music-card"><h3>Готовые варианты</h3><div class="look-presets">${presets.map(preset).join('')}</div></section>
+        <section class="group music-card look-preview"><div class="music-head"><h3>Предпросмотр</h3><span class="pill">Только на экране</span></div><div class="speakers ${cls}" style="${style}" inert>${demo.map(card).join('')}</div></section>
+        <section class="group music-card"><h3>Настроить вручную</h3>
+          <div class="look-row"><span>Раскладка</span>${seg('layout',[['tile','Плитка'],['wide','Широкая'],['classic','Классика']])}</div>
+          ${look.layout==='classic'?'':`<div class="look-row"><span>Стиль</span>${seg('style',[['pastel','Пастель'],['dark','Тёмный'],['gradient','Градиент']])}</div>
+          <div class="look-row top"><span>Цвета состояний</span><div class="look-colors">${color('play','Играет')}${color('idle','Тихо')}${color('talk','Алиса говорит')}${color('off','Нет связи')}</div></div>
+          <div class="look-row"><span>Кнопки на карточке</span><div class="seg" role="group"><button type="button" data-action="admin-look" data-tools="1" aria-pressed="${look.tools}" ${blocked}>Показывать</button><button type="button" data-action="admin-look" data-tools="0" aria-pressed="${!look.tools}" ${blocked}>Скрыть</button></div></div>`}
+          <div class="actions"><button type="button" class="secondary" data-action="admin-look-reset" ${blocked}>Вернуть как было</button></div></section></div>`;
+    }
+    async _saveLook(change){
+      const a=this._admin;if(!a?.look)return;
+      a.look={...a.look,...change,colors:{...a.look.colors,...(change.colors??{})}};this._look=a.look;this._render();
+      clearTimeout(this._lookTimer);
+      this._lookTimer=setTimeout(async()=>{try{const saved=await this._api('/api/look','PUT',a.look);if(this._admin===a){a.look=saved;}this._look=saved;}catch(error){if(this._admin===a){a.message='Не удалось сохранить: '+error.message;this._render();}}},350);
+    }
     _help(page,label='Подробнее в справке'){return `<button type="button" class="help-link" data-action="wiki" data-page="${page}">${icon('help-circle-outline')}<span>${label}</span></button>`;}
     _houseHead(active){const tabs=[['commands','Команды'],['devices','Устройства'],['dictionary','Словарь']];return `<div class="page-intro"><div><h2 id="admin-title" class="admin-title">Дом</h2><p class="help">Что Алиса умеет делать в вашем доме</p></div></div><div class="seg page-seg" role="tablist" aria-label="Разделы">${tabs.map(([id,label])=>`<button type="button" role="tab" aria-selected="${active===id}" data-action="house-tab" data-tab="${id}" ${this._admin?.busy?'disabled':''}>${label}</button>`).join('')}</div>`;}
     _musicPage(blocked){
@@ -979,7 +1096,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(a.music===undefined){a.music=null;this._api('/api/music').then(value=>{if(this._admin===a){a.music=value;this._render();}}).catch(()=>{if(this._admin===a){a.music=false;this._render();}});}
       if(!a.music)return `<p class="help">${a.music===false?'Настройки недоступны.':'Загрузка…'}</p>`;
       const ready=this._speakers.filter(s=>s.media_entity);a.relaySpeaker??=ready[0]?.id;
-      return `<div class="music-page"><div class="page-intro"><div><h3>Рация</h3><p class="help">Скажите «Алиса, скажи на кухню, ужин готов» — колонка на кухне произнесёт сообщение.</p></div></div><section class="group music-card"><h3>Фраза перед сообщением</h3><p class="help">Скажите «Алиса, скажи на кухню, ужин готов», и колонка на кухне произнесёт эту фразу, а затем сообщение. Если оставить поле пустым, прозвучит только сообщение.</p><label>Фраза<input data-relay-intro value="${escape(a.music.relay_intro??'')}" maxlength="100" placeholder="Царь изволит глаголить" ${blocked}></label>${ready.length?`<label>Колонка для проверки<select data-relay-speaker ${blocked}>${ready.map(s=>`<option value="${escape(s.id)}" ${s.id===a.relaySpeaker?'selected':''}>${escape(s.name)}</option>`).join('')}</select></label><div class="actions"><button type="button" class="secondary" data-action="admin-relay-test" ${blocked}>Прослушать на колонке</button></div>`:'<p class="help">Ни у одной колонки не выбран media_player.</p>'}</section></div>`;
+      return `<div class="music-page"><div class="page-intro"><div><h3>Интерком</h3><p class="help">Скажите «Алиса, скажи на кухню, ужин готов» — колонка на кухне произнесёт сообщение.</p></div></div><section class="group music-card"><h3>Фраза перед сообщением</h3><p class="help">Скажите «Алиса, скажи на кухню, ужин готов», и колонка на кухне произнесёт эту фразу, а затем сообщение. Если оставить поле пустым, прозвучит только сообщение.</p><label>Фраза<input data-relay-intro value="${escape(a.music.relay_intro??'')}" maxlength="100" placeholder="Царь изволит глаголить" ${blocked}></label>${ready.length?`<label>Колонка для проверки<select data-relay-speaker ${blocked}>${ready.map(s=>`<option value="${escape(s.id)}" ${s.id===a.relaySpeaker?'selected':''}>${escape(s.name)}</option>`).join('')}</select></label><div class="actions"><button type="button" class="secondary" data-action="admin-relay-test" ${blocked}>Прослушать на колонке</button></div>`:'<p class="help">Ни у одной колонки не выбран media_player.</p>'}</section></div>`;
     }
     /* Every step is read from the live state, so the list ticks itself off as the person goes. */
     _setupSteps(){
@@ -998,9 +1115,7 @@ button:active:not(:disabled){transform:scale(.97)}
     _aiPage(blocked){
       const a=this._admin;if(!a.options)return '<p class="help">Загрузка…</p>';
       const values={...a.options,...a.appDraft},url=values.llm_base_url??'',status=a.aiStatus;
-      const presets=[['OmniRoute','http://IP:ПОРТ/v1','transit-connection-variant'],['DeepSeek','https://api.deepseek.com/v1','brain'],['OpenAI','https://api.openai.com/v1','creation-outline'],['Свой сервер','','server-outline']];
-      const preset=([label,address,glyph])=>`<button type="button" data-action="admin-ai-preset" data-url="${escape(address)}" aria-pressed="${!!address&&address===url}" ${blocked}>${icon(glyph)}${label}</button>`;
-      return `<div class="music-page"><section class="group music-card"><h3>AI-провайдер</h3><p class="help">Любой OpenAI-совместимый API. Без него запросы обрабатывает штатная Алиса.</p><div class="ai-presets" role="group" aria-label="Провайдер">${presets.map(preset).join('')}</div></section><section class="group music-card"><h3>Подключение</h3><label>Base URL<input data-app-field="llm_base_url" value="${escape(url)}" placeholder="https://…/v1" spellcheck="false" autocomplete="off" ${blocked}></label><label>API key<input data-app-field="llm_api_key" type="password" value="${escape(a.appDraft?.llm_api_key??'')}" placeholder="${a.options.llm_api_key?'Сохранён, оставьте пустым':'Ключ провайдера'}" autocomplete="off" ${blocked}></label><label>Модель или комбо<input data-app-field="llm_model" list="ai-models" value="${escape(values.llm_model??'')}" placeholder="Подставится сама, если вариант один" spellcheck="false" autocomplete="off" ${blocked}></label><datalist id="ai-models">${(a.aiModels??[]).map(model=>`<option value="${escape(model)}"></option>`).join('')}</datalist>${status?`<p class="ai-status" data-ok="${status.ok}" role="status">${icon(status.ok?'check-circle-outline':'alert-circle-outline')}${escape(status.message)}</p>`:''}<div class="actions"><button type="button" class="secondary" data-action="admin-ai-check" ${blocked}>Проверить</button><button type="button" class="primary" data-action="admin-ai-save" ${blocked}>Сохранить</button></div><p class="help">Для роутера вроде OmniRoute здесь указывается комбо: реальную модель выбирает он сам. Адрес должен быть доступен из Home Assistant, <code>localhost</code> здесь означает само приложение. После сохранения приложение перезапустится.</p></section>${a.aiApply?`<section class="group music-card"><h3>Применить на колонках</h3><p class="help">Мост на каждой колонке перезапустится с новым провайдером. Если он не запустится, прежние настройки вернутся сами.</p><div class="actions"><button type="button" class="primary" data-action="admin-ai-apply" ${blocked}>Применить</button></div></section>`:''}</div>`;
+      return `<div class="music-page"><div class="page-intro"><div><h3>AI</h3><p class="help">Любой OpenAI-совместимый API. Без него запросы обрабатывает штатная Алиса.</p></div>${this._help('LLM','AI в справке')}</div><section class="group music-card"><h3>Подключение</h3><label>Base URL<input data-app-field="llm_base_url" value="${escape(url)}" placeholder="https://…/v1" spellcheck="false" autocomplete="off" ${blocked}></label><label>API key<input data-app-field="llm_api_key" type="password" value="${escape(a.appDraft?.llm_api_key??'')}" placeholder="${a.options.llm_api_key?'Сохранён, оставьте пустым':'Ключ провайдера'}" autocomplete="off" ${blocked}></label><label>Модель или комбо<input data-app-field="llm_model" list="ai-models" value="${escape(values.llm_model??'')}" placeholder="Подставится сама, если вариант один" spellcheck="false" autocomplete="off" ${blocked}></label><datalist id="ai-models">${(a.aiModels??[]).map(model=>`<option value="${escape(model)}"></option>`).join('')}</datalist>${status?`<p class="ai-status" data-ok="${status.ok}" role="status">${icon(status.ok?'check-circle-outline':'alert-circle-outline')}${escape(status.message)}</p>`:''}<div class="actions"><button type="button" class="secondary" data-action="admin-ai-check" ${blocked}>Проверить</button><button type="button" class="primary" data-action="admin-ai-save" ${blocked}>Сохранить</button></div><p class="help">Для роутера вроде OmniRoute здесь указывается комбо: реальную модель выбирает он сам. Адрес должен быть доступен из Home Assistant, <code>localhost</code> здесь означает само приложение. После сохранения приложение перезапустится.</p></section>${a.aiApply?`<section class="group music-card"><h3>Применить на колонках</h3><p class="help">Мост на каждой колонке перезапустится с новым провайдером. Если он не запустится, прежние настройки вернутся сами.</p><div class="actions"><button type="button" class="primary" data-action="admin-ai-apply" ${blocked}>Применить</button></div></section>`:''}</div>`;
     }
     /* App-wide steps once, then each speaker under its own name, so it is clear which one needs what. */
     _setupPage(){
@@ -1012,7 +1127,7 @@ button:active:not(:disabled){transform:scale(.97)}
         const done=items.filter(item=>item[1]).length,next=items.find(item=>!item[1]);
         return `<article class="setup-speaker" data-state="${next?'todo':'done'}"><header><div><h4>${escape(s.name)}</h4><p>${escape([s.area,s.host].filter(Boolean).join(' · '))}</p></div><span class="pill ${next?'warn':'ok'}">${done} из ${items.length}</span></header><ul class="setup-chips">${items.map(([label,ok])=>`<li data-ok="${ok}">${icon(ok?'check-circle':'circle-outline')}${label}</li>`).join('')}</ul>${next?`<div class="setup-next"><button type="button" class="primary small" data-action="setup" data-id="${id}">${next[2]}</button><p>${escape(next[3])}</p></div>`:''}</article>`;
       };
-      const extras=[['music','music-note','Музыка','Что играет по «включи музыку»'],['ai','creation-outline','AI','Свой провайдер для ответов'],['relay','walkie-talkie','Рация','Сказать что-то в другую комнату']];
+      const extras=[['music','music-note','Музыка','Что играет по «включи музыку»'],['ai','creation-outline','AI','Свой провайдер для ответов'],['relay','message-arrow-right-outline','Интерком','Сказать что-то в другую комнату']];
       return `<div class="setup-page"><div class="page-intro"><div><h3>${finished?'Всё готово':'Быстрая настройка'}</h3><p class="help">${finished?'Скажите «Алиса» и любую из ваших команд.':'Приложение проверяет шаги само: галочки появятся, как только шаг будет выполнен.'}</p></div>${this._help('Installation','Установка в справке')}</div>
         <h4 class="setup-sub">Приложение</h4><ol class="setup-list">${steps.slice(0,2).map(appRow).join('')}</ol>
         <div class="setup-sub-row"><h4 class="setup-sub">Колонки</h4><button type="button" class="secondary small" data-action="add-speaker">${icon('plus')}Колонка</button></div>
@@ -1032,7 +1147,7 @@ button:active:not(:disabled){transform:scale(.97)}
     }
 
     _adminDialog(){
-      const a=this._admin,blocked=a.busy?'disabled':'',groups=[['Алиса',[['setup','Быстрая настройка','rocket-launch-outline'],['ai','AI','creation-outline'],['music','Музыка','music-note'],['relay','Рация','walkie-talkie']]],['Приложение',[['app','Подключение','connection'],['advanced','Конфигурация','code-json']]]],page=this._section==='speaker',speaker=this._speakers.find(s=>s.id===a.speakerId);let body='';
+      const a=this._admin,blocked=a.busy?'disabled':'',groups=[['Алиса',[['setup','Быстрая настройка','rocket-launch-outline'],['ai','AI','creation-outline'],['music','Музыка','music-note'],['relay','Интерком','message-arrow-right-outline']]],['Вид',[['look','Кастомизация','palette-outline']]],['Приложение',[['app','Подключение','connection'],['advanced','Конфигурация','code-json']]]],page=this._section==='speaker',speaker=this._speakers.find(s=>s.id===a.speakerId);let body='';
       const station=page?'':`<label>Колонка<select data-admin-field="speakerId" ${blocked}>${this._speakers.map(s=>`<option value="${escape(s.id)}" ${s.id===a.speakerId?'selected':''}>${escape(s.name)} · ${escape(s.host)}</option>`).join('')}</select></label>`;
       if(a.tab==='devices')body=`<div id="admin-access-body" class="fields">${this._adminAccessBody()}</div>`;
       if(a.tab==='indicator')body=this._indicatorBody(station,blocked);
@@ -1040,6 +1155,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(a.tab==='ai')body=this._aiPage(blocked);
       if(a.tab==='music')body=this._musicPage(blocked);
       if(a.tab==='relay')body=this._relayPage(blocked);
+      if(a.tab==='look')body=this._lookPage(blocked);
       if(a.tab==='dictionary')body=this._dictionaryBody(station,blocked);
       const files=`<label>Путь<input data-admin-field="path" value="${escape(a.path)}" ${blocked}></label><div class="actions"><button type="button" class="secondary" data-action="admin-read" ${blocked}>Открыть</button><button type="button" data-action="admin-path" data-path="/data/opt/quasar-bridge/config.json" ${blocked}>Мост</button><button type="button" data-action="admin-path" data-path="/data/opt/quasar-bridge/runtime.env" ${blocked}>Окружение</button><button type="button" data-action="admin-path" data-path="/data/opt/quasar-bridge/start.sh" ${blocked}>Запуск</button></div><label>Содержимое<textarea class="admin-code" data-admin-field="content" rows="16" spellcheck="false" ${blocked||!a.fileRevision?'disabled':''}>${escape(a.content)}</textarea></label><div class="actions"><button type="button" class="primary" data-action="admin-write" ${blocked||!a.fileRevision?'disabled':''}>Сохранить с копией</button><button type="button" class="secondary" data-action="admin-restart-bridge" ${blocked}>Перезапустить мост</button></div><p class="help">Текстовые файлы до 32 КБ. Перед записью создаётся копия, службы не перезапускаются. В окружении могут быть секреты.</p>`;
       const shell=`<label>Команда от root, до 10 секунд<textarea class="admin-code" data-admin-field="command" rows="4" spellcheck="false" placeholder="ps w" ${blocked}>${escape(a.command)}</textarea></label><div class="actions"><button type="button" class="primary" data-action="admin-run" ${blocked}>Выполнить</button><button type="button" class="secondary" data-action="admin-diagnostic" ${blocked}>Подставить диагностику</button></div><pre class="admin-output" tabindex="0">${escape(a.output||'Здесь появится вывод.')}</pre>`;
@@ -1097,6 +1213,8 @@ button:active:not(:disabled){transform:scale(.97)}
         if(action==='admin-ai-check'){const values={...a.options,...appFields};const result=await this._api('/api/ai-check','POST',{base_url:values.llm_base_url??'',api_key:appFields.llm_api_key??'',model:values.llm_model??''});a.aiStatus=result;a.aiModels=result.models??[];if(result.model)a.appDraft={...a.appDraft,llm_model:result.model};a.message='';return;}
         if(action==='admin-ytm-install'){const s=this._speakers.find(item=>item.id===button.dataset.speaker);await this._api('/api/speakers/'+s.id+'/ytm','POST',{});s.ytm_installed=true;a.message='Плеер установлен: '+s.name+'.';return;}
         if(action==='admin-music-view'){a.musicView=button.dataset.source;a.message='';return;}
+        if(action==='admin-look'){const d=button.dataset,change={};if(d.layout)change.layout=d.layout;if(d.style)change.style=d.style;if(d.tools)change.tools=d.tools==='1';await this._saveLook(change);return;}
+        if(action==='admin-look-reset'){await this._saveLook(this._lookDefault());return;}
         if(action==='admin-music-default'){const value=button.dataset.source;a.music=await this._api('/api/music','PUT',{...a.music,source:value==='yandex'?'yandex':'alternative',...(value==='yandex'?{}:{provider:value})});a.message='';return;}
         if(action==='admin-command'){a.command=button.dataset.command;a.svcOpen={...a.svcOpen,console:true};a.message='';return;}
         if(action==='admin-svc-toggle'){const key=button.dataset.key;a.svcOpen={...a.svcOpen,[key]:!a.svcOpen?.[key]};a.message='';return;}
@@ -1212,7 +1330,7 @@ button:active:not(:disabled){transform:scale(.97)}
       else if(section==='journal')body=`<section class="page-narrow" aria-labelledby="journal-title"><div class="sec"><h2 id="journal-title">Журнал</h2></div>${this._diagnostics()}</section>`;
       else if(section==='house'&&!this._admin)body=`<section class="page-narrow house-page" aria-labelledby="admin-title">${this._houseHead('commands')}<div class="house-intro"><p>Своя фраза запускает автоматизацию или скрипт Home Assistant. Скажите «Алиса» и любую из фраз.</p>${this._help('Commands','Как это работает')}</div>${this._commandsHead(rows,'Свои команды','h3')}${this._commandList(rows,disabled)}</section>`;
       else if(section==='house'||section==='music'||section==='speaker'||section==='settings')body=this._admin?this._adminDialog():'<p class="help">Загрузка…</p>';
-      else body=`<div id="setup-notice-region">${this._setupNotice()}</div><div class="speakers-page"><section aria-labelledby="speakers-title"><div class="sec"><div><h2 id="speakers-title">Колонки</h2><p id="speaker-summary">${this._speakerSummary()}</p></div><div class="sec-actions">${iconButton('refresh','refresh','Обновить',disabled)}<button data-action="add-speaker" ${this._managerError?'disabled':''}>${icon('plus')}Колонка</button></div></div>${this._speakerPanel(disabled)}</section></div>`;
+      else body=`<div id="setup-notice-region">${this._setupNotice()}</div><div class="stage"><section aria-labelledby="speakers-title"><div class="sec"><div><h2 id="speakers-title">Колонки</h2><p id="speaker-summary">${this._speakerSummary()}</p></div><div class="sec-actions">${iconButton('refresh','refresh','Обновить',disabled)}<button data-action="add-speaker" ${this._managerError?'disabled':''}>${icon('plus')}Колонка</button></div></div>${this._speakerPanel(disabled)}</section><section aria-labelledby="commands-title">${this._commandsHead(rows,'Команды')}${this._commandList(shown,disabled)}<button class="more" data-action="section" data-section="house">${rows.length>shown.length?'Все команды: '+rows.length:'Открыть в «Доме»'}</button><p class="foot">Скажите «Алиса» и любую из фраз.</p></section></div>`;
       return `${this._appbar()}${this._notice()}${body}`;
     }
     async _go(section){
@@ -1303,13 +1421,13 @@ button:active:not(:disabled){transform:scale(.97)}
     async _autoUpdateToggle(){const next=this._speakers[0]?.auto_update===false;try{await this._api('/api/auto-update','POST',{enabled:next});for(const s of this._speakers)s.auto_update=next;}catch{}this._render();}
     async _airplayToggle(id){const s=this._speakers.find(item=>item.id===id),a=s?.connection?.airplay;if(!a||this._stationBusy.has(id))return;this._stationBusy.add(id);const button=this.shadowRoot.querySelector('[data-action="airplay"][data-id="'+id+'"]');if(button){button.disabled=true;}try{s.connection.airplay=await this._api('/api/speakers/'+encodeURIComponent(id)+'/airplay','POST',{action:a.enabled?'off':'on'});this._stationMessages[id]='';}catch{this._stationMessages[id]='Не удалось переключить AirPlay. Проверьте, что мост обновлён.';}finally{this._stationBusy.delete(id);this._render();}}
     async _bridgeVolume(id,level){try{await this._api('/api/speakers/'+encodeURIComponent(id)+'/volume','POST',{level});this._stationMessages[id]='';return true;}catch{return false;}}
-    _refreshMedia(){if(!this.shadowRoot)return;for(const speaker of this._speakers??[]){const region=this.shadowRoot.querySelector('[data-media="'+speaker.id+'"]');if(region&&this._volumeDragging!==speaker.id&&!this._stationBusy.has(speaker.id)){const pending=this._pendingVolumes?.get(speaker.id),actual=this._media(speaker).state?.attributes.volume_level;if(pending&&typeof actual==='number'&&Math.abs(actual*100-pending.value)<.51)this._pendingVolumes.delete(speaker.id);this._patch(region,this._mediaControls(speaker));}}}
+    _refreshMedia(){if(!this.shadowRoot)return;for(const speaker of this._speakers??[]){const region=this.shadowRoot.querySelector('[data-media="'+speaker.id+'"]');if(region&&this._volumeDragging!==speaker.id&&!this._stationBusy.has(speaker.id)){const pending=this._pendingVolumes?.get(speaker.id),actual=this._media(speaker).state?.attributes.volume_level;if(pending&&typeof actual==='number'&&Math.abs(actual*100-pending.value)<.51)this._pendingVolumes.delete(speaker.id);this._patch(region,this._mediaControls(speaker));}}this._applyMoods();}
     /* HA reports states several times a second. Rebuilding unchanged controls restarts hover, drops focus and can swallow a click. */
     _patch(region,markup){if(region._markup===markup)return;region._markup=markup;region.innerHTML=markup;}
     async _mediaAction(id,service,data={}){const speaker=this._speakers.find(s=>s.id===id);if(!speaker||this._stationBusy.has(id))return;const media=this._media(speaker);const bits={volume_set:4,media_stop:4096,media_pause:1,media_play:16384,play_media:512};if(!bits[service]||!media.can(bits[service])||(service==='play_media'&&!media.yandex)){this._stationMessages[id]='Это действие недоступно для выбранного медиаплеера.';this._refreshMedia();return false;}
       this._stationBusy.add(id);const utility=this._utility;const relatedButtons=[...this.shadowRoot.querySelectorAll('.utility-dialog button[data-id="'+id+'"]')].filter(el=>['tts','test-sound','media'].includes(el.dataset.action)).map(el=>({el,disabled:el.disabled}));for(const item of relatedButtons)item.el.disabled=true;if(utility?.type==='control'&&utility.speakerId===id){utility.message='Отправка запроса…';this._utilityMessage();}for(const control of this.shadowRoot.querySelectorAll('[data-media="'+id+'"] input,[data-media="'+id+'"] button[data-service]'))control.disabled=true;try{await this._hass.callService('media_player',service,data,{entity_id:speaker.media_entity});this._stationMessages[id]=service==='volume_set'?'':'Запрос отправлен в Home Assistant.';return true;}catch(error){this._stationMessages[id]='Не удалось отправить запрос. Повторите ещё раз.';return false;}finally{this._stationBusy.delete(id);for(const item of relatedButtons)if(item.el.isConnected)item.el.disabled=item.disabled;if(this._utility===utility&&utility?.type==='control'&&utility.speakerId===id){utility.message=this._stationMessages[id];this._utilityMessage();}this._refreshMedia();}}
     _speakerTint(s){const color=this._speakerIndicators?.[s.id]?.color;return /^#[0-9a-f]{6}$/i.test(color??'')?`style="--spk:${color}"`:'';}
-    _speakerPanel(disabled){return `${this._managerError?'<div class="notice" data-manager-error role="status"><span>Нет связи с сервисом колонок. Данные могут быть устаревшими.</span><button data-action="refresh">Повторить</button></div>':''}${this._tab==='home'?'':`<div class="sec"><p id="speaker-summary">${this._speakerSummary()}</p>${iconButton('refresh','refresh','Обновить',disabled)}</div>`}<div class="speakers">${this._speakers.map(s=>`<article class="spk" ${this._speakerTint(s)}><div class="spk-head"><div class="spk-name"><h3>${escape(s.name)}</h3><p class="help">${escape(s.area||'Комната не указана')}</p><div class="state" data-connection="${escape(s.id)}">${this._speakerStatus(s)}</div></div>${this._speakerIllustration(s)}</div><div data-media="${escape(s.id)}">${this._mediaControls(s)}</div></article>`).join('')}</div>${!this._speakers.length&&!this._managerError?`<div class="list"><div class="empty">${this._loaded?'<h3>Колонок пока нет</h3><p>Добавьте станцию, чтобы управлять звуком и назначать команды.</p>':'<h3>Загрузка…</h3>'}</div></div>`:''}`;}
+    _speakerPanel(disabled){return `${this._managerError?'<div class="notice" data-manager-error role="status"><span>Нет связи с сервисом колонок. Данные могут быть устаревшими.</span><button data-action="refresh">Повторить</button></div>':''}${this._tab==='home'?'':`<div class="sec"><p id="speaker-summary">${this._speakerSummary()}</p>${iconButton('refresh','refresh','Обновить',disabled)}</div>`}<div class="speakers ${this._lookClass().cls}" style="${this._lookClass().style}">${this._speakers.map(s=>`<article class="spk" data-spk="${escape(s.id)}" data-mood="${this._mood(s)[0]}" ${this._speakerTint(s)}><div class="spk-head"><div class="spk-name"><h3>${escape(s.name)}</h3><p class="help">${escape(s.area||'Комната не указана')}</p><div class="spk-mood">${this._mood(s)[1]}</div><div class="state" data-connection="${escape(s.id)}">${this._speakerStatus(s)}</div></div>${this._speakerIllustration(s)}</div><div data-media="${escape(s.id)}">${this._mediaControls(s)}</div></article>`).join('')}</div>${!this._speakers.length&&!this._managerError?`<div class="list"><div class="empty">${this._loaded?'<h3>Колонок пока нет</h3><p>Добавьте станцию, чтобы управлять звуком и назначать команды.</p>':'<h3>Загрузка…</h3>'}</div></div>`:''}`;}
     _diagnostics(){return `<div class="journal-tools journal-filters"><input type="search" data-journal="query" aria-label="Поиск по журналу" placeholder="Поиск фразы" value="${escape(this._journalQuery??'')}" autocomplete="off"><select data-journal="speaker" aria-label="Колонка"><option value="">Все колонки</option>${this._speakers.map(s=>`<option value="${escape(s.id)}" ${s.id===this._journalSpeaker?'selected':''}>${escape(s.name)}</option>`).join('')}</select>${iconButton('activity-refresh','refresh','Обновить журнал')}</div><div id="activity-region">${this._activityMarkup()}</div>`;}
     _statusLabel(status){return ({handled:'Обработано',forwarded:'Передано Алисе',answered:'Ответ дан',accepted:'Запрос принят',confirmed:'Состояние подтверждено',already:'Уже в нужном состоянии',clarification:'Нужно уточнение',unavailable:'Недоступно',error:'Ошибка',cancelled:'Отменено',success:'Выполнено',completed:'Выполнено',failed:'Ошибка',pending:'В обработке'})[status]??'Статус не указан';}
     _routeLabel(route){return ({home:'Управление домом',yandex:'Штатная Алиса',llm:'Нейросеть',playback:'Воспроизведение'})[route]??'Маршрут не определён';}

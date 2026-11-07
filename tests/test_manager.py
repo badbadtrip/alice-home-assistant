@@ -683,6 +683,16 @@ if __name__ == '__main__':
     unittest.main()
 
 
+class LookStateTests(unittest.TestCase):
+    def test_keeps_only_known_values(self):
+        import service
+        look = service.look_state({'layout': 'wide', 'style': 'neon', 'tools': 'yes', 'colors': {'play': '#ABCDEF', 'idle': 'red', 'extra': '#000000'}})
+        self.assertEqual(look['layout'], 'wide')
+        self.assertEqual(look['style'], 'pastel')
+        self.assertTrue(look['tools'])
+        self.assertEqual(look['colors'], {**service.LOOK_DEFAULT['colors'], 'play': '#abcdef'})
+
+
 class MetricsStateTests(unittest.TestCase):
     def test_keeps_numbers_of_the_right_speaker(self):
         import service

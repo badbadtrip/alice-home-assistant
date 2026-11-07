@@ -294,13 +294,19 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     } catch { response.status(502).json({ error: 'Speaker did not answer' }) }
   })
   // Speakers report their player as it changes; the manager reads it for the panel.
-  const nowPlaying = new Map<string, { at: number; value: unknown }>()
+  // Newer bridges also send their health and system figures, so the app needs no polling.
+  const nowPlaying = new Map<string, { at: number; health?: unknown; system?: unknown; value: unknown }>()
   const PlayerField = z.union([z.string().max(2048), z.number()])
-  const NowPlayingSchema = z.object({ now_playing: z.record(z.string(), PlayerField).nullable() })
+  const Bag = z.record(z.string(), z.unknown()).optional()
+  const NowPlayingSchema = z.object({
+    health: Bag, now_playing: z.record(z.string(), PlayerField).nullable(), system: Bag
+  })
   app.post('/now-playing', (request, response) => {
     const parsed = NowPlayingSchema.safeParse(request.body); const speaker = request.get('x-alice-speaker')
-    if (!speaker || speaker.length > 64 || !parsed.success) { response.status(400).json({ error: 'Invalid player state' }); return }
-    nowPlaying.set(speaker, { at: Date.now(), value: parsed.data.now_playing })
+    const isTooBig = JSON.stringify(request.body).length > 32_768
+    if (isTooBig || !speaker || speaker.length > 64 || !parsed.success) { response.status(400).json({ error: 'Invalid player state' }); return }
+    const { health, now_playing: value, system } = parsed.data
+    nowPlaying.set(speaker, { at: Date.now(), health, system, value })
     response.json({ ok: true })
   })
   app.get('/now-playing', (_, response) => {

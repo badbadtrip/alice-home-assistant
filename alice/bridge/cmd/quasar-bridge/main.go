@@ -352,10 +352,9 @@ func main() {
 			}
 		}
 	}
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+	healthState := func(ctx context.Context) map[string]any {
 		state := engine.RoutingStatus()
-		data, _ := json.Marshal(map[string]any{"status": "ok", "mode": cfg.Mode, "client_frames": clientCount.Load(), "server_frames": serverCount.Load(), "routing_revision": state.Revision, "routing_rules": state.ActiveRules, "conversation_log_enabled": logs.Enabled(), "conversation_log_failures": logs.Failures(), "assistant_tools_enabled": cfg.AssistantTools.Enabled, "dialogue_context_enabled": cfg.DialogueContext.Enabled && cfg.Mode == "hybrid", "home_assistant_enabled": engine.Home != nil && cfg.Mode == "hybrid", "mcp_servers_configured": mcpConfigured, "speaker_id": os.Getenv("QUASAR_HOME_SPEAKER_ID"), "speaker_area": os.Getenv("QUASAR_HOME_AREA"), "activity_dropped": func() uint64 {
+		return map[string]any{"status": "ok", "mode": cfg.Mode, "client_frames": clientCount.Load(), "server_frames": serverCount.Load(), "routing_revision": state.Revision, "routing_rules": state.ActiveRules, "conversation_log_enabled": logs.Enabled(), "conversation_log_failures": logs.Failures(), "assistant_tools_enabled": cfg.AssistantTools.Enabled, "dialogue_context_enabled": cfg.DialogueContext.Enabled && cfg.Mode == "hybrid", "home_assistant_enabled": engine.Home != nil && cfg.Mode == "hybrid", "mcp_servers_configured": mcpConfigured, "speaker_id": os.Getenv("QUASAR_HOME_SPEAKER_ID"), "speaker_area": os.Getenv("QUASAR_HOME_AREA"), "activity_dropped": func() uint64 {
 			if hf != nil {
 				return hf.ActivityDropped()
 			}
@@ -375,7 +374,11 @@ func main() {
 				return airPlay.health()
 			}
 			return nil
-		}(), "now_playing": playing.Pick(r.Context(), playerSources()...)})
+		}(), "now_playing": playing.Pick(ctx, playerSources()...)}
+	}
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		data, _ := json.Marshal(healthState(r.Context()))
 		_, _ = w.Write(data)
 	})
 	mux.HandleFunc("GET /volume", proxy.VolumeHandler)
@@ -445,8 +448,8 @@ func main() {
 		go serveLAN(ctx, token, mux)
 	}
 	if hf != nil {
-		// The panel learns of a new track within a second instead of waiting for the next health check.
-		go nowplaying.Watch(ctx, &playing, playerSources, hf.ReportNowPlaying)
+		// The speaker reports itself on every change, so the app does not poll it.
+		go watchState(ctx, healthState, hf.ReportState)
 		hf.StartVoiceCache(ctx)
 		hf.StartActivity(ctx)
 		engine.Activity = hf.RecordActivity

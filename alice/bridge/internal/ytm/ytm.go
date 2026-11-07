@@ -11,6 +11,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"quasarbridge/internal/nowplaying"
@@ -21,9 +24,31 @@ const (
 	socket = "/tmp/ytm-alice-run/control.sock"
 )
 
+// IdleStop is how long a player with nothing to play keeps its memory.
+const IdleStop = 10 * time.Minute
+
 type Client struct {
 	Root   string
 	Socket string
+
+	wanted atomic.Bool
+	once   sync.Once
+	wake   chan struct{}
+}
+
+func (c *Client) wakeup() chan struct{} {
+	c.once.Do(func() { c.wake = make(chan struct{}, 1) })
+	return c.wake
+}
+
+// Wake starts the player if it sleeps. It runs only while there is music to play.
+func (c *Client) Wake() {
+	if !c.wanted.Swap(true) {
+		select {
+		case c.wakeup() <- struct{}{}:
+		default:
+		}
+	}
 }
 
 func New() *Client { return &Client{Root: root, Socket: socket} }
@@ -36,22 +61,52 @@ func (c *Client) Available() bool {
 	return err == nil && info.Mode().IsRegular()
 }
 
-// Supervise keeps the player running. The manager installs it at any time, so the
-// file is looked for again instead of once at boot.
+// Supervise runs the player while it is wanted and lets it go after IdleStop of silence,
+// so a speaker with little memory pays for it only during music. The manager installs
+// the player at any time, so the file is looked for again on each start.
 func (c *Client) Supervise(ctx context.Context) {
 	for ctx.Err() == nil {
-		if c.Available() {
-			command := exec.CommandContext(ctx, c.binary(), "serve")
-			command.Env = append(os.Environ(), "YAM_ROOT="+c.Root, "YTM_ALICE_DATA="+filepath.Join(c.Root, "var"),
-				"YTM_ALICE_VOICE=0", "YTM_ALICE_CAST=0", "YTM_ALICE_WEB_ADDR=off", "GOMEMLIMIT=48MiB")
-			if err := command.Run(); err != nil && ctx.Err() == nil {
-				slog.Warn("ytm_stopped", "error", err)
-			}
+		if c.wanted.Load() && c.Available() {
+			c.run(ctx)
 		}
 		select {
 		case <-ctx.Done():
+		case <-c.wakeup():
 		case <-time.After(10 * time.Second):
 		}
+	}
+}
+
+func (c *Client) run(ctx context.Context) {
+	runCtx, stop := context.WithCancel(ctx)
+	defer stop()
+	command := exec.CommandContext(runCtx, c.binary(), "serve")
+	command.Env = append(os.Environ(), "YAM_ROOT="+c.Root, "YTM_ALICE_DATA="+filepath.Join(c.Root, "var"),
+		"YTM_ALICE_VOICE=0", "YTM_ALICE_CAST=0", "YTM_ALICE_WEB_ADDR=off", "GOMEMLIMIT=48MiB")
+	command.Cancel = func() error { return command.Process.Signal(syscall.SIGTERM) }
+	command.WaitDelay = 5 * time.Second
+	go func() {
+		quiet := time.Now()
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-runCtx.Done():
+				return
+			case <-ticker.C:
+			}
+			if c.Active(runCtx) {
+				quiet = time.Now()
+			} else if time.Since(quiet) >= IdleStop {
+				c.wanted.Store(false)
+				slog.Info("ytm_idle_stop")
+				stop()
+				return
+			}
+		}
+	}()
+	if err := command.Run(); err != nil && runCtx.Err() == nil {
+		slog.Warn("ytm_stopped", "error", err)
 	}
 }
 
@@ -135,6 +190,13 @@ func current(s state) *nowplaying.Info {
 
 // Play searches and starts. An empty query asks for the account's recommendations.
 func (c *Client) Play(ctx context.Context, query string) error {
+	c.Wake()
+	// A sleeping player needs a moment to open its socket.
+	for deadline := time.Now().Add(8 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		if _, err := os.Stat(c.Socket); err == nil {
+			break
+		}
+	}
 	request := map[string]string{"action": "play", "query": query}
 	if query == "" {
 		request = map[string]string{"action": "recommendations"}

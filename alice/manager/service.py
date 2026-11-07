@@ -251,6 +251,11 @@ class Manager:
         self.connection_lock = threading.RLock()
         self.connections = {}
         self.pending_delivery = {}
+        # The panel waits on this revision instead of polling the speaker list.
+        self.state_cond = threading.Condition()
+        self.state_revision = 0
+        self.pushed_seen = {}
+        self.polled_at = {}
         self.monitor_stop = threading.Event()
         self.monitor_thread = None
         self.airplay_next_check = 0.0
@@ -292,7 +297,8 @@ class Manager:
                 updater.cycle(self)
             except Exception:
                 pass
-            self.monitor_stop.wait(max(0.1, 5 - (time.monotonic() - began)))
+            # Pushed states are read every second; only old bridges are polled, every 5 seconds.
+            self.monitor_stop.wait(max(0.1, 1 - (time.monotonic() - began)))
 
     @staticmethod
     def _connection_default():
@@ -342,7 +348,7 @@ class Manager:
             connection['now_playing'] = value or (current if isinstance(current, dict) and current.get('source') == 'yandex_music' else None)
         return result
 
-    def bridge_get(self, speaker, path, timeout=8):
+    def bridge_get(self, speaker, path, timeout=8, ssh_fallback=True):
         """Routine calls go over HTTP. SSH is the fallback for a bridge that predates it."""
         if not re.fullmatch(r'/[a-z-]+(\?[A-Za-z0-9_=&.-]*)?', path):
             raise Error('Некорректный адрес моста.', 500)
@@ -354,7 +360,8 @@ class Manager:
             if error.code not in (401, 404):
                 raise Error('Мост ответил ошибкой.', 502) from None
         except (OSError, Error):
-            pass
+            if not ssh_fallback:
+                raise Error('Колонка не отвечает по сети.', 502) from None
         return self.ssh(speaker, 'wget -T 4 -q -O - "http://127.0.0.1:18861' + path + '"', timeout=timeout)
 
     def _metrics(self, speaker):
@@ -408,11 +415,28 @@ class Manager:
         with self.connection_lock:
             self.connections = {key: value for key, value in self.connections.items() if key in known}
             self.pending_delivery = {key: value for key, value in self.pending_delivery.items() if key in known}
+        try:
+            reported = self._hf_request('/now-playing')
+        except Exception:
+            reported = {}
+        if not isinstance(reported, dict):
+            reported = {}
+        now = time.time()
         for speaker in records:
             if self.monitor_stop.is_set():
                 break
             if not speaker.get('trusted_fingerprint'):
                 continue
+            entry = reported.get(speaker['id'])
+            if isinstance(entry, dict) and isinstance(entry.get('health'), dict) and type(entry.get('at')) in (int, float) and now * 1000 - entry['at'] < 40000:
+                # The bridge reported itself; nothing to connect to.
+                if self.pushed_seen.get(speaker['id']) != entry['at']:
+                    self.pushed_seen[speaker['id']] = entry['at']
+                    self._monitor_speaker(speaker, entry)
+                continue
+            if now - self.polled_at.get(speaker['id'], 0) < 5:
+                continue
+            self.polled_at[speaker['id']] = now
             # Never overlap a health poll with install, manual check or reboot.
             # Busy devices naturally become unknown after the stale threshold.
             if not self.operation_lock.acquire(blocking=False):
@@ -437,14 +461,27 @@ class Manager:
             return current  # HA being away must not mark the speaker offline.
         return stock if stock and (not current or stock['status'] == 'playing') else current
 
-    def _monitor_speaker(self, speaker):
+    def wait_state(self, revision, timeout=12):
+        # Install and update progress is written to the registry, so a change there wakes the panel too.
+        registry = self.store.directory / 'speakers.json'
+        stamp = lambda: registry.stat().st_mtime_ns if registry.exists() else 0
+        written, deadline = stamp(), time.monotonic() + timeout
+        with self.state_cond:
+            while self.state_revision == revision and stamp() == written:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    break
+                self.state_cond.wait(min(1, left))
+            return self.state_revision
+
+    def _monitor_speaker(self, speaker, pushed=None):
         identity = self._connection_identity(speaker)
         with self.connection_lock:
             previous = self.connections.get(speaker['id'], {})
             value = dict(previous.get('value', self._connection_default())) if previous.get('identity') == identity else self._connection_default()
         began = time.monotonic()
         try:
-            health = json.loads(self.bridge_get(speaker, '/healthz'))
+            health = pushed['health'] if pushed else json.loads(self.bridge_get(speaker, '/healthz', ssh_fallback=speaker['id'] not in self.pushed_seen))
             if not isinstance(health, dict) or health.get('status') != 'ok':
                 raise Error('Мост сообщил о неисправности.', 502)
             if health.get('speaker_id') != speaker['id']:
@@ -456,14 +493,14 @@ class Manager:
                          now_playing=self._now_playing(speaker, health.get('now_playing')),
                          voice_phrase_count=count if type(count) is int and 0 <= count <= 100000 else None,
                          voice_phrase_revision=revision if isinstance(revision, str) and re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', revision) else None,
-                         metrics=self._metrics(speaker))
+                         metrics=metrics_state({'speaker_id': speaker['id'], 'system': pushed.get('system')}, speaker['id']) if pushed else self._metrics(speaker))
         except Error as error:
             message = str(error) if error.status == 409 else 'Нет связи с мостом. Проверьте питание и подключение колонки.'
             value.update(status='offline', error=message, now_playing=None)
         except Exception:
             value.update(status='offline', error='Мост не вернул корректный статус.', now_playing=None)
         value['delivery'] = self._delivery(speaker, value)
-        value.update(checked_at=int(time.time()), latency_ms=round((time.monotonic() - began) * 1000, 1))
+        value.update(checked_at=int(time.time()), latency_ms=None if pushed else round((time.monotonic() - began) * 1000, 1))
         # A successful answer from a previous address must not mark an edited
         # or removed registration online.
         try:
@@ -474,6 +511,11 @@ class Manager:
             return
         with self.connection_lock:
             self.connections[speaker['id']] = {'identity': identity, 'value': value}
+        quiet = ('checked_at', 'latency_ms', 'last_seen', 'metrics')
+        if {k: v for k, v in value.items() if k not in quiet} != {k: v for k, v in previous.get('value', {}).items() if k not in quiet}:
+            with self.state_cond:
+                self.state_revision += 1
+                self.state_cond.notify_all()
 
     def _hf_token(self):
         env_path = Path(self.config.get('home_functions_env', '/nonexistent/alice-functions.env'))
@@ -616,10 +658,26 @@ class Manager:
 
     def ssh(self, speaker, command, data=None, timeout=30):
         self.validate_speaker(speaker)
-        return run(['ssh', '-F', '/dev/null', '-i', self.config['ssh_key'], '-o', 'IdentitiesOnly=yes',
-                    '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=8',
-                    '-o', 'UserKnownHostsFile=' + str(self.known_hosts), '-p', str(speaker['port']),
-                    'root@' + speaker['host'], command], data, timeout)
+        # An install or update sends a dozen commands; they share one connection for a minute
+        # instead of a handshake each. A dead link is noticed within ten seconds.
+        # The shared connection runs as its own process with no pipes, so it never holds a reply open.
+        base = ['ssh', '-F', '/dev/null', '-i', self.config['ssh_key'], '-o', 'IdentitiesOnly=yes',
+                '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=8',
+                '-o', 'UserKnownHostsFile=' + str(self.known_hosts), '-p', str(speaker['port'])]
+        mux = Path(self.config.get('ssh_mux_dir', '/tmp/alice-ssh'))
+        socket_path = mux / ('%s_%d' % (speaker['host'], speaker['port']))
+        options = []
+        try:
+            mux.mkdir(mode=0o700, exist_ok=True)
+            if not mux.is_symlink() and (mux.stat().st_mode & 0o077) == 0:
+                if not socket_path.exists():
+                    subprocess.run([*base, '-o', 'ControlMaster=yes', '-o', 'ControlPath=' + str(socket_path), '-o', 'ControlPersist=60',
+                                    '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=2', '-fN', 'root@' + speaker['host']],
+                                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                options = ['-o', 'ControlMaster=no', '-o', 'ControlPath=' + str(socket_path)]
+        except (OSError, subprocess.SubprocessError):
+            options = []
+        return run([*base, *options, 'root@' + speaker['host'], command], data, timeout)
 
     def fingerprints(self, speaker_id):
         speaker = self.store.speaker(speaker_id)
@@ -1351,9 +1409,12 @@ class Handler(BaseHTTPRequestHandler):
             if set(payload) == {'enabled'} and isinstance(payload['enabled'], bool):
                 return 200, updater.set_enabled(manager, payload['enabled'])
             raise Error('Ожидается enabled.')
+        if len(path) == 3 and path[:2] == ['api', 'speakers-wait'] and method == 'GET' and re.fullmatch(r'\d{1,12}', path[2]):
+            revision = manager.wait_state(int(path[2]))
+            return 200, {'speakers': manager.speakers(), 'revision': revision, **manager.setup()}
         if path == ['api', 'speakers']:
             if method == 'GET':
-                return 200, {'speakers': manager.speakers(), **manager.setup()}
+                return 200, {'speakers': manager.speakers(), 'revision': manager.state_revision, **manager.setup()}
             if method == 'POST':
                 candidate = {**payload, 'host': lan_ip(payload.get('host'))}
                 manager.validate_speaker(candidate)

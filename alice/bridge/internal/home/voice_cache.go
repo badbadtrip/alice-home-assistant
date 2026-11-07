@@ -13,7 +13,6 @@ import (
  "time"
  "unicode"
 
- "quasarbridge/internal/nowplaying"
  "quasarbridge/internal/playback"
 )
 
@@ -98,11 +97,11 @@ func (f *Functions) Relay(ctx context.Context,room,message string) error {
  return f.request(ctx,http.MethodPost,"/relay",map[string]string{"room":room,"message":message},&done)
 }
 
-// ReportNowPlaying tells the server what this speaker plays; nil means nothing.
-func (f *Functions) ReportNowPlaying(ctx context.Context,info *nowplaying.Info) error {
+// ReportState tells the server what this speaker plays and how it is doing.
+func (f *Functions) ReportState(ctx context.Context,state map[string]any) error {
  ctx,cancel:=context.WithTimeout(ctx,2*time.Second);defer cancel()
  var done struct {OK bool `json:"ok"`}
- return f.request(ctx,http.MethodPost,"/now-playing",map[string]any{"now_playing":info},&done)
+ return f.request(ctx,http.MethodPost,"/now-playing",state,&done)
 }
 
 // FindSpotify asks the server, which holds the account, for something to play.

@@ -426,6 +426,26 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(offline['checked_at'], 1015)
         self.assertNotIn('Secret', offline['error'])
 
+    def test_pushed_state_needs_no_connection_and_wakes_the_panel(self):
+        self.manager.store.metadata(self.speaker['id'], trusted_fingerprint='SHA256:trusted')
+        health = {'status': 'ok', 'speaker_id': self.speaker['id'], 'voice_phrase_count': 3}
+        pushed = {self.speaker['id']: {'at': 1000 * 1000, 'value': None, 'health': health, 'system': {'temp_c': 50}}}
+        revision = self.manager.state_revision
+        with patch.object(self.manager, '_hf_request', return_value=pushed), patch.object(self.manager, 'ssh') as ssh,                 patch.object(self.manager, 'bridge_get') as bridge, patch('service.time.time', return_value=1001):
+            self.manager.monitor_cycle()
+            connection = self.manager.speakers()[0]['connection']
+        ssh.assert_not_called()
+        bridge.assert_not_called()
+        self.assertEqual(connection['status'], 'online')
+        self.assertEqual(connection['metrics']['temp_c'], 50)
+        self.assertEqual(self.manager.wait_state(revision, timeout=0), revision + 1)
+        # Once a bridge has reported itself, a silent one is checked over HTTP only.
+        with patch.object(self.manager, '_hf_request', return_value={}), patch.object(self.manager, 'ssh') as ssh,                 patch('service.urlopen', side_effect=OSError), patch('service.time.time', return_value=1100):
+            self.manager.monitor_cycle()
+            connection = self.manager.speakers()[0]['connection']
+        ssh.assert_not_called()
+        self.assertEqual(connection['status'], 'offline')
+
     def test_monitor_skips_untrusted_and_busy_install_then_stales_without_network_get(self):
         with patch.object(self.manager, 'ssh') as ssh:
             self.manager.monitor_cycle()

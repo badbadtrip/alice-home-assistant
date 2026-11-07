@@ -190,7 +190,14 @@ details[open]>summary:before{transform:rotate(45deg)}
 .admin-code{font:13px/1.55 var(--ha-font-family-code,ui-monospace,monospace);tab-size:2}
 .admin-output{margin:0;padding:12px 14px;max-height:45dvh;overflow:auto;border-radius:var(--control);background:var(--tint);font:13px/1.55 var(--ha-font-family-code,ui-monospace,monospace);white-space:pre-wrap}
 .svc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}.svc{position:relative;justify-content:flex-start;gap:12px;height:auto;padding:14px;border-radius:var(--radius);background:var(--surface);color:var(--text);box-shadow:var(--lift);text-align:left;white-space:normal}.svc:hover:not(:disabled){background:var(--surface);outline:1px solid var(--line)}.svc[aria-selected=true]{outline:2px solid var(--accent);outline-offset:-2px}.svc-icon{display:flex;flex:none;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:var(--tint-strong)}.svc-icon[data-service=spotify]{color:#1db954}.svc-icon[data-service=youtube]{color:#f03}.svc-text{display:grid;gap:2px;min-width:0}.svc-text small{display:flex;gap:6px;align-items:center;color:var(--muted);font-weight:400}.svc-text i{width:7px;height:7px;flex:none;border-radius:50%;background:var(--muted)}.svc-text i[data-ready=true]{background:var(--ok)}.svc-main{position:absolute;top:10px;right:12px;padding:1px 8px;border-radius:9px;background:var(--accent-tint);color:var(--accent);font-size:11px}.svc-note{margin:-4px 2px}.svc-note .help{margin:0}.svc-speakers{display:grid;gap:8px}.svc-speaker{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:var(--control);background:var(--tint)}.svc-speaker span{display:grid}.svc-speaker small{color:var(--muted)}
-.now-line{display:flex;align-items:center;gap:7px;min-width:0;max-width:100%;margin-top:6px;font-size:13px;color:var(--muted)}.now-line b{flex:0 1 auto;min-width:2ch;overflow:hidden;color:var(--text);font-weight:500;text-overflow:ellipsis;white-space:nowrap}.now-line>span:not(.now-svc){flex:0 2 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.now-line>span:not(.now-svc):before{content:'· ';}.now-line>ha-icon{--mdc-icon-size:14px;flex:none}.now-svc{display:grid;flex:none;place-items:center;width:20px;height:20px;border-radius:6px;color:#fff;background:#6b6f76}.now-svc ha-icon{--mdc-icon-size:14px}.now-line[data-source=spotify] .now-svc{background:#1db954}.now-line[data-source=youtube_music] .now-svc{background:#ff0033}.now-line[data-source=yandex_music] .now-svc{background:#fc3f1d}.now-line[data-source=airplay] .now-svc{background:#3a3a3c}.now-line[data-paused=true]{opacity:.62}
+.now-pill{display:inline-flex;align-items:center;gap:8px;max-width:100%;margin-top:10px;padding:5px 12px 5px 5px;border-radius:999px;background:color-mix(in srgb,var(--spk,var(--accent)) 20%,transparent);color:var(--text);font-size:13px;font-weight:500;vertical-align:top}
+.now-svc{display:grid;flex:none;place-items:center;width:22px;height:22px;border-radius:50%;background:#6b6f76;color:#fff}.now-svc ha-icon{--mdc-icon-size:14px}.now-pill[data-source=spotify] .now-svc{background:#1db954;color:#000}.now-pill[data-source=youtube_music] .now-svc{background:#ff0033}.now-pill[data-source=yandex_music] .now-svc{background:#fc3f1d}.now-pill[data-source=airplay] .now-svc{background:#3a3a3c}
+.now-track{min-width:0;overflow:hidden;white-space:nowrap;mask-image:linear-gradient(90deg,#000 calc(100% - 14px),transparent)}.now-track:not([data-run]){mask-image:none}.now-track>span{display:inline-block}.now-track[data-run]>span{animation:now-run var(--run,8s) linear infinite}
+@keyframes now-run{0%,18%{transform:translateX(0)}72%,100%{transform:translateX(var(--shift,0))}}
+.now-eq{display:flex;flex:none;align-items:flex-end;gap:2px;height:11px}.now-eq i{width:2.5px;height:100%;border-radius:1px;background:var(--spk,var(--accent));transform-origin:bottom;animation:now-eq 1.1s ease-in-out infinite}.now-eq i:nth-child(2){animation-delay:-.35s}.now-eq i:nth-child(3){animation-delay:-.7s}@keyframes now-eq{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+.now-state{display:grid;flex:none;color:var(--muted)}.now-state ha-icon{--mdc-icon-size:14px}
+.spk-alert{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err);font-size:12px}.spk-alert.soft{background:var(--tint);color:var(--muted)}
+@media(prefers-reduced-motion:reduce){.now-track[data-run]>span,.now-eq i{animation:none}.now-track{text-overflow:ellipsis}}
 .ai-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.ai-presets button{gap:8px;background:var(--tint);color:var(--muted)}.ai-presets button[aria-pressed=true]{background:var(--accent-tint);color:var(--text);outline:2px solid var(--accent);outline-offset:-2px}.ai-status{display:flex;gap:8px;align-items:center;margin:0;color:var(--err)}.ai-status[data-ok=true]{color:var(--ok)}
 .setup-page{display:grid;gap:16px;width:100%;max-width:640px;margin:0 auto}.setup-head{display:grid;grid-template-columns:1fr auto;gap:12px 16px;align-items:start}.setup-head h3{margin:0 0 2px;font-size:18px}.setup-head p{margin:0}.setup-count{font-size:15px;white-space:nowrap}.setup-bar{grid-column:1/-1;height:6px;overflow:hidden;border-radius:3px;background:var(--tint-strong)}.setup-bar i{display:block;height:100%;border-radius:3px;background:var(--accent)}
 .setup-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}.setup-step{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-radius:var(--radius);background:var(--surface);box-shadow:var(--lift)}.setup-step[data-state=now]{padding:16px;outline:2px solid var(--accent);outline-offset:-2px}.setup-step[data-state=later]{background:transparent;box-shadow:none;color:var(--muted)}
@@ -452,7 +459,7 @@ button:active:not(:disabled){transform:scale(.97)}
         await this._loadManager();this._renderEditorStatus();
         this._repairSpeakerView();
         if(this._onSpeakers()&&!this._speakerDialog){
-          for(const speaker of this._speakers){const region=this.shadowRoot.querySelector('[data-connection="'+speaker.id+'"]');if(region)this._patch(region,this._speakerStatus(speaker));}
+          for(const speaker of this._speakers){const region=this.shadowRoot.querySelector('[data-connection="'+speaker.id+'"]');if(region)this._patch(region,this._speakerStatus(speaker));}this._fitNowPills();
           const summary=this.shadowRoot.getElementById('speaker-summary');if(summary)summary.textContent=this._speakerSummary();const setup=this.shadowRoot.getElementById('setup-notice-region');if(setup){const markup=this._setupNotice();if(setup.innerHTML!==markup)setup.innerHTML=markup;}
         }
       },5000);
@@ -609,7 +616,7 @@ button:active:not(:disabled){transform:scale(.97)}
       const rows=this._registry.filter(item=>this._selected(item));
       const page=document.createElement('template');page.innerHTML=`<main>${this._tab==='home'?this._home(rows,disabled):this._standalone(rows,disabled)}${this._dialog?this._editor(disabled):''}${this._speakerDialog?this._speakerEditor(disabled):''}${this._utility&&!this._utility.inline?this._utilityDialog():''}</main>`;
       morphChildren(this.shadowRoot,page.content,this.shadowRoot.activeElement);
-      this._bindNativePicker();this._bindUtilityPickers();this._syncIndicatorAnimations();
+      this._bindNativePicker();this._bindUtilityPickers();this._syncIndicatorAnimations();this._fitNowPills();
       if(this._dialog)queueMicrotask(()=>this.shadowRoot.querySelector('#phrases')?.focus());
     }
     _notice(){return this._message&&!this._dialog&&!this._utility?`<div class="notice" role="status"><span>${escape(this._message)}</span>${this._undo?'<button data-action="undo">Отменить</button>':''}</div>`:'';}
@@ -999,7 +1006,8 @@ button:active:not(:disabled){transform:scale(.97)}
       if(this._needsSetup(s))return `<span class="is-warn"><span class="dot"></span>${s.install?.state==='awaiting_acceptance'?'Проверьте голос':s.install?.state==='awaiting_reboot'?'Нужна перезагрузка':'Мост не настроен'}</span><button data-action="setup" data-id="${escape(s.id)}" ${this._speakersStale?'disabled':''}>Настроить</button>`;
       const c=s.connection??{},status=this._managerError?'unknown':c.status??'unknown',delivery=this._managerError?'unknown':c.delivery?.status??'unknown';
       const line=status==='online'?'':status==='offline'?'Не в сети':'Статус уточняется',extra={pending:'команды обновляются',error:'ошибка синхронизации'}[delivery],update={updating:'мост обновляется',verifying:'мост обновляется',rolling_back:'возврат версии моста',failed:'обновление моста не прошло'}[s.bridge_update?.state],airplayText=c.airplay?.enabled?(c.airplay.error?'AirPlay: ошибка приёмника':c.airplay.playing?'AirPlay играет':c.airplay.connected?'AirPlay подключён':'AirPlay готов'):'',airplay=airplayText?`<span class="air ${c.airplay.playing||c.airplay.connected?'on':''}" role="img" aria-label="${airplayText}" title="${airplayText}">${icon('cast-audio')}</span>`:'';
-      return `${this._nowLine(s)}${line?`<span class="${status==='offline'?'is-bad':''}" title="${escape(c.error??c.delivery?.message??'')}"><span class="dot"></span>${line}</span>`:''}${[extra,update].filter(Boolean).map(text=>`<span>${text}</span>`).join('')}`;
+      const alerts=[[line,status==='offline'?'':'soft',c.error],[extra,delivery==='error'?'':'soft',c.delivery?.message],[update,s.bridge_update?.state==='failed'?'':'soft','']].filter(([text])=>text);
+      return `${this._nowLine(s)}${alerts.map(([text,tone,hint])=>`<span class="spk-alert ${tone}" title="${escape(hint??'')}">${escape(text[0].toUpperCase()+text.slice(1))}</span>`).join('')}`;
     }
     _speakerFacts(s){
       const c=s.connection??{},status=this._managerError?'unknown':c.status??'unknown',delivery=this._managerError?'unknown':c.delivery?.status??'unknown';
@@ -1010,17 +1018,16 @@ button:active:not(:disabled){transform:scale(.97)}
     _media(s){const state=this._hass?.states[s.media_entity];const available=!!state&&!['unavailable','unknown','off'].includes(state.state);const features=Number(state?.attributes.supported_features??0);return {state,available,features,can:bit=>available&&(features&bit)===bit,yandex:this._mediaPlatforms[s.media_entity]==='yandex_station'};}
     /* While something plays the track is the card: the cover fills it, the speaker becomes a caption. */
     /* What is playing, as one quiet line under the room. */
+    /* A pill in the speaker's colour. Text that does not fit scrolls slowly, pausing at both ends. */
     _nowLine(s){
       const now=s.connection?.status==='online'?s.connection?.now_playing:null;if(!now||!['playing','paused'].includes(now.status))return '';
       const [label,glyph]={spotify:['Spotify','spotify'],youtube_music:['YouTube Music','youtube'],airplay:['AirPlay','cast-audio'],yandex_music:['Яндекс Музыка','music-circle']}[now.source]??['Музыка','music-note'];
-      const title=now.title||label,paused=now.status==='paused';
-      return `<span class="now-line" data-source="${escape(now.source??'')}" data-paused="${paused}" title="${escape([title,now.artist,label,paused?'пауза':''].filter(Boolean).join(' · '))}"><span class="now-svc" role="img" aria-label="${escape(label)}">${icon(glyph)}</span><b>${escape(title)}</b>${now.artist?`<span>${escape(now.artist)}</span>`:''}${paused?icon('pause'):''}</span>`;
+      const text=[now.title||label,now.artist].filter(Boolean).join(' · '),paused=now.status==='paused';
+      return `<span class="now-pill" data-source="${escape(now.source??'')}" title="${escape([text,label,paused?'пауза':''].filter(Boolean).join(' · '))}"><span class="now-svc" role="img" aria-label="${escape(label)}">${icon(glyph)}</span><span class="now-track"><span>${escape(text)}</span></span>${paused?`<span class="now-state" aria-label="Пауза">${icon('pause')}</span>`:'<span class="now-eq" aria-hidden="true"><i></i><i></i><i></i></span>'}</span>`;
     }
-    /* The round button means quiet now: music from any service and Alice's reply. */
-    async _silence(id,service){
-      const s=this._speakers.find(item=>item.id===id);if(!s||this._stationBusy.has(id))return;
-      if(service==='media_play'||s.connection?.status!=='online')return this._mediaAction(id,service);
-      this._stationBusy.add(id);try{await this._api('/api/speakers/'+encodeURIComponent(id)+'/player','POST',{action:'silence'});if(s.connection?.now_playing)s.connection.now_playing.status='paused';}catch(error){this._stationMessages[id]=error.message;}finally{this._stationBusy.delete(id);this._refreshMedia();}
+    /* Measured after each paint: only overflowing titles move, by exactly what is hidden. */
+    _fitNowPills(){
+      requestAnimationFrame(()=>{for(const track of this.shadowRoot?.querySelectorAll('.now-track')??[]){const inner=track.firstElementChild,hidden=inner.scrollWidth-track.clientWidth;if(hidden>4){track.style.setProperty('--shift',-hidden+'px');track.style.setProperty('--run',Math.max(6,hidden/28+4)+'s');track.dataset.run='';}else{delete track.dataset.run;}}});
     }
     async _playerAction(id,action){
       const s=this._speakers.find(item=>item.id===id),now=s?.connection?.now_playing;if(!now)return;

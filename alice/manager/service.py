@@ -292,7 +292,7 @@ class Manager:
                 updater.cycle(self)
             except Exception:
                 pass
-            self.monitor_stop.wait(max(0.1, 3 - (time.monotonic() - began)))
+            self.monitor_stop.wait(max(0.1, 5 - (time.monotonic() - began)))
 
     @staticmethod
     def _connection_default():
@@ -341,6 +341,21 @@ class Manager:
             # Stock Yandex music is seen by HA, not by the bridge.
             connection['now_playing'] = value or (current if isinstance(current, dict) and current.get('source') == 'yandex_music' else None)
         return result
+
+    def bridge_get(self, speaker, path, timeout=8):
+        """Routine calls go over HTTP. SSH is the fallback for a bridge that predates it."""
+        if not re.fullmatch(r'/[a-z-]+(\?[A-Za-z0-9_=&.-]*)?', path):
+            raise Error('Некорректный адрес моста.', 500)
+        try:
+            request = Request('http://' + lan_ip(speaker['host']) + ':18862' + path, headers={'Authorization': 'Bearer ' + self._hf_token()})
+            with urlopen(request, timeout=min(timeout, 6)) as response:
+                return response.read(256 * 1024)
+        except HTTPError as error:
+            if error.code not in (401, 404):
+                raise Error('Мост ответил ошибкой.', 502) from None
+        except (OSError, Error):
+            pass
+        return self.ssh(speaker, 'wget -T 4 -q -O - "http://127.0.0.1:18861' + path + '"', timeout=timeout)
 
     def _metrics(self, speaker):
         # Plain HTTP on the home network: a wrong token or an old bridge just gives none.
@@ -429,7 +444,7 @@ class Manager:
             value = dict(previous.get('value', self._connection_default())) if previous.get('identity') == identity else self._connection_default()
         began = time.monotonic()
         try:
-            health = json.loads(self.ssh(speaker, 'wget -T 3 -q -O - http://127.0.0.1:18861/healthz', timeout=8))
+            health = json.loads(self.bridge_get(speaker, '/healthz'))
             if not isinstance(health, dict) or health.get('status') != 'ok':
                 raise Error('Мост сообщил о неисправности.', 502)
             if health.get('speaker_id') != speaker['id']:
@@ -717,7 +732,7 @@ class Manager:
         health = None
         if present:
             try:
-                health = json.loads(self.ssh(speaker, 'wget -T 3 -q -O - http://127.0.0.1:18861/healthz'))
+                health = json.loads(self.bridge_get(speaker, '/healthz'))
             except (Error, ValueError):
                 pass
         result = {'root': True, 'architecture': 'aarch64', 'bridge_present': present,
@@ -891,7 +906,7 @@ class Manager:
 
     def _verified_health(self, speaker, area=None):
         try:
-            health = json.loads(self.ssh(speaker, 'sleep 5; wget -T 4 -q -O - http://127.0.0.1:18861/healthz', timeout=15))
+            health = (time.sleep(5), json.loads(self.bridge_get(speaker, '/healthz', timeout=15)))[1]
         except (Error, ValueError):
             raise Error('Мост не подтвердил успешный запуск.', 502) from None
         if not isinstance(health, dict) or health.get('status') != 'ok' or health.get('speaker_id') != speaker['id']:
@@ -1050,7 +1065,7 @@ class Manager:
         try:
             self.ssh(speaker, 'mv ' + DEVICE + '/bin/quasar-bridge' + suffix + ' ' + DEVICE + '/bin/quasar-bridge && mv ' + DEVICE + '/runtime.env' + suffix + ' ' + DEVICE + '/runtime.env')
             self._restart_process(speaker)
-            health = json.loads(self.ssh(speaker, 'sleep 5; wget -T 4 -q -O - http://127.0.0.1:18861/healthz', timeout=15))
+            health = (time.sleep(5), json.loads(self.bridge_get(speaker, '/healthz', timeout=15)))[1]
             if health.get('status') != 'ok' or health.get('speaker_id') != speaker['id']:
                 raise Error('Новая версия не подтвердила идентификатор и исправность.', 502)
             if adoption is not None and health.get('speaker_area') != speaker['area']:

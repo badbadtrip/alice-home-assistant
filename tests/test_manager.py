@@ -417,7 +417,7 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(online['last_seen'], 1000)
         self.assertEqual(online['voice_phrase_count'], 2)
         self.assertEqual(online['voice_phrase_revision'], 'a' * 64)
-        self.assertEqual(ssh.call_args.args[1], 'wget -T 3 -q -O - http://127.0.0.1:18861/healthz')
+        self.assertEqual(ssh.call_args.args[1], 'wget -T 4 -q -O - "http://127.0.0.1:18861/healthz"')
         with patch.object(self.manager, 'ssh', side_effect=Error('Secret SSH stderr must not leak', 502)), patch('service.time.time', return_value=1015):
             self.manager.monitor_cycle()
             offline = self.manager.speakers()[0]['connection']

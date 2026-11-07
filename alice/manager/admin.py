@@ -124,7 +124,7 @@ def station(manager, speaker_id, operation, payload):
             if type(level) is not int or not 0 <= level <= 10:
                 raise Error('Громкость колонки: от 0 до 10.')
             # GET: BusyBox wget on Lite 2 has no --post-data.
-            manager.ssh(speaker, f'wget -T 3 -q -O - http://127.0.0.1:18861/volume?level={level}', timeout=8)
+            manager.bridge_get(speaker, f'/volume?level={level}')
             return {'level': level}
         if operation == 'airplay':
             action = payload.get('action')
@@ -148,7 +148,7 @@ def station(manager, speaker_id, operation, payload):
             action = payload.get('action')
             if action not in ('pause', 'resume', 'next', 'previous', 'silence'):
                 raise Error('Неизвестная команда плеера.')
-            manager.ssh(speaker, 'wget -T 4 -q -O - "http://127.0.0.1:18861/player?action=' + action + '"', timeout=10)
+            manager.bridge_get(speaker, '/player?action=' + action, timeout=10)
             return {'ok': True}
         if operation == 'ytm':
             # Other people's speakers differ: say why before anything is written.

@@ -61,7 +61,7 @@ def notify(message):
 
 def _verified(manager, speaker):
     try:
-        health = json.loads(manager.ssh(speaker, 'wget -T 3 -q -O - http://127.0.0.1:18861/healthz', timeout=8))
+        health = json.loads(manager.bridge_get(speaker, '/healthz'))
         if health.get('status') != 'ok' or health.get('speaker_id') != speaker['id'] or not health.get('client_frames'):
             return False
         manager.ssh(speaker, MIXER_CHECK, timeout=12)
@@ -153,7 +153,7 @@ def music_state(manager, speakers):
             state = _ha('states/' + entity)
             playing = bool(state) and state.get('state') == 'playing'
             if _music_sent.get(speaker['id']) != playing:
-                manager.ssh(speaker, 'wget -T 3 -q -O /dev/null "http://127.0.0.1:18861/music-state?playing=%d"' % playing, timeout=8)
+                manager.bridge_get(speaker, '/music-state?playing=%d' % playing)
                 _music_sent[speaker['id']] = playing
         except Exception:
             pass

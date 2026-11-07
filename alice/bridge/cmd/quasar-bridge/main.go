@@ -24,14 +24,14 @@ import (
 	"quasarbridge/internal/bridge"
 	"quasarbridge/internal/dialogue"
 	"quasarbridge/internal/home"
-	"quasarbridge/internal/journal"
 	"quasarbridge/internal/indicator"
+	"quasarbridge/internal/journal"
 	"quasarbridge/internal/llm"
 	"quasarbridge/internal/metrics"
 	"quasarbridge/internal/nowplaying"
 	"quasarbridge/internal/soloist"
-	"quasarbridge/internal/ytm"
 	"quasarbridge/internal/wire"
+	"quasarbridge/internal/ytm"
 )
 
 func main() {
@@ -158,7 +158,9 @@ func main() {
 		lc.OnRequest = ring.Request
 	}
 	llmDisabled := os.Getenv("QUASAR_LLM_DISABLED") == "1"
-	if llmDisabled { planner = noLLMPlanner{} }
+	if llmDisabled {
+		planner = noLLMPlanner{}
+	}
 	engine := &bridge.Engine{LLM: planner, Dialogue: dialogue.New(cfg.DialogueContext), SystemPrompt: cfg.SystemPrompt}
 	var musicQueue *assistant.MusicQueue
 	var hc *home.Controller
@@ -242,7 +244,8 @@ func main() {
 			llmStatus := "disabled"
 			if !llmDisabled {
 				if _, err := lc.Complete(ctx, []llm.Message{{Role: "user", Content: "Ответь одним словом: связь"}}, false); err != nil {
-					slog.Error("LLM check failed"); os.Exit(1)
+					slog.Error("LLM check failed")
+					os.Exit(1)
 				}
 				llmStatus = "ok"
 			}
@@ -352,7 +355,12 @@ func main() {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		state := engine.RoutingStatus()
-		data, _ := json.Marshal(map[string]any{"status": "ok", "mode": cfg.Mode, "client_frames": clientCount.Load(), "server_frames": serverCount.Load(), "routing_revision": state.Revision, "routing_rules": state.ActiveRules, "conversation_log_enabled": logs.Enabled(), "conversation_log_failures": logs.Failures(), "assistant_tools_enabled": cfg.AssistantTools.Enabled, "dialogue_context_enabled": cfg.DialogueContext.Enabled && cfg.Mode == "hybrid", "home_assistant_enabled": engine.Home != nil && cfg.Mode == "hybrid", "mcp_servers_configured": mcpConfigured, "speaker_id": os.Getenv("QUASAR_HOME_SPEAKER_ID"), "speaker_area": os.Getenv("QUASAR_HOME_AREA"), "activity_dropped": func() uint64 {if hf != nil {return hf.ActivityDropped()};return 0}(), "voice_phrase_revision": func() string {
+		data, _ := json.Marshal(map[string]any{"status": "ok", "mode": cfg.Mode, "client_frames": clientCount.Load(), "server_frames": serverCount.Load(), "routing_revision": state.Revision, "routing_rules": state.ActiveRules, "conversation_log_enabled": logs.Enabled(), "conversation_log_failures": logs.Failures(), "assistant_tools_enabled": cfg.AssistantTools.Enabled, "dialogue_context_enabled": cfg.DialogueContext.Enabled && cfg.Mode == "hybrid", "home_assistant_enabled": engine.Home != nil && cfg.Mode == "hybrid", "mcp_servers_configured": mcpConfigured, "speaker_id": os.Getenv("QUASAR_HOME_SPEAKER_ID"), "speaker_area": os.Getenv("QUASAR_HOME_AREA"), "activity_dropped": func() uint64 {
+			if hf != nil {
+				return hf.ActivityDropped()
+			}
+			return 0
+		}(), "voice_phrase_revision": func() string {
 			if hf != nil {
 				return hf.VoicePhraseRevision()
 			}
@@ -434,14 +442,14 @@ func main() {
 	}
 	mux.Handle("GET /metrics", metrics.Handler("", snapshot))
 	if token := os.Getenv("QUASAR_HOME_FUNCTIONS_TOKEN"); token != "" {
-		go serveMetrics(ctx, token, snapshot)
+		go serveLAN(ctx, token, mux)
 	}
 	if hf != nil {
 		// The panel learns of a new track within a second instead of waiting for the next health check.
 		go nowplaying.Watch(ctx, &playing, playerSources, hf.ReportNowPlaying)
 		hf.StartVoiceCache(ctx)
-  hf.StartActivity(ctx)
-  engine.Activity=hf.RecordActivity
+		hf.StartActivity(ctx)
+		engine.Activity = hf.RecordActivity
 	}
 	reloads := make(chan os.Signal, 1)
 	signal.Notify(reloads, syscall.SIGHUP)
@@ -480,4 +488,7 @@ func main() {
 }
 
 type noLLMPlanner struct{}
-func (noLLMPlanner) Complete(context.Context, []llm.Message, bool) (string, error) { return "", llm.ErrDisabled }
+
+func (noLLMPlanner) Complete(context.Context, []llm.Message, bool) (string, error) {
+	return "", llm.ErrDisabled
+}

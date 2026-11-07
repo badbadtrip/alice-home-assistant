@@ -35,9 +35,9 @@ class AdminTests(unittest.TestCase):
   m.jobs={'job':{'speaker_id':'test','status':'running'}}
   with self.assertRaises(Error):station(m,'test','console',{'command':'uname'})
  def test_volume_validates_level_and_calls_loopback_bridge(self):
-  m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'}),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(return_value=b'{}'))
+  m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'}),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},bridge_get=Mock(return_value=b'{}'))
   self.assertEqual(station(m,'test','volume',{'level':7}),{'level':7})
-  self.assertIn('http://127.0.0.1:18861/volume?level=7',m.ssh.call_args.args[1]);self.assertNotIn('--post-data',m.ssh.call_args.args[1])
+  self.assertEqual(m.bridge_get.call_args.args[1],'/volume?level=7')
   for level in (-1,11,True,'5;reboot',None,5.0):
    with self.subTest(level=level),self.assertRaises(Error):station(m,'test','volume',{'level':level})
  def test_airplay_switch_keeps_old_service_off_and_rejects_other_actions(self):

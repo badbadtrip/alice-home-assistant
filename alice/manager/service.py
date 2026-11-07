@@ -280,7 +280,7 @@ class Manager:
                 updater.cycle(self)
             except Exception:
                 pass
-            self.monitor_stop.wait(max(0.1, 15 - (time.monotonic() - began)))
+            self.monitor_stop.wait(max(0.1, 5 - (time.monotonic() - began)))
 
     @staticmethod
     def _connection_default():

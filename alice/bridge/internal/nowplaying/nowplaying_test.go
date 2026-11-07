@@ -42,3 +42,22 @@ func TestPickDoesNotWaitForSlowSource(t *testing.T) {
 		t.Fatal("the budget was not kept")
 	}
 }
+
+func TestTrackerHidesAPausedSourceThatDidNotPlayLast(t *testing.T) {
+	var tracker Tracker
+	spotify := &Info{Source: "spotify", Status: Paused}
+	youtube := &Info{Source: "youtube_music", Status: Playing}
+	if got := tracker.Pick(context.Background(), fixed(spotify, nil), fixed(nil, nil)); got != nil {
+		t.Fatalf("a stale pause showed: %+v", got)
+	}
+	if got := tracker.Pick(context.Background(), fixed(spotify, nil), fixed(youtube, nil)); got != youtube {
+		t.Fatalf("got %+v", got)
+	}
+	if got := tracker.Pick(context.Background(), fixed(spotify, nil), fixed(nil, nil)); got != nil {
+		t.Fatalf("stopped YouTube fell back to Spotify: %+v", got)
+	}
+	paused := &Info{Source: "youtube_music", Status: Paused}
+	if got := tracker.Pick(context.Background(), fixed(spotify, nil), fixed(paused, nil)); got != paused {
+		t.Fatalf("got %+v", got)
+	}
+}

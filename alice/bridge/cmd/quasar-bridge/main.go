@@ -220,6 +220,7 @@ func main() {
 	}
 	engine.Silencer = proxy
 	youtube := ytm.New()
+	var playing nowplaying.Tracker
 	engine.YouTube = youtube
 	if err := engine.SetRouting(withoutModelFallback(cfg.Routing, llmDisabled)); err != nil {
 		slog.Error("routing rejected", "error", err)
@@ -363,7 +364,7 @@ func main() {
 			if youtube.Available() {
 				sources = append(sources, youtube.Now)
 			}
-			return nowplaying.Pick(r.Context(), sources...)
+			return playing.Pick(r.Context(), sources...)
 		}()})
 		_, _ = w.Write(data)
 	})

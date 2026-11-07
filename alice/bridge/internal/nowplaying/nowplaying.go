@@ -61,3 +61,39 @@ func Pick(ctx context.Context, sources ...Source) *Info {
 	}
 	return held
 }
+
+// Tracker remembers which source played last. A paused item belongs on the card only
+// when it comes from that source: Spotify paused hours ago must not replace YouTube.
+type Tracker struct {
+	mu   sync.Mutex
+	last string
+}
+
+func (t *Tracker) Pick(ctx context.Context, sources ...Source) *Info {
+	ctx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	found := make([]*Info, len(sources))
+	var group sync.WaitGroup
+	for i, source := range sources {
+		group.Go(func() {
+			if info, err := source(ctx); err == nil {
+				found[i] = info
+			}
+		})
+	}
+	group.Wait()
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for _, info := range found {
+		if info != nil && info.Status != Paused {
+			t.last = info.Source
+			return info
+		}
+	}
+	for _, info := range found {
+		if info != nil && info.Source == t.last {
+			return info
+		}
+	}
+	return nil
+}

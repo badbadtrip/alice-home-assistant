@@ -462,7 +462,7 @@ button:active:not(:disabled){transform:scale(.97)}
           for(const speaker of this._speakers){const region=this.shadowRoot.querySelector('[data-connection="'+speaker.id+'"]');if(region)this._patch(region,this._speakerStatus(speaker));}this._fitNowPills();
           const summary=this.shadowRoot.getElementById('speaker-summary');if(summary)summary.textContent=this._speakerSummary();const setup=this.shadowRoot.getElementById('setup-notice-region');if(setup){const markup=this._setupNotice();if(setup.innerHTML!==markup)setup.innerHTML=markup;}
         }
-      },5000);
+      },3000);
     }
     disconnectedCallback() {
       this.ownerDocument.removeEventListener('keydown',this._adminKeyHandler,true);

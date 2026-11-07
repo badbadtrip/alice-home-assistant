@@ -301,6 +301,48 @@ main{max-width:1360px;padding:0 24px 48px}
 .stage{display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
 @media(min-width:1100px){.stage{grid-template-columns:minmax(0,1fr) 380px;gap:32px;align-items:start}}
 .page-narrow{max-width:820px;margin:0 auto}
+.page-wide{max-width:1280px;margin:0 auto}
+.metrics{--m-blue:#2a78d6;--m-orange:#eb6834;--m-aqua:#1baf7a;--m-violet:#6250d6;--m-magenta:#d55181}
+:host([dark]) .metrics{--m-blue:#3987e5;--m-orange:#d95926;--m-aqua:#199e70;--m-violet:#9085e9;--m-magenta:#d55181}
+.m-range{margin:0;flex:none}.m-range button{min-width:52px}
+.m-pick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.m-pick button{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--text);font:inherit;cursor:pointer}
+.m-pick button[aria-selected="true"]{border-color:transparent;background:var(--accent-tint);color:var(--accent);font-weight:500}
+.m-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}.m-dot.on{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent)}
+.m-head{padding:16px 20px;margin-bottom:16px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--lift)}
+.m-head h3{font-size:20px;font-weight:600;margin-bottom:6px}
+.m-facts{display:flex;flex-wrap:wrap;gap:4px 0;margin:0;padding:0;list-style:none;color:var(--muted);font-size:13px}
+.m-facts li{display:inline-flex;align-items:center;gap:6px;padding:0 12px}.m-facts li:first-child{padding-left:0;color:var(--text);font-weight:500}
+.m-facts li+li{border-left:1px solid var(--line)}.m-facts ha-icon{--mdc-icon-size:16px;color:var(--muted)}
+.m-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+@media(min-width:900px){.m-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.m-card{padding:16px 18px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--lift);min-width:0}
+.m-card header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.m-card h3{font-size:16px;font-weight:600}.m-card header p{font-size:12.5px;margin-top:2px}
+.m-now{font-size:22px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.m-legend{display:flex;flex-direction:column;gap:2px;margin:0;padding:0;list-style:none;font-size:12.5px;color:var(--muted)}
+.m-legend li{display:flex;align-items:center;gap:6px;justify-content:flex-end}.m-legend b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums;min-width:72px;text-align:right}
+.m-legend i,.m-tip i{width:10px;height:3px;border-radius:2px;flex:none}
+.m-plot{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:170px 22px;column-gap:8px;touch-action:pan-y}
+.m-y{position:relative;grid-row:1;min-width:40px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.m-y span{position:absolute;right:0;transform:translateY(50%);white-space:nowrap}
+.m-y span:first-child{transform:none}.m-y span:last-child{transform:translateY(100%)}
+.m-area{position:relative;grid-row:1;grid-column:2;cursor:crosshair}
+.m-area svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.m-grid-line{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke;stroke-dasharray:3 4}
+.m-line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.m-x{position:relative;grid-row:2;grid-column:2;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.m-x span{position:absolute;top:6px;transform:translateX(-50%);white-space:nowrap}
+.m-cross{position:absolute;top:0;bottom:0;width:1px;background:color-mix(in srgb,var(--text) 45%,transparent);pointer-events:none}
+.m-tip{position:absolute;top:8px;z-index:2;display:flex;flex-direction:column;gap:3px;min-width:132px;margin-left:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--dialog);box-shadow:0 6px 18px rgb(0 0 0/.18);font-size:12px;pointer-events:none}
+.m-tip.flip{transform:translateX(calc(-100% - 20px))}
+.m-tip b{font-weight:600;margin-bottom:2px}.m-tip span{display:flex;align-items:center;gap:6px;color:var(--muted)}.m-tip em{margin-left:auto;padding-left:10px;font-style:normal;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.m-mark{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px var(--surface);pointer-events:none}
+.m-tip[hidden],.m-cross[hidden],.m-mark[hidden]{display:none}
+.m-table{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.m-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:48px 20px;border:1px dashed var(--line);border-radius:var(--radius);text-align:center}
+.m-empty ha-icon{--mdc-icon-size:36px;color:var(--muted);margin-bottom:6px}
+@media(max-width:600px){.m-facts{gap:6px 14px}.m-facts li{padding:0}.m-facts li+li{border-left:0}.m-head{padding:14px 16px}.m-card{padding:14px 14px 10px}.m-plot{grid-template-rows:150px 22px}.metrics>.sec{flex-wrap:wrap}}
 .more{width:100%;margin-top:8px}
 .speakers{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
 .spk{--spk:var(--accent);display:flex;flex-direction:column;gap:8px;padding:20px;border-radius:28px}
@@ -366,7 +408,7 @@ button:active:not(:disabled){transform:scale(.97)}
       this.shadowRoot.addEventListener('toggle',e=>{if(e.target.matches('details.admin-entity-details')&&this._admin){if(e.target.open)this._admin.expanded.add(e.target.dataset.entity);else this._admin.expanded.delete(e.target.dataset.entity);}if(e.target.id==='home-journal'&&e.target.isConnected){this._journalOpen=e.target.open;if(e.target.open)this._loadActivity();}if(e.target.matches('details[data-speaker]')){const id=e.target.dataset.speaker;if(e.target.open)this._expandedSpeakers.add(id);else this._expandedSpeakers.delete(id);}},true);
       this._tab='commands'; this._section='speakers'; this._speakers=[]; this._assignments={}; this._chosen=[]; this._all=true;
       this.shadowRoot.addEventListener('click', e => this._click(e));
-      this.shadowRoot.addEventListener('pointerdown',e=>{if(e.target.dataset.volume)this._volumeDragging=e.target.dataset.volume;});
+      this.shadowRoot.addEventListener('pointermove',e=>this._metricHover(e));this.shadowRoot.addEventListener('pointerout',e=>this._metricLeave(e));this.shadowRoot.addEventListener('pointerdown',e=>{if(e.target.dataset.volume)this._volumeDragging=e.target.dataset.volume;});
       for(const event of ['pointerup','pointercancel'])this.shadowRoot.addEventListener(event,e=>{if(e.target.dataset.volume&&this._volumeDragging===e.target.dataset.volume)this._volumeDragging=undefined;});
       this.shadowRoot.addEventListener('submit', e => { e.preventDefault(); if(e.target.id==='admin-form')return; if(e.target.id==='utility-form')return this._submitUtility();e.target.id==='speaker-form' ? this._register(e.target) : this._save(); });
       this.shadowRoot.addEventListener('keydown',e=>{
@@ -466,7 +508,7 @@ button:active:not(:disabled){transform:scale(.97)}
       this._stopAdminHA();
       this._embeddedStyle?.remove();this._embeddedStyle=undefined;
       this._unsubscribe?.(); this._unsubscribe = undefined;
-      clearTimeout(this._refreshTimer);clearInterval(this._connectionTimer);this._watchToken=(this._watchToken??0)+1;
+      clearTimeout(this._refreshTimer);clearInterval(this._connectionTimer);clearTimeout(this._metricsTimer);this._watchToken=(this._watchToken??0)+1;
     }
     _patchSpeakers(){
       this._renderEditorStatus();this._repairSpeakerView();
@@ -609,7 +651,7 @@ button:active:not(:disabled){transform:scale(.97)}
     }
     async _readManager() {
       if(!this._config.manager_url&&!this._config.manager_app)return;
-      try {const [data,assign]=await Promise.all([this._api('/api/speakers'),this._api('/api/assignments')]);this._speakers=data.speakers??[];this._speakerRevision=data.revision;this._key=data.public_key;this._installationReady=data.installation_ready;this._advertisedUrl=data.advertised_url;this._adoptionEnabled=data.adoption_enabled===true;this._assignments=assign.assignments??{};this._managerError='';await Promise.all(this._speakers.filter(s=>s.media_entity).map(async speaker=>{try{const entry=await this._hass.callWS({type:'config/entity_registry/get',entity_id:speaker.media_entity});this._mediaPlatforms[speaker.media_entity]=entry?.platform??null;}catch{this._mediaPlatforms[speaker.media_entity]=null;}}));this._speakersStale=false;this._renderIdle();this._loadSpeakerPreviews().then(()=>{this._saveSnapshot();this._renderIdle();});}
+      try {const [data,assign]=await Promise.all([this._api('/api/speakers'),this._api('/api/assignments')]);this._speakers=data.speakers??[];this._speakerRevision=data.revision;this._key=data.public_key;this._installationReady=data.installation_ready;this._advertisedUrl=data.advertised_url;this._adoptionEnabled=data.adoption_enabled===true;this._assignments=assign.assignments??{};this._managerError='';await Promise.all(this._speakers.filter(s=>s.media_entity&&!(s.media_entity in this._mediaPlatforms)).map(async speaker=>{try{const entry=await this._hass.callWS({type:'config/entity_registry/get',entity_id:speaker.media_entity});this._mediaPlatforms[speaker.media_entity]=entry?.platform??null;}catch{this._mediaPlatforms[speaker.media_entity]=null;}}));this._speakersStale=false;this._renderIdle();this._loadSpeakerPreviews().then(()=>{this._saveSnapshot();this._renderIdle();});}
       catch(error){this._managerError=error.message;this._speakersStale=false;}
       this._resumeAddressSetup();
     }
@@ -975,11 +1017,99 @@ button:active:not(:disabled){transform:scale(.97)}
       finally{a.busy=false;this._render();}
     }
 
-    _appbar(){const tabs=[['speakers','Колонки','speaker'],['commands','Команды','microphone-outline'],['music','Музыка','music-note'],['house','Дом','home-outline'],['journal','Журнал','history']],current=this._section==='speaker'?'speakers':this._section;return `<header class="appbar ${window===window.top?'under-ha':''}"><div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/></svg><h1>Алиса</h1></div><nav class="tabs" aria-label="Разделы">${tabs.map(([id,label,name])=>`<button type="button" data-action="section" data-section="${id}" ${current===id?'aria-current="page"':''}>${icon(name)}<span>${label}</span></button>`).join('')}</nav><div class="appbar-actions"><button type="button" class="secondary" data-action="tts">${icon('bullhorn-outline')}<span class="bar-label">Объявление</span></button><button type="button" class="icon" data-action="section" data-section="settings" aria-label="Настройки" title="Настройки" ${current==='settings'?'aria-current="page"':''}>${icon('cog-outline')}</button><button type="button" class="icon" data-action="guide" aria-label="Руководство" title="Руководство">${icon('help-circle-outline')}</button></div></header>`;}
+    _appbar(){const tabs=[['speakers','Колонки','speaker'],['commands','Команды','microphone-outline'],['music','Музыка','music-note'],['house','Дом','home-outline'],['metrics','Метрики','chart-areaspline'],['journal','Журнал','history']],current=this._section==='speaker'?'speakers':this._section;return `<header class="appbar ${window===window.top?'under-ha':''}"><div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/></svg><h1>Алиса</h1></div><nav class="tabs" aria-label="Разделы">${tabs.map(([id,label,name])=>`<button type="button" data-action="section" data-section="${id}" ${current===id?'aria-current="page"':''}>${icon(name)}<span>${label}</span></button>`).join('')}</nav><div class="appbar-actions"><button type="button" class="secondary" data-action="tts">${icon('bullhorn-outline')}<span class="bar-label">Объявление</span></button><button type="button" class="icon" data-action="section" data-section="settings" aria-label="Настройки" title="Настройки" ${current==='settings'?'aria-current="page"':''}>${icon('cog-outline')}</button><button type="button" class="icon" data-action="guide" aria-label="Руководство" title="Руководство">${icon('help-circle-outline')}</button></div></header>`;}
+    /* Metrics: one speaker at a time, Beszel-style area charts from the app's day of history. */
+    async _loadMetrics(){
+      try{this._metricsData=await this._api('/api/metrics');this._metricsError='';}
+      catch(error){this._metricsError=error.message;}
+      this._renderMetrics();
+      clearTimeout(this._metricsTimer);
+      if(this._section==='metrics')this._metricsTimer=setTimeout(()=>{if(this.isConnected&&this._section==='metrics'&&!document.hidden)this._loadMetrics();else if(this._section==='metrics')this._metricsTimer=setTimeout(()=>this._loadMetrics(),5000);},30000);
+    }
+    _renderMetrics(){const region=this.shadowRoot.getElementById('metrics-region');if(region){const markup=this._metricsBody();if(region.innerHTML!==markup)region.innerHTML=markup;}}
+    _metricsPage(){
+      const range=this._metricsRange??3600,ranges=[[3600,'1 ч'],[21600,'6 ч'],[86400,'24 ч']];
+      return `<section class="page-wide metrics" aria-labelledby="metrics-title"><div class="sec"><div><h2 id="metrics-title">Метрики</h2><p>Колонки присылают данные сами, точка раз в 30 секунд, история за сутки</p></div><div class="seg m-range" role="tablist" aria-label="Период">${ranges.map(([value,label])=>`<button role="tab" type="button" data-action="metrics-range" data-range="${value}" aria-selected="${range===value}">${label}</button>`).join('')}</div></div><div id="metrics-region">${this._metricsBody()}</div></section>`;
+    }
+    _metricsBody(){
+      const speakers=this._speakers.filter(s=>s.trusted_fingerprint);
+      if(!speakers.length)return `<div class="m-empty">${icon('chart-areaspline')}<h3>Нет подключённых колонок</h3><p>Метрики появятся после установки моста на колонку.</p></div>`;
+      if(!speakers.some(s=>s.id===this._metricsSpeaker))this._metricsSpeaker=speakers[0].id;
+      const speaker=speakers.find(s=>s.id===this._metricsSpeaker),c=speaker.connection??{},m=c.metrics??{},online=c.status==='online';
+      const pick=speakers.length>1?`<div class="m-pick" role="tablist" aria-label="Колонка">${speakers.map(s=>`<button type="button" role="tab" data-action="metrics-speaker" data-id="${escape(s.id)}" aria-selected="${s.id===speaker.id}"><i class="m-dot ${s.connection?.status==='online'?'on':''}"></i>${escape(s.name)}</button>`).join('')}</div>`:'';
+      const facts=[[`<i class="m-dot ${online?'on':''}"></i>`,online?'В сети':c.status==='offline'?'Не в сети':'Нет данных'],[icon('ip-network-outline'),escape(speaker.host)],[icon('speaker'),{midi:'Станция Миди',mini2:'Станция Мини 2',lite2:'Станция Лайт 2'}[this._speakerModel(speaker)]],
+        m.uptime_s!=null?[icon('clock-outline'),this._metricDuration(m.uptime_s)]:null,m.cpus?[icon('cpu-64-bit'),m.cpus+' '+this._plural(m.cpus,'ядро','ядра','ядер')]:null,
+        m.mem_total_kb?[icon('memory'),this._metricBytes(m.mem_total_kb)]:null,m.data_total_kb?[icon('harddisk'),this._metricBytes(m.data_total_kb)+' флеш']:null].filter(Boolean);
+      const head=`<div class="m-head"><h3>${escape(speaker.name)}</h3><ul class="m-facts">${facts.map(([mark,text])=>`<li>${mark}<span>${text}</span></li>`).join('')}</ul></div>`;
+      if(this._metricsError&&!this._metricsData)return pick+head+`<div class="m-empty"><h3>Не удалось загрузить историю</h3><p>${escape(this._metricsError)}</p></div>`;
+      const data=this._metricsData,fields=data?.fields??[],rows=(data?.speakers?.[speaker.id]??[]).map(row=>Object.fromEntries(fields.map((key,i)=>[key,row[i]])));
+      const now=Date.now()/1000,range=this._metricsRange??3600,shown=rows.filter(row=>row.t>=now-range);
+      if(shown.length<2)return pick+head+`<div class="m-empty">${icon('chart-timeline-variant')}<h3>${data?'Данные копятся':'Загрузка'}</h3><p>${data?'Первые графики появятся через минуту. Нужен мост версии 0.46 или новее.':'Загружаем историю колонки.'}</p></div>`;
+      const last=shown[shown.length-1],kb=v=>v==null?null:v*1024;
+      const charts=[
+        {key:'cpu',title:'Процессор',hint:'Загрузка всех ядер',color:'var(--m-blue)',max:100,unit:'%',fmt:v=>Math.round(v)+'%',series:[['Загрузка','cpu_pct']]},
+        {key:'mem',title:'Память',hint:'Занято из '+this._metricBytes(last.mem_total_kb),color:'var(--m-aqua)',max:kb(last.mem_total_kb),fmt:v=>this._metricBytes(v/1024),series:[['Занято',row=>kb(row.mem_used_kb)]]},
+        {key:'temp',title:'Температура',hint:'Самая горячая зона',color:'var(--m-orange)',fmt:v=>Math.round(v)+' °C',floor:true,series:[['Температура','temp_c']]},
+        {key:'net',title:'Сеть',hint:'Скорость по всем интерфейсам',color:'var(--m-blue)',fmt:v=>this._metricBytes(v/1024)+'/с',series:[['Приём','net_rx_bps','var(--m-blue)'],['Отдача','net_tx_bps','var(--m-orange)']]},
+        {key:'disk',title:'Флеш',hint:'Занято на /data из '+this._metricBytes(last.data_total_kb),color:'var(--m-violet)',max:kb(last.data_total_kb),fmt:v=>this._metricBytes(v/1024),series:[['Занято',row=>kb(row.data_used_kb)]]},
+        {key:'bridge',title:'Память моста',hint:'Сколько занимает сам мост',color:'var(--m-magenta)',fmt:v=>this._metricBytes(v/1024),series:[['Мост',row=>kb(row.bridge_rss_kb)]]}];
+      this._metricCharts={};
+      const cards=charts.map(chart=>this._metricChart(chart,shown,now-range,now)).filter(Boolean).join('');
+      return pick+head+`<div class="m-grid">${cards}</div>`;
+    }
+    _metricChart(chart,rows,from,to){
+      const series=chart.series.map(([name,key,color])=>({name,color:color??chart.color,values:rows.map(row=>{const v=typeof key==='function'?key(row):row[key];return typeof v==='number'&&isFinite(v)?v:null;})}));
+      const all=series.flatMap(s=>s.values).filter(v=>v!=null);if(!all.length)return '';
+      const points=Math.min(rows.length,240),step=rows.length/points,bucket=(values,i)=>{const part=values.slice(Math.floor(i*step),Math.max(Math.floor((i+1)*step),Math.floor(i*step)+1)).filter(v=>v!=null);return part.length?part.reduce((a,b)=>a+b,0)/part.length:null;};
+      const times=Array.from({length:points},(_,i)=>rows[Math.min(rows.length-1,Math.floor((i+.5)*step))].t);
+      series.forEach(s=>{s.points=Array.from({length:points},(_,i)=>bucket(s.values,i));});
+      // Gaps longer than three samples are drawn as gaps: the speaker was off or unreachable.
+      const gapAt=i=>i>0&&times[i]-times[i-1]>Math.max(95,step*30*3);
+      let top=chart.max??Math.max(...all),bottom=0;
+      if(chart.floor){const low=Math.min(...all);bottom=Math.max(0,Math.floor((low-5)/10)*10);top=Math.ceil((Math.max(...all)+5)/10)*10;}
+      else if(chart.max==null){const nice=[1,2,2.5,5,10],pow=Math.pow(10,Math.floor(Math.log10(top||1)));top=(nice.find(n=>n*pow>=top*1.1)??10)*pow;}
+      if(!(top>bottom))top=bottom+1;
+      const W=1000,H=220,x=t=>(t-from)/(to-from)*W,y=v=>H-(v-bottom)/(top-bottom)*H;
+      const paths=series.map(s=>{let line='',area='',open=null,lastX=0;
+        s.points.forEach((v,i)=>{if(v==null||gapAt(i)){if(open!=null){area+=`L${lastX.toFixed(1)},${H}L${open.toFixed(1)},${H}Z`;open=null;}if(v==null)return;}
+          const px=x(times[i]),py=y(v);if(open==null){line+=`M${px.toFixed(1)},${py.toFixed(1)}`;area+=`M${px.toFixed(1)},${H}L${px.toFixed(1)},${py.toFixed(1)}`;open=px;}else{line+=`L${px.toFixed(1)},${py.toFixed(1)}`;area+=`L${px.toFixed(1)},${py.toFixed(1)}`;}lastX=px;});
+        if(open!=null)area+=`L${lastX.toFixed(1)},${H}L${open.toFixed(1)},${H}Z`;return {...s,line,area};});
+      const ticks=[0,.25,.5,.75,1].map(f=>bottom+(top-bottom)*f),span=to-from,labelStep=span<=3600?600:span<=21600?3600:14400;
+      const xticks=[];for(let t=Math.ceil(from/labelStep)*labelStep;t<=to;t+=labelStep)xticks.push(t);
+      const clock=t=>new Date(t*1000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+      const current=series.map(s=>[...s.points].reverse().find(v=>v!=null));
+      const now=series.length===1?`<div class="m-now">${chart.fmt(current[0]??0)}</div>`:`<ul class="m-legend">${series.map((s,i)=>`<li><i style="background:${s.color}"></i>${s.name}<b>${current[i]==null?'—':chart.fmt(current[i])}</b></li>`).join('')}</ul>`;
+      this._metricCharts[chart.key]={times,series,fmt:chart.fmt,from,to,clock,top,bottom};
+      return `<article class="m-card"><header><div><h3>${chart.title}</h3><p>${chart.hint}</p></div>${now}</header>
+        <div class="m-plot" data-metric="${chart.key}"><div class="m-y">${ticks.map(v=>`<span style="bottom:${((v-bottom)/(top-bottom)*100).toFixed(2)}%">${chart.fmt(v)}</span>`).join('')}</div>
+        <div class="m-area"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs>${paths.map((p,i)=>`<linearGradient id="mg-${chart.key}-${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.color}" stop-opacity=".42"/><stop offset="1" stop-color="${p.color}" stop-opacity=".06"/></linearGradient>`).join('')}</defs>
+        ${ticks.map(v=>`<line class="m-grid-line" x1="0" x2="${W}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/>`).join('')}
+        ${paths.map((p,i)=>`<path d="${p.area}" fill="url(#mg-${chart.key}-${i})"/><path class="m-line" d="${p.line}" stroke="${p.color}"/>`).join('')}</svg>
+        <div class="m-cross" hidden></div>${series.map((s,i)=>`<i class="m-mark" data-mark="${i}" style="--c:${s.color}" hidden></i>`).join('')}<div class="m-tip" role="status" hidden></div></div>
+        <div class="m-x">${xticks.map(t=>`<span style="left:${((t-from)/span*100).toFixed(2)}%">${clock(t)}</span>`).join('')}</div></div>
+        <table class="m-table"><caption>${chart.title}</caption><tr><th>Время</th>${series.map(s=>`<th>${s.name}</th>`).join('')}</tr>${times.slice(-6).map((t,k)=>{const i=times.length-6+k;return i<0?'':`<tr><td>${clock(t)}</td>${series.map(s=>`<td>${s.points[i]==null?'—':chart.fmt(s.points[i])}</td>`).join('')}</tr>`;}).join('')}</table></article>`;
+    }
+    _metricHover(event){
+      const plot=event.target.closest?.('.m-plot');const area=plot?.querySelector('.m-area');const chart=plot&&this._metricCharts?.[plot.dataset.metric];
+      this.shadowRoot.querySelectorAll('.m-plot.hovered').forEach(other=>{if(other!==plot){other.classList.remove('hovered');other.querySelector('.m-cross').hidden=other.querySelector('.m-tip').hidden=true;other.querySelectorAll('.m-mark').forEach(mark=>mark.hidden=true);}});
+      if(!chart||!area)return;
+      const box=area.getBoundingClientRect(),ratio=Math.min(1,Math.max(0,(event.clientX-box.left)/box.width)),t=chart.from+ratio*(chart.to-chart.from);
+      let best=0;chart.times.forEach((time,i)=>{if(Math.abs(time-t)<Math.abs(chart.times[best]-t))best=i;});
+      const values=chart.series.map(s=>s.points[best]);if(values.every(v=>v==null)){plot.querySelector('.m-cross').hidden=plot.querySelector('.m-tip').hidden=true;return;}
+      const left=(chart.times[best]-chart.from)/(chart.to-chart.from)*100,cross=plot.querySelector('.m-cross'),tip=plot.querySelector('.m-tip');
+      plot.classList.add('hovered');cross.hidden=tip.hidden=false;cross.style.left=left+'%';
+      tip.innerHTML=`<b>${chart.clock(chart.times[best])}</b>${chart.series.map((s,i)=>`<span><i style="background:${s.color}"></i>${s.name}<em>${values[i]==null?'—':chart.fmt(values[i])}</em></span>`).join('')}`;
+      plot.querySelectorAll('.m-mark').forEach(mark=>{const v=values[mark.dataset.mark];mark.hidden=v==null;if(v!=null){mark.style.left=left+'%';mark.style.top=(100-(v-chart.bottom)/(chart.top-chart.bottom)*100)+'%';}});tip.style.left=left+'%';tip.classList.toggle('flip',left>60);
+    }
+    _metricLeave(event){const plot=event.target.closest?.('.m-plot');if(plot&&!plot.contains(event.relatedTarget)){plot.classList.remove('hovered');plot.querySelector('.m-cross').hidden=plot.querySelector('.m-tip').hidden=true;plot.querySelectorAll('.m-mark').forEach(mark=>mark.hidden=true);}}
+    _metricBytes(kb){if(kb==null)return '—';const units=[['ГБ',1048576],['МБ',1024],['КБ',1]];const [unit,size]=units.find(([,size])=>kb>=size)??units[2];const v=kb/size;return (v>=100||unit==='КБ'?Math.round(v):v.toFixed(1).replace('.',','))+' '+unit;}
+    _metricDuration(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?d+' '+this._plural(d,'день','дня','дней')+(h?' '+h+' ч':''):h?h+' ч '+m+' мин':m+' мин';}
+    _plural(n,one,few,many){const a=n%10,b=n%100;return a===1&&b!==11?one:a>=2&&a<=4&&(b<12||b>14)?few:many;}
     _commandsHead(rows,title,tag='h2'){return `<div class="sec"><div><${tag} id="commands-title">${title}</${tag}><p>${this._commandSummary(rows)}</p></div><div class="sec-actions">${iconButton('preview','text-search','Проверить фразу без выполнения')}<button data-action="new">${icon('plus')}Команда</button></div></div>`;}
     _home(rows,disabled){
       const section=this._section,shown=rows.slice(0,3);let body;
       if(section==='commands')body=`<section class="page-narrow" aria-labelledby="commands-title">${this._commandsHead(rows,'Команды')}${this._commandList(rows,disabled)}<p class="foot">Скажите «Алиса» и любую из фраз.</p></section>`;
+      else if(section==='metrics')body=this._metricsPage();
       else if(section==='journal')body=`<section class="page-narrow" aria-labelledby="journal-title"><div class="sec"><h2 id="journal-title">Журнал</h2></div>${this._diagnostics()}</section>`;
       else if(section==='house'||section==='music'||section==='speaker'||section==='settings')body=this._admin?this._adminDialog():'<p class="help">Загрузка…</p>';
       else body=`<div id="setup-notice-region">${this._setupNotice()}</div><div class="stage"><section aria-labelledby="speakers-title"><div class="sec"><div><h2 id="speakers-title">Колонки</h2><p id="speaker-summary">${this._speakerSummary()}</p></div><div class="sec-actions">${iconButton('refresh','refresh','Обновить',disabled)}<button data-action="add-speaker" ${this._managerError?'disabled':''}>${icon('plus')}Колонка</button></div></div>${this._speakerPanel(disabled)}</section><section aria-labelledby="commands-title">${this._commandsHead(rows,'Команды')}${this._commandList(shown,disabled)}${rows.length>shown.length?`<button class="more" data-action="section" data-section="commands">Все команды: ${rows.length}</button>`:''}<p class="foot">Скажите «Алиса» и любую из фраз.</p></section></div>`;
@@ -992,7 +1122,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(this._utility?.inline)this._utility=null;
       if(a&&!adminSection(section)){this._stopAdminHA();this._admin=null;}
       const previous=this._section;this._section=section;this._journalOpen=section==='journal';
-      if(!adminSection(section)){this._render();if(section==='journal')this._loadActivity();return;}
+      if(!adminSection(section)){this._render();if(section==='journal')this._loadActivity();if(section==='metrics')this._loadMetrics();else clearTimeout(this._metricsTimer);return;}
       if(!this._admin){await this._openAdmin(first(section));if(!this._admin){this._section=previous;this._render();return;}}
       await this._adminAction('admin-tab',{dataset:{tab:first(section)}});
     }
@@ -1248,6 +1378,8 @@ button:active:not(:disabled){transform:scale(.97)}
       if(action==='add-speaker'){this._speakerDialog=true;this._message='';this._render();return;}
       if(action==='close-speaker'){this._speakerDialog=false;this._render();return;}
       if(action==='section')return this._go(button.dataset.section);
+      if(action==='metrics-range'){this._metricsRange=Number(button.dataset.range);this.shadowRoot.querySelectorAll('[data-action="metrics-range"]').forEach(b=>b.setAttribute('aria-selected',String(b===button)));this._renderMetrics();return;}
+      if(action==='metrics-speaker'){this._metricsSpeaker=button.dataset.id;this._renderMetrics();return;}
       if(action==='guide')return this._openGuide();
       if(['commands','speakers','diagnostics'].includes(action)){this._tab=action;this._render();if(action==='diagnostics')this._loadActivity();return;}
       if(action==='retry-editor'){button.disabled=true;await this._loadManager();await this._bindNativePicker();return;}

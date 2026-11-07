@@ -77,3 +77,17 @@ func TestLocalDictionaryEntryIsAcceptedByCache(t *testing.T) {
 		t.Fatal("unknown phrase matched")
 	}
 }
+
+func TestVoiceCacheSkipsUnchangedTable(t *testing.T) {
+ body:=`{"revision":"r1","commands":[{"phrases":["свет"],"target":"script.a"}]}`
+ parsed:=0
+ server:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
+  if r.Header.Get("If-None-Match")==`"t1"` {w.WriteHeader(http.StatusNotModified);return}
+  parsed++
+  w.Header().Set("ETag",`"t1"`);w.Write([]byte(body))
+ }))
+ defer server.Close()
+ f:=Functions{URL:server.URL}
+ for range 3 {if err:=f.RefreshVoiceCache(t.Context());err!=nil {t.Fatal(err)}}
+ if parsed!=1 || f.VoicePhraseRevision()!="r1" {t.Fatalf("sent %d tables, revision %q",parsed,f.VoicePhraseRevision())}
+}

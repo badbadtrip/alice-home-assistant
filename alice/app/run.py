@@ -88,7 +88,7 @@ def main():
         if timezone:env['HOME_TIMEZONE']=timezone
         # Manager creates durable state before Home Functions starts reading it.
         children.append(subprocess.Popen([sys.executable,str(root/'manager/service.py')],env={**env,'ALICE_MANAGER_CONFIG':str(data/'manager.json')}))
-        children.append(subprocess.Popen(['node',str(root/'home-functions/node_modules/tsx/dist/cli.mjs'),str(root/'home-functions/src/main.ts')],cwd=root/'home-functions',env=env))
+        children.append(subprocess.Popen(['node',str(root/'home-functions/main.mjs')],cwd=root/'home-functions',env=env))
         print('Алиса запущена. Откройте веб-интерфейс и Wiki. Установка мостов требует настроенного advertised_url.',flush=True)
         while not stop.wait(1):
             if any(child.poll() is not None for child in children):raise RuntimeError('Один из сервисов остановлен')

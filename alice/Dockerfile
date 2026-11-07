@@ -26,14 +26,15 @@ RUN npm install -g pnpm@10.23.0
 COPY server/package.json server/pnpm-lock.yaml server/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY server/ ./
-RUN pnpm lint && pnpm typecheck && pnpm test
+RUN pnpm lint && pnpm typecheck && pnpm test && pnpm build
 
 FROM node:25-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv openssh-client ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
  && python3 -m venv /app/venv \
  && /app/venv/bin/pip install --no-cache-dir 'websockets>=15.0.1,<16'
-COPY --from=dependencies /app/home-functions /app/home-functions
+# Only the bundled server ships; its build tools stay in the build stage.
+COPY --from=dependencies /app/home-functions/dist/main.mjs /app/home-functions/main.mjs
 COPY --from=bridge /quasar-bridge /app/artifacts/quasar-bridge
 COPY --from=ytm /ytm-alice.tar.gz /app/artifacts/ytm-alice.tar.gz
 COPY bridge/LICENSE bridge/NOTICE bridge/THIRD_PARTY_NOTICES /app/artifacts/

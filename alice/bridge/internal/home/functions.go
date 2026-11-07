@@ -68,6 +68,14 @@ type FunctionPlan struct {
 }
 
 func (f *Functions) request(ctx context.Context, method, path string, body, result any) error {
+	return f.requestTagged(ctx, method, path, body, result, nil)
+}
+
+// errNotModified means the server still has what this speaker holds.
+var errNotModified = errors.New("not modified")
+
+// requestTagged sends the tag of what the speaker holds; an unchanged answer has no body.
+func (f *Functions) requestTagged(ctx context.Context, method, path string, body, result any, tag *string) error {
 	var input io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -84,6 +92,9 @@ func (f *Functions) request(ctx context.Context, method, path string, body, resu
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+f.Token)
+	if tag != nil && *tag != "" {
+		req.Header.Set("If-None-Match", *tag)
+	}
  req.Header.Set("X-Alice-Speaker", f.SpeakerID)
 	client := f.HTTP
 	if client == nil {
@@ -94,11 +105,17 @@ func (f *Functions) request(ctx context.Context, method, path string, body, resu
 		return errors.New("home-functions connection failed")
 	}
 	defer resp.Body.Close()
+	if tag != nil && resp.StatusCode == http.StatusNotModified {
+		return errNotModified
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("home-functions HTTP %d", resp.StatusCode)
 	}
 	if err = json.NewDecoder(io.LimitReader(resp.Body, 256<<10)).Decode(result); err != nil {
 		return errors.New("invalid home-functions response")
+	}
+	if tag != nil {
+		*tag = resp.Header.Get("ETag")
 	}
 	return nil
 }

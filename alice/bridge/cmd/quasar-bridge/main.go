@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -211,13 +212,6 @@ func main() {
 		engine.Assistant = &assistant.Agent{Client: lc, Tools: tools, MaxRounds: cfg.AssistantTools.MaxRounds, MaxCalls: cfg.AssistantTools.MaxCalls}
 	}
 	// A speaker with its own Spotify client answers playback commands directly.
-	if local := (&soloist.Client{StateDir: "/data/soloist/state"}); ring != nil && local.Available() {
-		ring.AddMusic(func() bool {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			return local.Playing(ctx)
-		})
-	}
 	if local := (&soloist.Client{StateDir: "/data/soloist/state"}); engine.Playback == nil && local.Available() {
 		engine.Playback = local
 	}
@@ -340,6 +334,26 @@ func main() {
 		}
 		return sources
 	}
+	// One look at the players a second serves the state report, the ring and /metrics.
+	var trackMu sync.Mutex
+	var trackAt time.Time
+	var track *nowplaying.Info
+	currentTrack := func(ctx context.Context) *nowplaying.Info {
+		trackMu.Lock()
+		defer trackMu.Unlock()
+		if time.Since(trackAt) > 900*time.Millisecond {
+			track, trackAt = playing.Pick(ctx, playerSources()...), time.Now()
+		}
+		return track
+	}
+	if ring != nil {
+		ring.AddMusic(func() bool {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			info := currentTrack(ctx)
+			return info != nil && info.Status == nowplaying.Playing
+		})
+	}
 	mux := http.NewServeMux()
 	if musicQueue != nil {
 		mux.Handle("/music-stream/", musicQueue)
@@ -374,7 +388,7 @@ func main() {
 				return airPlay.health()
 			}
 			return nil
-		}(), "now_playing": playing.Pick(ctx, playerSources()...)}
+		}(), "now_playing": currentTrack(ctx)}
 	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -422,9 +436,6 @@ func main() {
 	} else {
 		airPlay = control
 		mux.Handle("GET /airplay", control)
-		if ring != nil {
-			ring.AddMusic(func() bool { return control.health()["playing"] == true })
-		}
 		defer control.shutdown()
 		go control.resume()
 	}
@@ -441,7 +452,7 @@ func main() {
 			players["youtube_music"] = youtube.Now
 		}
 		return metrics.Snapshot{Status: "ok", SpeakerID: os.Getenv("QUASAR_HOME_SPEAKER_ID"), BridgeUptimeS: int64(time.Since(started).Seconds()),
-			System: metrics.Device.System(), NowPlaying: playing.Pick(ctx, playerSources()...), Players: metrics.Players(ctx, players)}
+			System: metrics.Device.System(), NowPlaying: currentTrack(ctx), Players: metrics.Players(ctx, players)}
 	}
 	mux.Handle("GET /metrics", metrics.Handler("", snapshot))
 	if token := os.Getenv("QUASAR_HOME_FUNCTIONS_TOKEN"); token != "" {

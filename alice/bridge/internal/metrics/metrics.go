@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"quasarbridge/internal/nowplaying"
@@ -28,7 +29,23 @@ type System struct {
 	DataTotalKB    int64    `json:"data_total_kb"`
 	DataFreeKB     int64    `json:"data_free_kb"`
 	TempC          *float64 `json:"temp_c"`
+	// Rates since the previous reading; nil on the first one.
+	CPUPercent  *float64 `json:"cpu_pct"`
+	NetRxBps    *float64 `json:"net_rx_bps"`
+	NetTxBps    *float64 `json:"net_tx_bps"`
+	BridgeRSSKB int64    `json:"bridge_rss_kb"`
 }
+
+type counters struct {
+	at          time.Time
+	busy, total uint64
+	rx, tx      uint64
+}
+
+var (
+	previousMu sync.Mutex
+	previous   = map[string]counters{}
+)
 
 type Snapshot struct {
 	Status        string                      `json:"status"`
@@ -81,6 +98,14 @@ func (r Root) System() System {
 		file.Close()
 	}
 	s.DataTotalKB, s.DataFreeKB = diskKB(r.Data)
+	r.rates(&s)
+	if raw, err := os.ReadFile(filepath.Join(r.Proc, "self/status")); err == nil {
+		for line := range strings.Lines(string(raw)) {
+			if fields := strings.Fields(line); len(fields) > 1 && fields[0] == "VmRSS:" {
+				s.BridgeRSSKB, _ = strconv.ParseInt(fields[1], 10, 64)
+			}
+		}
+	}
 	// The hottest zone is what matters for throttling.
 	zones, _ := filepath.Glob(filepath.Join(r.Sys, "class/thermal/thermal_zone*/temp"))
 	for _, zone := range zones {
@@ -98,6 +123,50 @@ func (r Root) System() System {
 		}
 	}
 	return s
+}
+
+// rates turns the kernel's running counters into CPU load and network speed.
+func (r Root) rates(s *System) {
+	now := counters{at: time.Now()}
+	if raw, err := os.ReadFile(filepath.Join(r.Proc, "stat")); err == nil {
+		line, _, _ := strings.Cut(string(raw), "\n")
+		if fields := strings.Fields(line); len(fields) > 4 && fields[0] == "cpu" {
+			for i, field := range fields[1:] {
+				value, _ := strconv.ParseUint(field, 10, 64)
+				now.total += value
+				if i != 3 && i != 4 { // idle and iowait
+					now.busy += value
+				}
+			}
+		}
+	}
+	if raw, err := os.ReadFile(filepath.Join(r.Proc, "net/dev")); err == nil {
+		for line := range strings.Lines(string(raw)) {
+			name, rest, ok := strings.Cut(line, ":")
+			name = strings.TrimSpace(name)
+			if !ok || name == "lo" {
+				continue
+			}
+			if fields := strings.Fields(rest); len(fields) > 8 {
+				rx, _ := strconv.ParseUint(fields[0], 10, 64)
+				tx, _ := strconv.ParseUint(fields[8], 10, 64)
+				now.rx, now.tx = now.rx+rx, now.tx+tx
+			}
+		}
+	}
+	previousMu.Lock()
+	last, ok := previous[r.Proc]
+	previous[r.Proc] = now
+	previousMu.Unlock()
+	if !ok || now.total <= last.total {
+		return
+	}
+	cpu := float64(now.busy-last.busy) / float64(now.total-last.total) * 100
+	s.CPUPercent = &cpu
+	if seconds := now.at.Sub(last.at).Seconds(); seconds > 0 && now.rx >= last.rx && now.tx >= last.tx {
+		rx, tx := float64(now.rx-last.rx)/seconds, float64(now.tx-last.tx)/seconds
+		s.NetRxBps, s.NetTxBps = &rx, &tx
+	}
 }
 
 // Players asks each source on its own so a quiet player still shows its state.

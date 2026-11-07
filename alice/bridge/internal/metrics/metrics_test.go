@@ -35,6 +35,28 @@ func TestSystemReadsProcAndHottestZone(t *testing.T) {
 	}
 }
 
+func TestRatesFollowCounters(t *testing.T) {
+	dir := t.TempDir()
+	root := Root{Proc: filepath.Join(dir, "proc"), Sys: dir, Data: dir}
+	write(t, filepath.Join(dir, "proc/stat"), "cpu  100 0 100 700 100 0 0 0\n")
+	write(t, filepath.Join(dir, "proc/net/dev"), `x|
+ y|
+    lo: 999 0 0 0 0 0 0 0 999
+ wlan0: 1000 0 0 0 0 0 0 0 500
+`)
+	if s := root.System(); s.CPUPercent != nil {
+		t.Fatal("first reading has no rate")
+	}
+	write(t, filepath.Join(dir, "proc/stat"), "cpu  150 0 150 700 100 0 0 0\n")
+	s := root.System()
+	if s.CPUPercent == nil || *s.CPUPercent != 100 {
+		t.Fatalf("cpu %v", s.CPUPercent)
+	}
+	if s.NetRxBps == nil || *s.NetRxBps != 0 {
+		t.Fatalf("rx %v", s.NetRxBps)
+	}
+}
+
 func TestHandlerNeedsTheToken(t *testing.T) {
 	handler := Handler("secret", func(context.Context) Snapshot { return Snapshot{Status: "ok"} })
 	request := httptest.NewRequest(http.MethodGet, "/metrics", nil)

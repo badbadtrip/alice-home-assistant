@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import gzip
 import http.client
 import io
 import ipaddress
@@ -49,7 +50,9 @@ def metrics_state(value, speaker_id):
     return {'uptime_s': number('uptime_s', 10**9), 'load_1m': number('load_1m', 1000), 'cpus': number('cpus', 256),
             'mem_total_kb': number('mem_total_kb', 10**9), 'mem_available_kb': number('mem_available_kb', 10**9),
             'data_total_kb': number('data_total_kb', 10**10), 'data_free_kb': number('data_free_kb', 10**10),
-            'temp_c': number('temp_c', 200)}
+            'temp_c': number('temp_c', 200), 'cpu_pct': number('cpu_pct', 100),
+            'net_rx_bps': number('net_rx_bps', 10**10), 'net_tx_bps': number('net_tx_bps', 10**10),
+            'bridge_rss_kb': number('bridge_rss_kb', 10**8)}
 
 
 def now_playing_state(value):
@@ -256,6 +259,9 @@ class Manager:
         self.state_revision = 0
         self.pushed_seen = {}
         self.polled_at = {}
+        self.history_lock = threading.Lock()
+        self.history = self._load_history()
+        self.history_saved = time.monotonic()
         self.monitor_stop = threading.Event()
         self.monitor_thread = None
         self.airplay_next_check = 0.0
@@ -461,6 +467,50 @@ class Manager:
             return current  # HA being away must not mark the speaker offline.
         return stock if stock and (not current or stock['status'] == 'playing') else current
 
+    # One sample per speaker every 30 seconds, kept for a day: about 2900 short rows each.
+    HISTORY_STEP = 30
+    HISTORY_SPAN = 86400
+    HISTORY_FIELDS = ('t', 'cpu_pct', 'load_1m', 'mem_used_kb', 'mem_total_kb', 'temp_c', 'data_used_kb', 'data_total_kb', 'net_rx_bps', 'net_tx_bps', 'bridge_rss_kb')
+
+    def _load_history(self):
+        try:
+            value = json.loads((self.store.directory / 'metrics-history.json').read_text(encoding='utf-8'))
+            return {key: rows for key, rows in value.items() if isinstance(key, str) and isinstance(rows, list)} if isinstance(value, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def _record_metrics(self, speaker_id, metrics, now):
+        if not isinstance(metrics, dict):
+            return
+        total, free = metrics.get('mem_total_kb'), metrics.get('mem_available_kb')
+        disk, left = metrics.get('data_total_kb'), metrics.get('data_free_kb')
+        row = [int(now), metrics.get('cpu_pct'), metrics.get('load_1m'),
+               total - free if total is not None and free is not None else None, total,
+               metrics.get('temp_c'), disk - left if disk is not None and left is not None else None, disk,
+               metrics.get('net_rx_bps'), metrics.get('net_tx_bps'), metrics.get('bridge_rss_kb')]
+        row = [round(v, 1) if isinstance(v, float) else v for v in row]
+        with self.history_lock:
+            rows = self.history.setdefault(speaker_id, [])
+            if rows and now - rows[-1][0] < self.HISTORY_STEP:
+                return
+            rows.append(row)
+            while rows and now - rows[0][0] > self.HISTORY_SPAN:
+                rows.pop(0)
+            if time.monotonic() - self.history_saved < 300:
+                return
+            self.history_saved = time.monotonic()
+            snapshot = {key: list(value) for key, value in self.history.items()}
+        try:
+            atomic_json(self.store.directory / 'metrics-history.json', snapshot)
+        except OSError:
+            pass
+
+    def metrics_history(self):
+        known = {speaker['id'] for speaker in self.store.read('speakers.json')}
+        with self.history_lock:
+            return {'fields': list(self.HISTORY_FIELDS), 'step': self.HISTORY_STEP,
+                    'speakers': {key: list(rows) for key, rows in self.history.items() if key in known}}
+
     def wait_state(self, revision, timeout=12):
         # Install and update progress is written to the registry, so a change there wakes the panel too.
         registry = self.store.directory / 'speakers.json'
@@ -511,6 +561,8 @@ class Manager:
             return
         with self.connection_lock:
             self.connections[speaker['id']] = {'identity': identity, 'value': value}
+        if value.get('status') == 'online':
+            self._record_metrics(speaker['id'], value.get('metrics'), time.time())
         quiet = ('checked_at', 'latency_ms', 'last_seen', 'metrics')
         if {k: v for k, v in value.items() if k not in quiet} != {k: v for k, v in previous.get('value', {}).items() if k not in quiet}:
             with self.state_cond:
@@ -521,6 +573,12 @@ class Manager:
         env_path = Path(self.config.get('home_functions_env', '/nonexistent/alice-functions.env'))
         if env_path.is_symlink() or not env_path.is_file() or env_path.stat().st_mode & 0o077:
             raise Error('Серверные реквизиты Home Functions недоступны.', 503)
+        # Read every second by the monitor; parsed again only when the file changes.
+        info = env_path.stat()
+        stamp = (str(env_path), getattr(info, 'st_mtime_ns', None), getattr(info, 'st_size', None))
+        cached = getattr(self, '_hf_token_cache', None)
+        if cached and cached[0] == stamp:
+            return cached[1]
         token = None
         for line in env_path.read_text().splitlines():
             key, sep, value = line.partition('=')
@@ -532,6 +590,7 @@ class Manager:
                     token = None
         if not token or any(ord(c) < 33 or ord(c) > 126 for c in token):
             raise Error('Серверные реквизиты Home Functions недоступны.', 503)
+        self._hf_token_cache = (stamp, token)
         return token
 
     def _hf_request(self, path, speaker=None, payload=None):
@@ -1099,7 +1158,10 @@ class Manager:
         self.ssh(speaker, 'umask 077; test -f ' + DEVICE + '/bin/quasar-bridge && test ! -L ' + DEVICE + '/bin/quasar-bridge && mkdir ' + backup
                  + ' && ln ' + DEVICE + '/bin/quasar-bridge ' + backup + '/quasar-bridge && cp -p ' + DEVICE + '/config.json ' + DEVICE + '/runtime.env ' + DEVICE + '/manifest.json ' + backup + '/')
         try:
-            self.ssh(speaker, 'umask 077; cat > ' + DEVICE + '/bin/quasar-bridge' + suffix + ' && chmod 700 ' + DEVICE + '/bin/quasar-bridge' + suffix, binary, timeout=90)
+            # Compressed, the binary travels in about a third of the time; the hash below checks the result.
+            packed = b'gunzip' in self.ssh(speaker, 'command -v gunzip || true')
+            self.ssh(speaker, 'umask 077; ' + ('gunzip -c' if packed else 'cat') + ' > ' + DEVICE + '/bin/quasar-bridge' + suffix + ' && chmod 700 ' + DEVICE + '/bin/quasar-bridge' + suffix,
+                     gzip.compress(binary, 6) if packed else binary, timeout=90)
             self.ssh(speaker, 'umask 077; cat > ' + DEVICE + '/runtime.env' + suffix, runtime.encode())
             uploaded = self.ssh(speaker, 'sha256sum ' + DEVICE + '/bin/quasar-bridge' + suffix).decode().split()[0]
             if uploaded != hashlib.sha256(binary).hexdigest():
@@ -1402,6 +1464,8 @@ class Handler(BaseHTTPRequestHandler):
             return 200, manager._hf_request('/music', None, payload)
         if path == ['api', 'phrase-check'] and method == 'POST':
             return 200, manager.phrase_check(payload)
+        if path == ['api', 'metrics'] and method == 'GET':
+            return 200, manager.metrics_history()
         if path == ['api', 'activity'] and method == 'GET':
             return 200, manager._hf_request('/events')
         if path == ['api', 'auto-update'] and method == 'POST':

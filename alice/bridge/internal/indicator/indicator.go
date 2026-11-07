@@ -160,6 +160,13 @@ type Controller struct {
 	active   int
 	sources  []func() bool
 	reported atomic.Bool
+	once     sync.Once
+	wake     chan struct{}
+}
+
+func (c *Controller) wakeup() chan struct{} {
+	c.once.Do(func() { c.wake = make(chan struct{}, 1) })
+	return c.wake
 }
 
 // AddMusic adds a player that can say for itself whether it is playing.
@@ -198,6 +205,11 @@ func (c *Controller) Begin() func() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.active++
+	// A dark ring sleeps between checks; thinking must light it at once.
+	select {
+	case c.wakeup() <- struct{}{}:
+	default:
+	}
 	var once sync.Once
 	return func() {
 		once.Do(func() {
@@ -294,8 +306,10 @@ func (c *Controller) Serve(ctx context.Context) {
 		return
 	}
 	started := time.Now()
-	ticker := time.NewTicker(16 * time.Millisecond)
-	defer ticker.Stop()
+	// Frames run at 60 per second only while something shows; a dark ring wakes once a second.
+	const frame = 16 * time.Millisecond
+	timer := time.NewTimer(0)
+	defer timer.Stop()
 	var cfg Config
 	var gate musicGate
 	var nextCheck time.Time
@@ -313,26 +327,33 @@ func (c *Controller) Serve(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case now := <-ticker.C:
-			if now.After(nextCheck) {
-				nextCheck = now.Add(time.Second)
-				cfg, allowed = c.load(), unmuted()
-				card := gate.update(audioPlaying())
-				go func() { sourced.Store(c.sourcePlaying()) }()
-				playing = card || sourced.Load()
-			}
-			look, ok := pick(cfg, c.thinking(), playing)
-			switch {
-			case ok && allowed:
-				_ = led.show(soft.next(look.Render(now.Sub(started), led.size)))
-				lit = true
-			case lit:
-				frame := soft.next(off)
-				if soft.dark() {
-					frame, lit = black, false
-				}
-				_ = led.show(frame)
-			}
+		case <-timer.C:
+		case <-c.wakeup():
 		}
+		now := time.Now()
+		if now.After(nextCheck) {
+			nextCheck = now.Add(time.Second)
+			cfg, allowed = c.load(), unmuted()
+			card := gate.update(audioPlaying())
+			go func() { sourced.Store(c.sourcePlaying()) }()
+			playing = card || sourced.Load()
+		}
+		look, ok := pick(cfg, c.thinking(), playing)
+		switch {
+		case ok && allowed:
+			_ = led.show(soft.next(look.Render(now.Sub(started), led.size)))
+			lit = true
+		case lit:
+			dim := soft.next(off)
+			if soft.dark() {
+				dim, lit = black, false
+			}
+			_ = led.show(dim)
+		}
+		delay := frame
+		if !lit {
+			delay = max(frame, time.Until(nextCheck))
+		}
+		timer.Reset(delay)
 	}
 }

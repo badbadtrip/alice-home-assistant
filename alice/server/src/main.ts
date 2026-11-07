@@ -344,7 +344,7 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     if (local.length > 0) commands.push({ enabled: true, phrases: local, target: 'script.alice_local_dictionary' })
     const revision = createHash('sha256').update(JSON.stringify(commands)).digest('hex').slice(0, 16)
     const music = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
-    response.json({
+    const body = JSON.stringify({
       commands,
       device_names: deviceVoiceNames(allowed),
       music_provider: music.provider,
@@ -354,6 +354,10 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
       revision,
       routing: await publishedRouting()
     })
+    // Speakers ask every few seconds; an unchanged table goes back without a body.
+    const tag = '"' + createHash('sha256').update(body).digest('hex').slice(0, 32) + '"'
+    if (request.get('if-none-match') === tag) { response.status(304).end(); return }
+    response.set('ETag', tag).type('application/json').send(body)
   })
 
   /**

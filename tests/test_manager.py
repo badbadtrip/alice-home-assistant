@@ -446,6 +446,16 @@ class ManagerTests(unittest.TestCase):
         ssh.assert_not_called()
         self.assertEqual(connection['status'], 'offline')
 
+    def test_metrics_history_keeps_one_sample_per_step(self):
+        metrics = {'cpu_pct': 12.34, 'mem_total_kb': 1000, 'mem_available_kb': 400, 'data_total_kb': 50, 'data_free_kb': 20, 'temp_c': 51.0}
+        for at in (1000, 1010, 1031, 1000 + 86400):
+            self.manager._record_metrics(self.speaker['id'], metrics, at)
+        rows = self.manager.metrics_history()['speakers'][self.speaker['id']]
+        self.assertEqual([row[0] for row in rows], [1000, 1031, 87400])
+        self.assertEqual(rows[0][1], 12.3)
+        self.assertEqual(rows[0][3], 600)
+        self.assertEqual(rows[0][6], 30)
+
     def test_monitor_skips_untrusted_and_busy_install_then_stales_without_network_get(self):
         with patch.object(self.manager, 'ssh') as ssh:
             self.manager.monitor_cycle()

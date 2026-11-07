@@ -30,6 +30,7 @@ type voicePhraseCache struct {
  snapshot atomic.Pointer[voicePhraseSnapshot]
  once sync.Once
  routing atomic.Pointer[[sha256.Size]byte]
+ tag atomic.Pointer[string]
 }
 
 func normalizeVoicePhrase(text string) string {
@@ -136,7 +137,13 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
   MusicProvider string `json:"music_provider"`
   RelayRooms []string `json:"relay_rooms"`
  }
- if err:=f.request(ctx,http.MethodGet,"/voice-phrases",nil,&response);err!=nil {return err}
+ // The table is only parsed when it changed; a weak speaker skips thousands of phrases.
+ tag:=""
+ if held:=f.voice.tag.Load();held!=nil {tag=*held}
+ if err:=f.requestTagged(ctx,http.MethodGet,"/voice-phrases",nil,&response,&tag);err!=nil {
+  if errors.Is(err,errNotModified) {return nil}
+  return err
+ }
  if response.Revision=="" {return errors.New("incomplete voice table")}
  if len(response.Commands)>1000 {return errors.New("voice table exceeds limit")}
  phrases:=map[string]bool{}
@@ -166,6 +173,7 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  if previous==nil || previous.Revision!=response.Revision {
   slog.Info("voice_phrase_cache_updated","phrases",len(phrases),"revision",response.Revision)
  }
+ f.voice.tag.Store(&tag)
  return nil
 }
 

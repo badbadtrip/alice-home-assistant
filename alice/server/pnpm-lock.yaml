@@ -8,45 +8,49 @@ importers:
 
   .:
     dependencies:
-      '@bksp/style-guide':
-        specifier: ^1.5.0
-        version: 1.10.0(eslint@9.39.5)(typescript@5.9.3)
       '@digital-alchemy/core':
         specifier: ^26.6.21
         version: 26.10.22(zod@4.6.7)
       '@digital-alchemy/hass':
         specifier: ^26.8.18
         version: 26.8.18(@digital-alchemy/core@26.10.22(zod@4.6.7))
-      '@types/express':
-        specifier: ^5.0.3
-        version: 5.0.6
       '@v3rt3p/types':
         specifier: github:v3rt3p/types#1.0.16
         version: https://codeload.github.com/v3rt3p/types/tar.gz/ab7dc469f9ee086c5c2b2c8b7873e23d93490594
       dotenv:
         specifier: ^17.2.0
         version: 17.4.2
-      eslint:
-        specifier: ^9.31.0
-        version: 9.39.5
       express:
         specifier: ^5.1.0
         version: 5.3.0
       tslog:
         specifier: ^4.9.3
         version: 4.11.0
-      tsx:
-        specifier: ^4.20.3
-        version: 4.23.15
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
       yaml:
         specifier: ^2.8.0
         version: 2.9.1
       zod:
         specifier: ^4.0.5
         version: 4.6.7
+    devDependencies:
+      '@bksp/style-guide':
+        specifier: ^1.5.0
+        version: 1.10.0(eslint@9.39.5)(typescript@5.9.3)
+      '@types/express':
+        specifier: ^5.0.3
+        version: 5.0.6
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      eslint:
+        specifier: ^9.31.0
+        version: 9.39.5
+      tsx:
+        specifier: ^4.20.3
+        version: 4.23.15
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
 
 packages:
 

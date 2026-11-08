@@ -15,6 +15,9 @@ type Custom struct {
 	YouTube  []string
 	Relay    []string
 	Commands map[string][]string
+	// Replace means the lists are the whole phrase base from the server: the built-in
+	// patterns step aside, so a phrase switched off in the panel is off here too.
+	Replace bool
 }
 
 var custom atomic.Pointer[Custom]
@@ -24,13 +27,18 @@ func SetCustom(c Custom) {
 	clean := func(list []string) []string {
 		out := make([]string, 0, len(list))
 		for _, item := range list {
-			if item = normalize(item); item != "" {
+			// "*" marks a word ending; normalize would drop it as punctuation.
+			stem := strings.HasSuffix(item, "*")
+			if item = normalize(strings.TrimSuffix(item, "*")); item != "" {
+				if stem {
+					item += "*"
+				}
 				out = append(out, item)
 			}
 		}
 		return out
 	}
-	next := Custom{Spotify: clean(c.Spotify), YouTube: clean(c.YouTube), Relay: clean(c.Relay), Commands: map[string][]string{}}
+	next := Custom{Spotify: clean(c.Spotify), YouTube: clean(c.YouTube), Relay: clean(c.Relay), Commands: map[string][]string{}, Replace: c.Replace}
 	for action, list := range c.Commands {
 		next.Commands[action] = clean(list)
 	}
@@ -38,6 +46,32 @@ func SetCustom(c Custom) {
 }
 
 var servicePrepositions = []string{"в", "на", "из", "через", "по"}
+
+// wordsAt reports whether phrase matches text word by word from the start; a phrase word
+// ending in "*" matches any ending.
+func wordsAt(text, phrase []string) bool {
+	if len(text) < len(phrase) {
+		return false
+	}
+	for i, word := range phrase {
+		if stem, ok := strings.CutSuffix(word, "*"); ok {
+			if !strings.HasPrefix(text[i], stem) {
+				return false
+			}
+		} else if text[i] != word {
+			return false
+		}
+	}
+	return true
+}
+
+func replacing() *Custom {
+	if c := custom.Load(); c != nil && c.Replace {
+		return c
+	}
+	return nil
+}
+
 var searchHead = regexp.MustCompile(`^(?:включи|поставь|запусти|сыграй|играй|найди)(?: мне)? `)
 
 var commands = []struct {
@@ -119,25 +153,29 @@ func service(text string) (string, string) {
 		}
 		return "youtube"
 	}
-	if match := serviceTail.FindStringSubmatch(text); match != nil {
-		return serviceTail.ReplaceAllString(text, ""), provider(match)
-	}
-	if match := serviceHead.FindStringSubmatch(text); match != nil {
-		return strings.Fields(text)[0] + " " + strings.TrimPrefix(text, match[0]), provider(match)
+	if replacing() == nil {
+		if match := serviceTail.FindStringSubmatch(text); match != nil {
+			return serviceTail.ReplaceAllString(text, ""), provider(match)
+		}
+		if match := serviceHead.FindStringSubmatch(text); match != nil {
+			return strings.Fields(text)[0] + " " + strings.TrimPrefix(text, match[0]), provider(match)
+		}
 	}
 	if c := custom.Load(); c != nil {
+		words := strings.Fields(text)
+		head := len(strings.Fields(searchHead.FindString(text)))
 		for _, named := range []struct {
 			provider string
 			names    []string
 		}{{"spotify", c.Spotify}, {"youtube", c.YouTube}} {
 			for _, name := range named.names {
 				for _, preposition := range servicePrepositions {
-					said := preposition + " " + name
-					if strings.HasSuffix(text, " "+said) {
-						return strings.TrimSuffix(text, " "+said), named.provider
+					said := append([]string{preposition}, strings.Fields(name)...)
+					if len(words) > len(said) && wordsAt(words[len(words)-len(said):], said) {
+						return strings.Join(words[:len(words)-len(said)], " "), named.provider
 					}
-					if head := searchHead.FindString(text); head != "" && strings.HasPrefix(text[len(head):], said+" ") {
-						return strings.Fields(text)[0] + " " + text[len(head)+len(said)+1:], named.provider
+					if head > 0 && len(words) > head+len(said) && wordsAt(words[head:], said) {
+						return words[0] + " " + strings.Join(words[head+len(said):], " "), named.provider
 					}
 				}
 			}
@@ -169,15 +207,17 @@ var relayAsk = regexp.MustCompile(`^(?:скажи|передай)(?: на| в| �
 // The message stays word for word: "что покушать" loses its meaning without "что".
 func Relay(text string) (room, message string, ok bool) {
 	text = normalize(text)
-	if match := relayAsk.FindStringSubmatch(text); match != nil {
-		return match[1], match[2], true
+	if replacing() == nil {
+		if match := relayAsk.FindStringSubmatch(text); match != nil {
+			return match[1], match[2], true
+		}
 	}
 	if c := custom.Load(); c != nil {
+		words := strings.Fields(text)
 		for _, verb := range c.Relay {
-			if rest, found := strings.CutPrefix(text, verb+" "); found {
-				if room, message, found := strings.Cut(rest, " "); found && message != "" {
-					return room, message, true
-				}
+			said := strings.Fields(verb)
+			if len(words) > len(said)+1 && wordsAt(words, said) {
+				return words[len(said)], strings.Join(words[len(said)+1:], " "), true
 			}
 		}
 	}
@@ -198,15 +238,18 @@ func playlistName(name string) string {
 
 func Command(text string) string {
 	text = normalize(text)
+	full := replacing()
 	for _, c := range commands {
-		if c.pattern.MatchString(text) {
+		// With the server's base only "restart" stays built in: it has no list of its own.
+		if (full == nil || c.action == "restart") && c.pattern.MatchString(text) {
 			return c.action
 		}
 	}
 	if c := custom.Load(); c != nil {
+		words := strings.Fields(text)
 		for action, phrases := range c.Commands {
 			for _, phrase := range phrases {
-				if text == phrase {
+				if said := strings.Fields(phrase); len(said) == len(words) && wordsAt(words, said) {
 					return action
 				}
 			}

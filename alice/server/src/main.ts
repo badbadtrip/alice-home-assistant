@@ -18,7 +18,7 @@ import { executeFunction } from './execution'
 import { createHomeAssistantApi, HomeAssistantApi } from './home-assistant'
 import { getLogger } from './logger'
 import { MusicSettingsSchema, readMusicSettings, writeMusicSettings } from './music'
-import { bridgePhrases, ownRules, PhrasesSchema } from './phrases'
+import { bridgePhrases, BUILTIN, keptRules, phraseRules, PhrasesSchema, ruleList } from './phrases'
 import { previewCommand } from './preview'
 import { callReadTool, READ_TOOLS } from './read-tools'
 import { readSpeakers, RelayRequestSchema, relayRooms, relaySpeaker, relayText } from './relay'
@@ -225,19 +225,28 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
   })
 
   // Speaker upgrades keep their own config, so routes reach them with this table.
-  const publishedRouting = async (): Promise<unknown> => {
+  const shippedRules = async (): Promise<undefined | { rules?: unknown[] }> => {
     if (!process.env.ALICE_ROUTING_PATH) return undefined
     try {
       const config = JSON.parse(await readFile(process.env.ALICE_ROUTING_PATH, 'utf8')) as { routing?: { rules?: unknown[] } }
-      if (!config.routing) return undefined
-      const { phrases } = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
-      return { ...config.routing, rules: [...ownRules(phrases), ...(config.routing.rules ?? [])] }
+      return config.routing
     } catch { return undefined }
   }
-  // The panel edits the owner's phrases; the routing comes along so it can tell where a phrase goes.
-  app.get('/phrases', async (_, response) => {
+  const publishedRouting = async (): Promise<unknown> => {
+    const routing = await shippedRules()
+    if (!routing) return undefined
     const { phrases } = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
-    response.json({ ...phrases, routing: await publishedRouting() })
+    return { ...routing, rules: [...phraseRules(phrases), ...keptRules(routing.rules ?? [], phrases)] }
+  }
+  // The panel shows the whole base: built-ins, the owner's edits and the rules, with the routing for hints.
+  const phraseBase = async (): Promise<unknown> => {
+    const { phrases } = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
+    const routing = await shippedRules()
+    const rules = ruleList(routing?.rules ?? [], phrases)
+    return { ...phrases, builtin: BUILTIN, routing: await publishedRouting(), rules }
+  }
+  app.get('/phrases', async (_, response) => {
+    response.json(await phraseBase())
   })
   app.post('/phrases', async (request, response) => {
     const parsed = PhrasesSchema.safeParse(request.body)
@@ -245,7 +254,7 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     try {
       const settings = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
       await writeMusicSettings(process.env.ALICE_MUSIC_PATH, { ...settings, phrases: parsed.data })
-      response.json({ ...parsed.data, routing: await publishedRouting() })
+      response.json(await phraseBase())
     } catch { response.status(503).json({ error: 'Не удалось сохранить фразы.' }) }
   })
   app.get('/music', async (_, response) => {

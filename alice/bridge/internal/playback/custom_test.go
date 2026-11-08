@@ -21,3 +21,23 @@ func TestCustomWordsExtendBuiltIns(t *testing.T) {
 		t.Fatal("built-in name lost")
 	}
 }
+
+func TestServerBaseReplacesBuiltIns(t *testing.T) {
+	SetCustom(Custom{Replace: true, Spotify: []string{"спотифа*"}, YouTube: []string{"ютуб*"}, Relay: []string{"передай в"}, Commands: map[string][]string{"pause": {"пауза"}, "stop": {"хватит"}}})
+	defer custom.Store(nil)
+	if _, _, provider, _ := Search("включи кино в ютубе"); provider != "youtube" {
+		t.Fatal("stem lost")
+	}
+	if _, _, provider, _ := Search("включи кино в spotify"); provider != "" {
+		t.Fatal("switched-off name still heard")
+	}
+	if Command("стоп") != "" || Command("хватит") != "stop" || Command("начни сначала") != "restart" {
+		t.Fatal("commands must follow the base, restart stays")
+	}
+	if _, _, ok := Relay("скажи на кухню привет"); ok {
+		t.Fatal("switched-off intercom word still heard")
+	}
+	if room, _, ok := Relay("передай в кухню привет"); !ok || room != "кухню" {
+		t.Fatal("intercom word from the base")
+	}
+}

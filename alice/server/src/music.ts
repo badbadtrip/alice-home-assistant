@@ -16,7 +16,7 @@ const SpotifyPlaylist = z.object({ name: z.string().trim().min(1).max(80), uri: 
 
 // "spotify" is the older name of the alternative sources; anything else is stock music.
 export const MusicSettingsSchema = z.object({
-  phrases: PhrasesSchema.default({ items: [], replies: {} }),
+  phrases: PhrasesSchema.default({ disabled: [], disabled_rules: [], items: [], replies: {} }),
   provider: z.preprocess(value => value === 'youtube' ? value : 'spotify', z.enum(['spotify', 'youtube'])),
   relay_intro: z.string().trim().max(100).default(''),
   source: z.preprocess(

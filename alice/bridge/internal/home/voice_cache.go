@@ -137,6 +137,7 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
    YouTube []string `json:"youtube"`
    Relay []string `json:"relay"`
    Commands map[string][]string `json:"commands"`
+   Replace bool `json:"replace"`
    Replies map[string]string `json:"replies"`
   } `json:"phrases"`
   Playlists []playback.Playlist `json:"playlists"`
@@ -178,7 +179,7 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names,Playlists:response.Playlists,MusicSource:response.MusicSource,RelayRooms:response.RelayRooms,MusicProvider:response.MusicProvider})
  f.applyRouting(response.Routing)
  // The owner's words and replies arrive with the table; an old server sends none.
- playback.SetCustom(playback.Custom{Spotify:response.Phrases.Spotify,YouTube:response.Phrases.YouTube,Relay:response.Phrases.Relay,Commands:response.Phrases.Commands})
+ playback.SetCustom(playback.Custom{Spotify:response.Phrases.Spotify,YouTube:response.Phrases.YouTube,Relay:response.Phrases.Relay,Commands:response.Phrases.Commands,Replace:response.Phrases.Replace})
  if f.OnReplies!=nil {f.OnReplies(response.Phrases.Replies)}
  if previous==nil || previous.Revision!=response.Revision {
   slog.Info("voice_phrase_cache_updated","phrases",len(phrases),"revision",response.Revision)

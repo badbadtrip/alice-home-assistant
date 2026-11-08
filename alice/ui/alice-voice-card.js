@@ -320,6 +320,13 @@ main{max-width:1360px;padding:0 24px 48px}
 .phrase-item button.icon{width:32px;height:32px;min-height:32px;color:var(--muted)}
 .badge[data-kind=ai]{color:#b9a3ff}.badge[data-kind=alice]{color:#ffcc00}.badge[data-kind=music]{color:#1ed760}.badge[data-kind=player]{color:var(--accent)}.badge[data-kind=relay]{color:#f2b7d3}
 .phrase-empty{padding:14px 4px}
+.phrase-item.is-off b,.phrase-item.is-off small{opacity:.5}.phrase-item.is-off .badge{opacity:.45}
+.phrase-switch{position:relative;flex:none;width:40px;height:24px;min-height:0;padding:0;border-radius:999px;background:var(--tint-strong)}
+.phrase-switch i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:transform .15s ease,background .15s ease}
+.phrase-switch[aria-checked=true]{background:var(--accent-tint)}.phrase-switch[aria-checked=true] i{transform:translateX(16px);background:var(--accent)}
+.badge[data-kind=rule]{color:var(--muted)}
+.phrase-list{max-height:520px;overflow:auto}
+
 .phrase-foot{margin-top:8px}
 .reply-list{display:flex;flex-direction:column;gap:2px;margin-top:10px;border-radius:14px;overflow:hidden}
 .reply-row{display:grid;grid-template-columns:minmax(160px,240px) minmax(0,1fr);align-items:center;gap:12px;padding:8px 10px;background:var(--tint);margin:0}
@@ -576,7 +583,7 @@ button:active:not(:disabled){transform:scale(.97)}
         if(e.key==='Escape'&&this._speakerDialog&&!this._busy){this._speakerDialog=false;this._render();}
       });
       this.shadowRoot.addEventListener('input', e => {
-        if(this._admin?.phrases&&(e.target.dataset?.phraseDraft!==undefined||e.target.dataset?.phraseTarget!==undefined)){const a=this._admin;if(e.target.dataset.phraseTarget!==undefined)a.phraseTarget=e.target.value;else a.phraseDraft=e.target.value;const hint=this.shadowRoot.getElementById('phrase-hint');if(hint)hint.innerHTML=this._phraseHint();return;}if(this._admin?.phrases&&e.target.dataset?.replyKey){const a=this._admin;a.phrases.replies={...a.phrases.replies,[e.target.dataset.replyKey]:e.target.value};clearTimeout(this._replySave);this._replySave=setTimeout(()=>this._savePhrases().catch(error=>{a.message=error.message;this._render();}),600);return;}
+        if(this._admin?.phrases&&(e.target.dataset?.phraseDraft!==undefined||e.target.dataset?.phraseTarget!==undefined)){const a=this._admin;if(e.target.dataset.phraseTarget!==undefined)a.phraseTarget=e.target.value;else a.phraseDraft=e.target.value;const hint=this.shadowRoot.getElementById('phrase-hint');if(hint)hint.innerHTML=this._phraseHint();clearTimeout(this._phraseFilterTimer);this._phraseFilterTimer=setTimeout(()=>this._render(),200);return;}if(this._admin?.phrases&&e.target.dataset?.replyKey){const a=this._admin;a.phrases.replies={...a.phrases.replies,[e.target.dataset.replyKey]:e.target.value};clearTimeout(this._replySave);this._replySave=setTimeout(()=>this._savePhrases().catch(error=>{a.message=error.message;this._render();}),600);return;}
         if(e.target.dataset.journal){this[e.target.dataset.journal==='query'?'_journalQuery':'_journalSpeaker']=e.target.value;this._activityPage=0;const region=this.shadowRoot.getElementById('activity-region');if(region)region.innerHTML=this._activityMarkup();return;}
         if(e.target.id==='admin-search'){this._admin.search=e.target.value;this._admin.page=0;this._renderAdminDevices();return;}
         if(this._admin&&e.target.dataset.deviceField&&e.target.tagName==='INPUT'&&e.target.type!=='checkbox'){this._setAdminEntity(e.target);return;}
@@ -1099,7 +1106,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(['spotify','youtube'].includes(target))return `<span>Скажите: <b>«включи Кино ${['через','в'][target==='spotify'?1:0]} ${escape(draft)}»</b> — заиграет ${target==='spotify'?'Spotify':'YouTube Music'}.</span>`;
       if(target==='relay')return `<span>Скажите: <b>«${escape(draft)} кухню ужин готов»</b> — сообщение прозвучит на кухне.</span>`;
       if(this._phraseTargets()[target][2]==='player')return `<span>Скажите <b>«${escape(draft)}»</b>, пока играет Spotify или YouTube Music.</span>`;
-      const rule=this._routeOf(draft,a.phrases?.routing),where={llm:'в AI',yandex:'Алисе',home:'в умный дом'}[rule.route]??'Алисе',own=String(rule.name).startsWith('owner_');
+      const rule=this._routeOf(draft,a.phrases?.routing),where={llm:'в AI',yandex:'Алисе',home:'в умный дом'}[rule.route]??'Алисе',own=false;
       const next=target==='llm'?'в AI':'Алисе',same=(rule.route==='llm')===(target==='llm');
       return `<span class="badge">${icon(rule.route==='llm'?'creation-outline':rule.route==='home'?'home-outline':'account-voice')}</span><span>Сейчас уходит <b>${where}</b>${own?' по вашей фразе':''}.${same?'':` После добавления пойдёт ${next}.`}</span>`;
     }
@@ -1107,26 +1114,32 @@ button:active:not(:disabled){transform:scale(.97)}
       const a=this._admin;
       if(a.phrases===undefined){a.phrases=null;this._api('/api/phrases').then(value=>{if(this._admin===a){a.phrases=value;this._render();}}).catch(error=>{if(this._admin===a){a.phrases=false;a.phrasesError=error.message;this._render();}});}
       if(!a.phrases)return `<p class="help">${a.phrases===false?escape(a.phrasesError??'Фразы недоступны.'):'Загрузка…'}</p>`;
-      const tab=a.phraseTab??'listen',targets=this._phraseTargets(),items=a.phrases.items??[],filter=a.phraseFilter??'all';
-      const head=`<div class="page-intro"><div><h3>Фразы</h3><p class="help">Свои слова для колонки. Встроенные фразы работают всегда, ваши добавляются к ним.</p></div><div class="seg" role="tablist"><button type="button" role="tab" data-action="admin-phrase-tab" data-tab="listen" aria-selected="${tab==='listen'}">Распознавание</button><button type="button" role="tab" data-action="admin-phrase-tab" data-tab="replies" aria-selected="${tab==='replies'}">Ответы</button></div></div>`;
+      const tab=a.phraseTab??'listen',targets=this._phraseTargets(),filter=a.phraseFilter??'all',p=a.phrases;
+      const head=`<div class="page-intro"><div><h3>Фразы</h3><p class="help">Всё, что колонка понимает: встроенные фразы и ваши. Изменения доходят до колонок за несколько секунд.</p></div><div class="seg" role="tablist"><button type="button" role="tab" data-action="admin-phrase-tab" data-tab="listen" aria-selected="${tab==='listen'}">Распознавание</button><button type="button" role="tab" data-action="admin-phrase-tab" data-tab="replies" aria-selected="${tab==='replies'}">Ответы</button></div></div>`;
       if(tab==='replies'){
-        const rows=this._replyKeys().map(([key,label,text])=>`<label class="reply-row"><span>${label}</span><input data-reply-key="${key}" value="${escape(a.phrases.replies?.[key]??'')}" placeholder="${escape(text)}" maxlength="200" ${blocked}></label>`).join('');
+        const rows=this._replyKeys().map(([key,label,text])=>`<label class="reply-row"><span>${label}</span><input data-reply-key="${key}" value="${escape(p.replies?.[key]??'')}" placeholder="${escape(text)}" maxlength="200" ${blocked}></label>`).join('');
         return `<div class="music-page phrases-page">${head}<section class="group music-card"><p class="help">Пустое поле — стандартный ответ. Сохраняется само.</p><div class="reply-list">${rows}</div></section></div>`;
       }
+      const off=new Set((p.disabled??[]).map(item=>item.target+'|'+item.phrase));
+      const rows=[...(p.items??[]).map((item,index)=>({...item,index,own:true})),...Object.entries(p.builtin??{}).flatMap(([target,list])=>list.map(phrase=>({phrase,target,own:false,on:!off.has(target+'|'+phrase)})))].filter(item=>targets[item.target]);
+      const query=(a.phraseDraft??'').trim().toLowerCase(),group=item=>targets[item.target][2];
       const groups=[['all','Все'],['ai','AI'],['alice','Алисе'],['music','Музыка'],['player','Плеер'],['relay','Интерком']];
-      const count=group=>group==='all'?items.length:items.filter(item=>targets[item.target]?.[2]===group).length;
-      const shown=items.map((item,index)=>({...item,index})).filter(item=>filter==='all'||targets[item.target]?.[2]===filter);
-      const list=shown.length?shown.map(item=>`<div class="phrase-item"><span class="badge" data-kind="${targets[item.target][2]}">${icon(targets[item.target][1])}</span><b>${escape(item.phrase)}</b><small>${targets[item.target][0]}</small><button type="button" class="icon" data-action="admin-phrase-remove" data-index="${item.index}" aria-label="Удалить «${escape(item.phrase)}»" ${blocked}>${icon('close')}</button></div>`).join(''):`<p class="help phrase-empty">${items.length?'В этой группе пока пусто.':'Своих фраз пока нет. Добавьте первую выше.'}</p>`;
+      const count=id=>rows.filter(item=>id==='all'||group(item)===id).length;
+      const shown=rows.filter(item=>(filter==='all'||group(item)===filter)&&(!query||item.phrase.includes(query.replace(/\*$/,''))));
+      const row=item=>`<div class="phrase-item ${item.own||item.on?'':'is-off'}"><span class="badge" data-kind="${group(item)}">${icon(targets[item.target][1])}</span><b>${escape(item.phrase)}</b><small>${targets[item.target][0]}${item.own?'':' · встроенная'}</small>${item.own?`<button type="button" class="icon" data-action="admin-phrase-edit" data-index="${item.index}" aria-label="Изменить «${escape(item.phrase)}»" ${blocked}>${icon('pencil-outline')}</button><button type="button" class="icon" data-action="admin-phrase-remove" data-index="${item.index}" aria-label="Удалить «${escape(item.phrase)}»" ${blocked}>${icon('close')}</button>`:`<button type="button" class="phrase-switch" role="switch" aria-checked="${item.on}" data-action="admin-phrase-builtin" data-target="${item.target}" data-phrase="${escape(item.phrase)}" aria-label="${item.on?'Выключить':'Включить'} «${escape(item.phrase)}»" ${blocked}><i></i></button>`}</div>`;
+      const editing=a.phraseEditing!==undefined;
+      const rules=(p.rules??[]).map(rule=>`<div class="phrase-item ${rule.enabled?'':'is-off'}"><span class="badge" data-kind="rule">${icon('format-list-checks')}</span><b>${escape(rule.label)}</b><button type="button" class="phrase-switch" role="switch" aria-checked="${rule.enabled}" data-action="admin-phrase-rule" data-name="${escape(rule.name)}" aria-label="${rule.enabled?'Выключить':'Включить'} правило" ${blocked}><i></i></button></div>`).join('');
       return `<div class="music-page phrases-page">${head}<section class="group music-card">
-        <div class="phrase-bar"><input data-phrase-draft value="${escape(a.phraseDraft??'')}" placeholder="Например: разузнай в интернете" maxlength="60" autocomplete="off" ${blocked}><select data-phrase-target ${blocked}>${Object.entries(targets).map(([id,[label]])=>`<option value="${id}" ${id===(a.phraseTarget??'llm')?'selected':''}>${label}</option>`).join('')}</select><button type="button" class="primary" data-action="admin-phrase-add" ${blocked}>Добавить</button></div>
+        <div class="phrase-bar"><input data-phrase-draft value="${escape(a.phraseDraft??'')}" placeholder="Найти или добавить фразу" maxlength="61" autocomplete="off" ${blocked}><select data-phrase-target ${blocked}>${Object.entries(targets).map(([id,[label]])=>`<option value="${id}" ${id===(a.phraseTarget??'llm')?'selected':''}>${label}</option>`).join('')}</select><button type="button" class="primary" data-action="admin-phrase-add" ${blocked}>${editing?'Сохранить':'Добавить'}</button>${editing?`<button type="button" class="secondary" data-action="admin-phrase-cancel" ${blocked}>Отмена</button>`:''}</div>
         <div class="phrase-hint" id="phrase-hint">${this._phraseHint()}</div>
         <div class="phrase-filters" role="group">${groups.map(([id,label])=>`<button type="button" data-action="admin-phrase-filter" data-filter="${id}" aria-pressed="${filter===id}">${label}<i>${count(id)}</i></button>`).join('')}</div>
-        <div class="phrase-list">${list}</div>
-        <div class="phrase-foot">${this._help('Commands','Встроенные фразы в справке')}</div></section></div>`;
+        <div class="phrase-list">${shown.length?shown.map(row).join(''):`<p class="help phrase-empty">${query?'Такой фразы нет — нажмите «Добавить».':'В этой группе пока пусто.'}</p>`}</div>
+        <p class="help phrase-foot">«*» в конце слова — любое окончание: «ютуб*» слышит и «ютубе», и «ютуба».</p></section>
+        ${rules?`<section class="group music-card"><div class="music-head"><h3>Правила</h3>${this._help('Commands','Как работают')}</div><p class="help">Сложные случаи, которые не записать списком фраз. Выключенное правило перестаёт решать, куда идёт запрос.</p><div class="phrase-list">${rules}</div></section>`:''}</div>`;
     }
     async _savePhrases(){
       const a=this._admin;if(!a?.phrases)return;
-      const saved=await this._api('/api/phrases','PUT',{items:a.phrases.items??[],replies:a.phrases.replies??{}});
+      const p=a.phrases,saved=await this._api('/api/phrases','PUT',{items:p.items??[],disabled:p.disabled??[],disabled_rules:p.disabled_rules??[],replies:p.replies??{}});
       if(this._admin===a)a.phrases=saved;
     }
     _help(page,label='Подробнее в справке'){return `<button type="button" class="help-link" data-action="wiki" data-page="${page}">${icon('help-circle-outline')}<span>${label}</span></button>`;}
@@ -1294,8 +1307,12 @@ button:active:not(:disabled){transform:scale(.97)}
         if(action==='admin-music-view'){a.musicView=button.dataset.source;a.message='';return;}
         if(action==='admin-phrase-tab'){a.phraseTab=button.dataset.tab;a.message='';return;}
         if(action==='admin-phrase-filter'){a.phraseFilter=button.dataset.filter;a.message='';return;}
-        if(action==='admin-phrase-add'){const phrase=(a.phraseDraft??'').trim().toLowerCase().replace(/\s+/g,' '),target=a.phraseTarget??'llm';if(!/^[\p{L}\p{N} -]{2,60}$/u.test(phrase))throw Error('Фраза — от 2 до 60 букв или цифр.');if((a.phrases.items??[]).some(item=>item.phrase===phrase&&item.target===target))throw Error('Такая фраза уже есть.');a.phrases.items=[...(a.phrases.items??[]),{phrase,target}];await this._savePhrases();a.phraseDraft='';a.message='Фраза добавлена. Колонки подхватят её за несколько секунд.';return;}
-        if(action==='admin-phrase-remove'){const index=Number(button.dataset.index);a.phrases.items=(a.phrases.items??[]).filter((_,i)=>i!==index);await this._savePhrases();a.message='';return;}
+        if(action==='admin-phrase-add'){const phrase=(a.phraseDraft??'').trim().toLowerCase().replace(/\s+/g,' '),target=a.phraseTarget??'llm',items=[...(a.phrases.items??[])];if(!/^[\p{L}\p{N} -]{2,60}\*?$/u.test(phrase))throw Error('Фраза — от 2 до 60 букв или цифр, «*» только в конце.');if(items.some((item,i)=>i!==a.phraseEditing&&item.phrase===phrase&&item.target===target)||(a.phrases.builtin?.[target]??[]).includes(phrase))throw Error('Такая фраза уже есть.');if(a.phraseEditing!==undefined)items[a.phraseEditing]={phrase,target};else items.push({phrase,target});a.phrases.items=items;await this._savePhrases();a.message=a.phraseEditing!==undefined?'Фраза изменена.':'Фраза добавлена. Колонки подхватят её за несколько секунд.';a.phraseDraft='';a.phraseEditing=undefined;return;}
+        if(action==='admin-phrase-edit'){const item=a.phrases.items[Number(button.dataset.index)];if(item){a.phraseEditing=Number(button.dataset.index);a.phraseDraft=item.phrase;a.phraseTarget=item.target;a.message='';}return;}
+        if(action==='admin-phrase-cancel'){a.phraseEditing=undefined;a.phraseDraft='';a.message='';return;}
+        if(action==='admin-phrase-builtin'){const {target,phrase}=button.dataset,list=a.phrases.disabled??[],had=list.some(item=>item.target===target&&item.phrase===phrase);a.phrases.disabled=had?list.filter(item=>!(item.target===target&&item.phrase===phrase)):[...list,{target,phrase}];await this._savePhrases();a.message='';return;}
+        if(action==='admin-phrase-rule'){const name=button.dataset.name,list=a.phrases.disabled_rules??[];a.phrases.disabled_rules=list.includes(name)?list.filter(item=>item!==name):[...list,name];await this._savePhrases();a.message='';return;}
+        if(action==='admin-phrase-remove'){const index=Number(button.dataset.index);a.phrases.items=(a.phrases.items??[]).filter((_,i)=>i!==index);a.phraseEditing=undefined;await this._savePhrases();a.message='';return;}
         if(action==='admin-look'){const d=button.dataset,change={};if(d.layout)change.layout=d.layout;if(d.style)change.style=d.style;if(d.tools)change.tools=d.tools==='1';await this._saveLook(change);return;}
         if(action==='admin-look-reset'){await this._saveLook(this._lookDefault());return;}
         if(action==='admin-music-default'){const value=button.dataset.source;a.music=await this._api('/api/music','PUT',{...a.music,source:value==='yandex'?'yandex':'alternative',...(value==='yandex'?{}:{provider:value})});a.message='';return;}

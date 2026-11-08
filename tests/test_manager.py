@@ -693,6 +693,14 @@ class LookStateTests(unittest.TestCase):
         self.assertEqual(look['colors'], {**service.LOOK_DEFAULT['colors'], 'play': '#abcdef'})
 
 
+class VolumeStateTests(unittest.TestCase):
+    def test_accepts_only_sane_volume(self):
+        import service
+        self.assertEqual(service.volume_state({'level': 5.5, 'percent': 55}), {'level': 5.5, 'percent': 55})
+        self.assertIsNone(service.volume_state({'level': 11, 'percent': 110}))
+        self.assertIsNone(service.volume_state('loud'))
+
+
 class MetricsStateTests(unittest.TestCase):
     def test_keeps_numbers_of_the_right_speaker(self):
         import service

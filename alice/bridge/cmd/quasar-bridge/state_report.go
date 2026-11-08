@@ -16,7 +16,7 @@ var volatileHealth = []string{"client_frames", "server_frames", "activity_droppe
 const StateHeartbeat = 15 * time.Second
 
 // watchState looks at the speaker every second and reports a change at once.
-func watchState(ctx context.Context, health func(context.Context) map[string]any, report func(context.Context, map[string]any) error) {
+func watchState(ctx context.Context, health func(context.Context) map[string]any, report func(context.Context, map[string]any) error, changed <-chan struct{}) {
 	var last string
 	var sent time.Time
 	ticker := time.NewTicker(time.Second)
@@ -34,6 +34,7 @@ func watchState(ctx context.Context, health func(context.Context) map[string]any
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+		case <-changed:
 		}
 	}
 }

@@ -54,6 +54,9 @@ type Snapshot struct {
 	System        System                      `json:"system"`
 	NowPlaying    *nowplaying.Info            `json:"now_playing"`
 	Players       map[string]*nowplaying.Info `json:"players"`
+	// Volume is the live loudness on Alice's scale; nil until the mixer was read.
+	Volume     any    `json:"volume"`
+	AliceState string `json:"alice_state"`
 }
 
 // Root lets tests point the readers at a fake /proc and /sys.

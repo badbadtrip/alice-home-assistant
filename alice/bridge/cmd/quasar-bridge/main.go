@@ -28,6 +28,7 @@ import (
 	"quasarbridge/internal/indicator"
 	"quasarbridge/internal/journal"
 	"quasarbridge/internal/llm"
+	"quasarbridge/internal/localstate"
 	"quasarbridge/internal/metrics"
 	"quasarbridge/internal/nowplaying"
 	"quasarbridge/internal/soloist"
@@ -367,6 +368,17 @@ func main() {
 			}
 		}
 	}
+	// The speaker's own volume and Alice's state, read on the speaker without the cloud.
+	var volume atomic.Pointer[localstate.Volume]
+	var voice atomic.Value
+	voice.Store("idle")
+	stateChanged := make(chan struct{}, 1)
+	changed := func() {
+		select {
+		case stateChanged <- struct{}{}:
+		default:
+		}
+	}
 	healthState := func(ctx context.Context) map[string]any {
 		state := engine.RoutingStatus()
 		return map[string]any{"status": "ok", "mode": cfg.Mode, "client_frames": clientCount.Load(), "server_frames": serverCount.Load(), "routing_revision": state.Revision, "routing_rules": state.ActiveRules, "conversation_log_enabled": logs.Enabled(), "conversation_log_failures": logs.Failures(), "assistant_tools_enabled": cfg.AssistantTools.Enabled, "dialogue_context_enabled": cfg.DialogueContext.Enabled && cfg.Mode == "hybrid", "home_assistant_enabled": engine.Home != nil && cfg.Mode == "hybrid", "mcp_servers_configured": mcpConfigured, "speaker_id": os.Getenv("QUASAR_HOME_SPEAKER_ID"), "speaker_area": os.Getenv("QUASAR_HOME_AREA"), "activity_dropped": func() uint64 {
@@ -389,7 +401,7 @@ func main() {
 				return airPlay.health()
 			}
 			return nil
-		}(), "now_playing": currentTrack(ctx)}
+		}(), "now_playing": currentTrack(ctx), "volume": volume.Load(), "alice_state": voice.Load()}
 	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -432,6 +444,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go youtube.Supervise(ctx)
+	go localstate.WatchVolume(ctx, func(v localstate.Volume) {
+		first := volume.Swap(&v) == nil
+		if ring != nil && !first {
+			ring.VolumeChanged()
+		}
+		changed()
+	})
+	go localstate.WatchAlice(ctx, localstate.AliceSocket, func(state string) {
+		voice.Store(state)
+		if ring != nil {
+			ring.SetVoice(state)
+		}
+		changed()
+	})
 	if control, err := newAirPlayControl(ctx, os.Getenv("QUASAR_DATA_DIR"), os.Getenv("QUASAR_HOME_AREA")); err != nil {
 		slog.Warn("airplay_unavailable", "error", err)
 	} else {
@@ -453,7 +479,8 @@ func main() {
 			players["youtube_music"] = youtube.Now
 		}
 		return metrics.Snapshot{Status: "ok", SpeakerID: os.Getenv("QUASAR_HOME_SPEAKER_ID"), BridgeUptimeS: int64(time.Since(started).Seconds()),
-			System: metrics.Device.System(), NowPlaying: currentTrack(ctx), Players: metrics.Players(ctx, players)}
+			System: metrics.Device.System(), NowPlaying: currentTrack(ctx), Players: metrics.Players(ctx, players),
+			Volume: volume.Load(), AliceState: voice.Load().(string)}
 	}
 	mux.Handle("GET /metrics", metrics.Handler("", snapshot))
 	if token := os.Getenv("QUASAR_HOME_FUNCTIONS_TOKEN"); token != "" {
@@ -461,7 +488,7 @@ func main() {
 	}
 	if hf != nil {
 		// The speaker reports itself on every change, so the app does not poll it.
-		go watchState(ctx, healthState, hf.ReportState)
+		go watchState(ctx, healthState, hf.ReportState, stateChanged)
 		hf.StartVoiceCache(ctx)
 		hf.StartActivity(ctx)
 		engine.Activity = hf.RecordActivity

@@ -41,6 +41,16 @@ NOW_SOURCES = ('airplay', 'spotify', 'youtube_music', 'yandex_music')
 NOW_STATUSES = ('playing', 'paused', 'buffering')
 
 
+def volume_state(value):
+    """The speaker's live volume from its own mixer: level 0-10 in halves and percent."""
+    if not isinstance(value, dict):
+        return None
+    level, percent = value.get('level'), value.get('percent')
+    if type(level) not in (int, float) or type(percent) is not int or not 0 <= level <= 10 or not 0 <= percent <= 100:
+        return None
+    return {'level': round(level * 2) / 2, 'percent': percent}
+
+
 def metrics_state(value, speaker_id):
     """Only numbers from the speaker's own report reach the panel."""
     if not isinstance(value, dict) or value.get('speaker_id') != speaker_id or not isinstance(value.get('system'), dict):
@@ -332,7 +342,7 @@ class Manager:
     @staticmethod
     def _connection_default():
         return {'status': 'unknown', 'last_seen': None, 'checked_at': None, 'error': None,
-                'speaker_id': None, 'voice_phrase_count': None, 'voice_phrase_revision': None, 'latency_ms': None, 'volume_push': False, 'airplay': None, 'now_playing': None,
+                'speaker_id': None, 'voice_phrase_count': None, 'voice_phrase_revision': None, 'latency_ms': None, 'volume_push': False, 'airplay': None, 'now_playing': None, 'volume': None, 'alice_state': None,
                 'delivery': {'status': 'unknown', 'expected_revision': None, 'actual_revision': None, 'message': 'Ожидается проверка колонки.'}}
 
     @staticmethod
@@ -564,6 +574,7 @@ class Manager:
             value.update(status='online', last_seen=int(time.time()), error=None,
                          speaker_id=speaker['id'], volume_push=health.get('volume_push') is True, airplay=airplay_state(health.get('airplay')),
                          now_playing=self._now_playing(speaker, health.get('now_playing')),
+                         volume=volume_state(health.get('volume')), alice_state=health.get('alice_state') if health.get('alice_state') in ('idle', 'listening', 'thinking', 'speaking') else None,
                          voice_phrase_count=count if type(count) is int and 0 <= count <= 100000 else None,
                          voice_phrase_revision=revision if isinstance(revision, str) and re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', revision) else None,
                          metrics=metrics_state({'speaker_id': speaker['id'], 'system': pushed.get('system')}, speaker['id']) if pushed else self._metrics(speaker))

@@ -25,7 +25,7 @@ func TestWatchStateReportsChangesNotCounters(t *testing.T) {
 		}
 		reports++
 		return nil
-	})
+	}, nil)
 	if reports != 2 {
 		t.Fatalf("got %d reports, want the first state and the revision change", reports)
 	}

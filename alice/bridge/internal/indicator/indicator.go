@@ -162,6 +162,44 @@ type Controller struct {
 	reported atomic.Bool
 	once     sync.Once
 	wake     chan struct{}
+	// The firmware draws listening, speaking and the volume level on the same ring.
+	// While it does, the bridge stays off the ring instead of fighting it.
+	voice    atomic.Value
+	volumeAt atomic.Int64
+}
+
+// YieldAfterVolume is how long the firmware keeps the ring after a volume change.
+const YieldAfterVolume = 1500 * time.Millisecond
+
+func (c *Controller) poke() {
+	select {
+	case c.wakeup() <- struct{}{}:
+	default:
+	}
+}
+
+// SetVoice receives Alice's state: idle, listening, thinking or speaking.
+func (c *Controller) SetVoice(state string) {
+	c.voice.Store(state)
+	c.poke()
+}
+
+// VolumeChanged hands the ring to the firmware's volume display for a moment.
+func (c *Controller) VolumeChanged() {
+	c.volumeAt.Store(time.Now().UnixNano())
+	c.poke()
+}
+
+func (c *Controller) yielding(now time.Time) bool {
+	if state, _ := c.voice.Load().(string); state != "" && state != "idle" {
+		return true
+	}
+	return now.Sub(time.Unix(0, c.volumeAt.Load())) < YieldAfterVolume
+}
+
+func (c *Controller) aliceIdle() bool {
+	state, _ := c.voice.Load().(string)
+	return state == "" || state == "idle"
 }
 
 func (c *Controller) wakeup() chan struct{} {
@@ -287,16 +325,18 @@ func unmuted() bool {
 // musicGate ignores short sounds: spoken answers must not start the music look.
 type musicGate struct{ on, off int }
 
+// Checked every 300 ms: 1.2 s of sound while Alice is quiet is music, and it stays
+// music through a second of silence between tracks.
 func (g *musicGate) update(running bool) bool {
 	if running {
-		g.on, g.off = min(g.on+1, 6), 0
+		g.on, g.off = min(g.on+1, 4), 0
 	} else {
 		g.off++
-		if g.off >= 3 {
+		if g.off >= 4 {
 			g.on = 0
 		}
 	}
-	return g.on >= 6
+	return g.on >= 4
 }
 
 // Serve draws the ring until ctx ends and leaves it dark.
@@ -312,7 +352,7 @@ func (c *Controller) Serve(ctx context.Context) {
 	defer timer.Stop()
 	var cfg Config
 	var gate musicGate
-	var nextCheck time.Time
+	var nextCheck, loaded time.Time
 	var sourced atomic.Bool
 	playing, allowed, lit := false, false, false
 	black := make([]Pixel, led.size)
@@ -332,13 +372,21 @@ func (c *Controller) Serve(ctx context.Context) {
 		}
 		now := time.Now()
 		if now.After(nextCheck) {
-			nextCheck = now.Add(time.Second)
-			cfg, allowed = c.load(), unmuted()
-			card := gate.update(audioPlaying())
+			nextCheck = now.Add(300 * time.Millisecond)
+			if now.Sub(loaded) > time.Second {
+				cfg, allowed, loaded = c.load(), unmuted(), now
+			}
+			// Alice's own speech also runs the sound card; it never counts as music.
+			card := gate.update(audioPlaying() && c.aliceIdle())
 			go func() { sourced.Store(c.sourcePlaying()) }()
 			playing = card || sourced.Load()
 		}
 		look, ok := pick(cfg, c.thinking(), playing)
+		if c.yielding(now) && !c.thinking() {
+			// Leave the last frame alone: the firmware is drawing over it right now.
+			lit, ok = false, false
+			soft = smoother{}
+		}
 		switch {
 		case ok && allowed:
 			_ = led.show(soft.next(look.Render(now.Sub(started), led.size)))

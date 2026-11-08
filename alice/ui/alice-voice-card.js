@@ -708,12 +708,12 @@ button:active:not(:disabled){transform:scale(.97)}
     _snapshotKey(){return 'alice-panel-snapshot:v1:'+(this._config.manager_app??this._config.manager_url??'')+':'+this._config.label;}
     _restoreSnapshot(){
       try{const saved=JSON.parse(localStorage.getItem(this._snapshotKey())||'null');if(!saved||!Array.isArray(saved.speakers))return false;
-        this._speakers=saved.speakers;this._registry=saved.commands??[];this._assignments=saved.assignments??{};this._speakerIndicators=saved.indicators??{};this._mediaPlatforms=saved.platforms??{};this._speakersStale=true;this._commandsStale=true;this._indicatorsStale=true;return true;
+        this._speakers=saved.speakers;if(saved.look&&typeof saved.look==='object')this._look=saved.look;this._registry=saved.commands??[];this._assignments=saved.assignments??{};this._speakerIndicators=saved.indicators??{};this._mediaPlatforms=saved.platforms??{};this._speakersStale=true;this._commandsStale=true;this._indicatorsStale=true;return true;
       }catch{return false;}
     }
     _saveSnapshot(){
       if(this._managerError)return;
-      try{localStorage.setItem(this._snapshotKey(),JSON.stringify({speakers:this._speakers.map(s=>({id:s.id,name:s.name,area:s.area,area_id:s.area_id,profile:s.profile,model:s.model,media_entity:s.media_entity,trusted_fingerprint:!!s.trusted_fingerprint,install:s.install?{state:s.install.state,adopted:s.install.adopted}:undefined,last_check:s.last_check?{root:s.last_check.root}:undefined,connection:{status:'unknown',last_seen:s.connection?.last_seen}})),commands:this._registry.filter(item=>this._selected(item)),assignments:this._assignments,indicators:this._speakerIndicators??{},platforms:this._mediaPlatforms}));}catch{}
+      try{localStorage.setItem(this._snapshotKey(),JSON.stringify({look:this._look,speakers:this._speakers.map(s=>({id:s.id,name:s.name,area:s.area,area_id:s.area_id,profile:s.profile,model:s.model,media_entity:s.media_entity,trusted_fingerprint:!!s.trusted_fingerprint,install:s.install?{state:s.install.state,adopted:s.install.adopted}:undefined,last_check:s.last_check?{root:s.last_check.root}:undefined,connection:{status:'unknown',last_seen:s.connection?.last_seen}})),commands:this._registry.filter(item=>this._selected(item)),assignments:this._assignments,indicators:this._speakerIndicators??{},platforms:this._mediaPlatforms}));}catch{}
     }
     _name(item) { return this._hass?.states[item.entity_id]?.attributes.friendly_name ?? item.name ?? item.original_name ?? item.entity_id; }
     _selected(item) { return (item.labels ?? []).includes(this._config.label); }
@@ -1049,7 +1049,7 @@ button:active:not(:disabled){transform:scale(.97)}
       const a=this._admin;if(!a?.look)return;
       a.look={...a.look,...change,colors:{...a.look.colors,...(change.colors??{})}};this._look=a.look;this._render();
       clearTimeout(this._lookTimer);
-      this._lookTimer=setTimeout(async()=>{try{const saved=await this._api('/api/look','PUT',a.look);if(this._admin===a){a.look=saved;}this._look=saved;}catch(error){if(this._admin===a){a.message='Не удалось сохранить: '+error.message;this._render();}}},350);
+      this._lookTimer=setTimeout(async()=>{try{const saved=await this._api('/api/look','PUT',a.look);if(this._admin===a){a.look=saved;}this._look=saved;this._saveSnapshot();}catch(error){if(this._admin===a){a.message='Не удалось сохранить: '+error.message;this._render();}}},350);
     }
     _help(page,label='Подробнее в справке'){return `<button type="button" class="help-link" data-action="wiki" data-page="${page}">${icon('help-circle-outline')}<span>${label}</span></button>`;}
     _houseHead(active){const tabs=[['commands','Команды'],['devices','Устройства'],['dictionary','Словарь']];return `<div class="page-intro"><div><h2 id="admin-title" class="admin-title">Дом</h2><p class="help">Что Алиса умеет делать в вашем доме</p></div></div><div class="seg page-seg" role="tablist" aria-label="Разделы">${tabs.map(([id,label])=>`<button type="button" role="tab" aria-selected="${active===id}" data-action="house-tab" data-tab="${id}" ${this._admin?.busy?'disabled':''}>${label}</button>`).join('')}</div>`;}

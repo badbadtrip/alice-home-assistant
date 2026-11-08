@@ -190,8 +190,8 @@ func (c *Controller) VolumeChanged() {
 	c.poke()
 }
 
-func (c *Controller) yielding(now time.Time) bool {
-	if state, _ := c.voice.Load().(string); state != "" && state != "idle" {
+func (c *Controller) yielding(now time.Time, own bool) bool {
+	if state, _ := c.voice.Load().(string); !own && state != "" && state != "idle" {
 		return true
 	}
 	return now.Sub(time.Unix(0, c.volumeAt.Load())) < YieldAfterVolume
@@ -346,6 +346,12 @@ func (c *Controller) Serve(ctx context.Context) {
 		return
 	}
 	started := time.Now()
+	// With an own voice look the firmware's voice animations are hidden and the bridge
+	// draws listening, thinking and speaking itself. This runs before the firmware starts.
+	own := StockReplaced()
+	if first := c.load(); !own && first.Enabled && first.valid() {
+		own = ReplaceStock("") == nil
+	}
 	// Frames run at 60 per second only while something shows; a dark ring wakes once a second.
 	const frame = 16 * time.Millisecond
 	timer := time.NewTimer(0)
@@ -381,8 +387,9 @@ func (c *Controller) Serve(ctx context.Context) {
 			go func() { sourced.Store(c.sourcePlaying()) }()
 			playing = card || sourced.Load()
 		}
-		look, ok := pick(cfg, c.thinking(), playing)
-		if c.yielding(now) && !c.thinking() {
+		voiced := own && !c.aliceIdle()
+		look, ok := pick(cfg, c.thinking() || voiced, playing)
+		if c.yielding(now, own) && !c.thinking() {
 			// Leave the last frame alone: the firmware is drawing over it right now.
 			lit, ok = false, false
 			soft = smoother{}

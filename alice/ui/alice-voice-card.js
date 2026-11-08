@@ -372,6 +372,7 @@ main{max-width:1360px;padding:0 24px 48px}
 .kv-action{display:flex;justify-content:flex-end}.kv-action button ha-icon{--mdc-icon-size:16px}
 .kv-note{margin-top:10px;font-size:12.5px}
 @media(max-width:700px){.kv-row{grid-template-columns:minmax(0,1fr) auto}.kv-label{grid-column:1/-1}}
+.is-stale button:disabled,.is-stale .range:has(input:disabled),.is-stale .tool:disabled{opacity:1}.is-stale :is(button,input,.range){pointer-events:none}
 .spk-mood{display:none}
 .look-tile,.look-wide{--ink:#151515;--ink-soft:rgb(0 0 0/.66);--well:rgb(0 0 0/.12);--well-fill:rgb(0 0 0/.28)}
 .look-tile .spk,.look-wide .spk{--mood:var(--c-idle);position:relative;gap:10px;padding:18px;border-radius:26px;box-shadow:none;overflow:hidden}
@@ -787,7 +788,7 @@ button:active:not(:disabled){transform:scale(.97)}
     }
     _saveSnapshot(){
       if(this._managerError)return;
-      try{localStorage.setItem(this._snapshotKey(),JSON.stringify({look:this._look,speakers:this._speakers.map(s=>({id:s.id,name:s.name,area:s.area,area_id:s.area_id,profile:s.profile,model:s.model,media_entity:s.media_entity,trusted_fingerprint:!!s.trusted_fingerprint,install:s.install?{state:s.install.state,adopted:s.install.adopted}:undefined,last_check:s.last_check?{root:s.last_check.root}:undefined,connection:{status:'unknown',last_seen:s.connection?.last_seen}})),commands:this._registry.filter(item=>this._selected(item)),assignments:this._assignments,indicators:this._speakerIndicators??{},platforms:this._mediaPlatforms}));}catch{}
+      try{localStorage.setItem(this._snapshotKey(),JSON.stringify({look:this._look,speakers:this._speakers.map(s=>({id:s.id,name:s.name,area:s.area,area_id:s.area_id,profile:s.profile,model:s.model,media_entity:s.media_entity,trusted_fingerprint:!!s.trusted_fingerprint,install:s.install?{state:s.install.state,adopted:s.install.adopted}:undefined,last_check:s.last_check?{root:s.last_check.root}:undefined,connection:{status:s.connection?.status==='online'?'online':'unknown',last_seen:s.connection?.last_seen,volume:s.connection?.volume}})),commands:this._registry.filter(item=>this._selected(item)),assignments:this._assignments,indicators:this._speakerIndicators??{},platforms:this._mediaPlatforms}));}catch{}
     }
     _name(item) { return this._hass?.states[item.entity_id]?.attributes.friendly_name ?? item.name ?? item.original_name ?? item.entity_id; }
     _selected(item) { return (item.labels ?? []).includes(this._config.label); }
@@ -877,7 +878,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(!this._config)return;
       const disabled=this._busy||this._speakersStale||this._commandsStale?'disabled':'';
       const rows=this._registry.filter(item=>this._selected(item));
-      const page=document.createElement('template');page.innerHTML=`<main><div id="ops-region" class="ops" aria-live="polite">${this._opsStrip()}</div>${this._tab==='home'?this._home(rows,disabled):this._standalone(rows,disabled)}${this._dialog?this._editor(disabled):''}${this._speakerDialog?this._speakerEditor(disabled):''}${this._utility&&!this._utility.inline?this._utilityDialog():''}</main>`;
+      const page=document.createElement('template');page.innerHTML=`<main class="${this._speakersStale?'is-stale':''}"><div id="ops-region" class="ops" aria-live="polite">${this._opsStrip()}</div>${this._tab==='home'?this._home(rows,disabled):this._standalone(rows,disabled)}${this._dialog?this._editor(disabled):''}${this._speakerDialog?this._speakerEditor(disabled):''}${this._utility&&!this._utility.inline?this._utilityDialog():''}</main>`;
       morphChildren(this.shadowRoot,page.content,this.shadowRoot.activeElement);
       this._bindNativePicker();this._bindUtilityPickers();this._syncIndicatorAnimations();this._fitNowPills();
       if(this._dialog)queueMicrotask(()=>this.shadowRoot.querySelector('#phrases')?.focus());
@@ -1582,7 +1583,7 @@ button:active:not(:disabled){transform:scale(.97)}
     _editor(disabled){return `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="editor-title"><header class="dialog-head"><h2 id="editor-title">${this._editing?'Команда':'Новая команда'}</h2>${iconButton('close','close','Закрыть',disabled)}</header><form id="command-form"><div class="dialog-body">${this._message?`<div class="notice" role="status">${escape(this._message)}</div>`:''}<div id="editor-service-status"></div><div class="fields"><label>Фразы, каждая с новой строки<textarea id="phrases" required maxlength="12000" placeholder="Я ухожу" ${disabled}>${escape(this._draftPhrases)}</textarea></label><div><ha-entity-picker id="target"></ha-entity-picker>${this._editing?`<p class="help"><code>${escape(this._editing)}</code></p>`:''}</div><div id="audience">${this._audienceFields()}</div></div></div><footer class="dialog-foot"><button type="button" data-action="close" ${disabled}>Отмена</button><button id="save-command" class="primary" type="submit" disabled>${this._busy?'Сохранение…':'Сохранить'}</button></footer></form></section></div>`;}
     _needsSetup(s){return !this._managerError&&(['awaiting_reboot','awaiting_acceptance','adopting'].includes(s.install?.state)||s.install?.adopted&&s.install?.state==='rolled_back'||(s.connection?.status!=='online'&&!s.connection?.last_seen&&s.install?.state!=='ready'));}
     _setupNotice(){const pending=this._speakers.filter(s=>this._needsSetup(s));return pending.length?`<aside class="alert" role="alert">${icon('alert-outline')}<div><strong>${pending.length===1?'Колонка не подключена':'Колонки не подключены'}</strong><p>${this._installationReady===false?'Сначала укажите локальный адрес приложения.':'Завершите настройку моста, чтобы работали голосовые команды.'}</p></div><button class="primary" data-action="setup" data-id="${escape(pending[0].id)}">Настроить</button></aside>`:'';}
-    _speakerSummary(){const online=this._speakers.filter(s=>!this._managerError&&s.connection?.status==='online').length;return plural(this._speakers.length,'колонка','колонки','колонок')+(this._speakersStale?' · обновляем…':' · на связи '+online);}
+    _speakerSummary(){const online=this._speakers.filter(s=>!this._managerError&&s.connection?.status==='online').length;return plural(this._speakers.length,'колонка','колонки','колонок')+' · на связи '+online;}
     _speakerStatus(s){
       if(this._needsSetup(s))return `<span class="is-warn"><span class="dot"></span>${s.install?.state==='awaiting_acceptance'?'Проверьте голос':s.install?.state==='awaiting_reboot'?'Нужна перезагрузка':'Мост не настроен'}</span><button data-action="setup" data-id="${escape(s.id)}" ${this._speakersStale?'disabled':''}>Настроить</button>`;
       const c=s.connection??{},status=this._managerError?'unknown':c.status??'unknown',delivery=this._managerError?'unknown':c.delivery?.status??'unknown';

@@ -351,6 +351,19 @@ main{max-width:1360px;padding:0 24px 48px}
 .svc-ssh code{display:block;padding:10px 12px;border-radius:10px;background:var(--tint);overflow-wrap:anywhere;font-size:12px}
 .svc-ssh .actions{margin-top:10px}
 @media(max-width:700px){.svc-switches{grid-template-columns:minmax(0,1fr)}}
+.ops{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:40;display:flex;flex-direction:column;gap:8px;width:min(360px,calc(100vw - 32px));pointer-events:none}
+.ops:empty{display:none}
+.op{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--dialog);box-shadow:0 8px 24px rgb(0 0 0/.28),0 0 0 1px var(--line);pointer-events:auto}
+.op>div{flex:1;min-width:0}.op b{display:block;font-weight:500;font-size:13.5px}.op small{display:block;color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.op .time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px}
+.op ha-icon{flex:none;--mdc-icon-size:22px}.op.ok ha-icon{color:var(--ok)}.op.fail ha-icon{color:var(--err)}
+@media(max-width:700px){.ops{left:16px;right:16px;width:auto;bottom:calc(76px + env(safe-area-inset-bottom))}}
+.svc-fact b{flex-wrap:wrap;word-break:break-all}.fact-note{display:block;width:100%;margin-top:2px;color:var(--muted);font-size:12px;font-weight:400;word-break:normal}.fact-note.bad{color:var(--err)}
+.svc-more-body label{display:grid;gap:6px;margin:0 0 12px;pointer-events:auto}
+.svc-more-body .actions{position:static;margin:0 0 14px;flex-wrap:wrap}
+.svc-more-body textarea,.svc-more-body input{width:100%}
+.svc-more-body .admin-output{margin-top:4px}
+.svc-ssh>p{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.svc-ssh>p code{display:inline-block;padding:2px 8px}
 .spk-mood{display:none}
 .look-tile,.look-wide{--ink:#151515;--ink-soft:rgb(0 0 0/.66);--well:rgb(0 0 0/.12);--well-fill:rgb(0 0 0/.28)}
 .look-tile .spk,.look-wide .spk{--mood:var(--c-idle);position:relative;gap:10px;padding:18px;border-radius:26px;box-shadow:none;overflow:hidden}
@@ -693,7 +706,7 @@ button:active:not(:disabled){transform:scale(.97)}
       clearTimeout(this._refreshTimer);clearInterval(this._connectionTimer);clearTimeout(this._metricsTimer);this._watchToken=(this._watchToken??0)+1;
     }
     _patchSpeakers(){
-      this._renderEditorStatus();this._repairSpeakerView();this._refreshMedia();this._applyMoods();
+      this._renderEditorStatus();this._repairSpeakerView();this._refreshMedia();this._applyMoods();this._tickOps();if(this._admin?.tab==='service'&&this._section==='speaker'&&!this._admin.busy&&!this.shadowRoot.activeElement?.matches?.('textarea,input'))this._render();
       if(!this._onSpeakers()||this._speakerDialog)return;
       for(const speaker of this._speakers){const region=this.shadowRoot.querySelector('[data-connection="'+speaker.id+'"]');if(region)this._patch(region,this._speakerStatus(speaker));}this._fitNowPills();
       const summary=this.shadowRoot.getElementById('speaker-summary');if(summary)summary.textContent=this._speakerSummary();const setup=this.shadowRoot.getElementById('setup-notice-region');if(setup){const markup=this._setupNotice();if(setup.innerHTML!==markup)setup.innerHTML=markup;}
@@ -856,7 +869,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(!this._config)return;
       const disabled=this._busy||this._speakersStale||this._commandsStale?'disabled':'';
       const rows=this._registry.filter(item=>this._selected(item));
-      const page=document.createElement('template');page.innerHTML=`<main>${this._tab==='home'?this._home(rows,disabled):this._standalone(rows,disabled)}${this._dialog?this._editor(disabled):''}${this._speakerDialog?this._speakerEditor(disabled):''}${this._utility&&!this._utility.inline?this._utilityDialog():''}</main>`;
+      const page=document.createElement('template');page.innerHTML=`<main><div id="ops-region" class="ops" aria-live="polite">${this._opsStrip()}</div>${this._tab==='home'?this._home(rows,disabled):this._standalone(rows,disabled)}${this._dialog?this._editor(disabled):''}${this._speakerDialog?this._speakerEditor(disabled):''}${this._utility&&!this._utility.inline?this._utilityDialog():''}</main>`;
       morphChildren(this.shadowRoot,page.content,this.shadowRoot.activeElement);
       this._bindNativePicker();this._bindUtilityPickers();this._syncIndicatorAnimations();this._fitNowPills();
       if(this._dialog)queueMicrotask(()=>this.shadowRoot.querySelector('#phrases')?.focus());
@@ -1067,6 +1080,9 @@ button:active:not(:disabled){transform:scale(.97)}
     /* One word for what the speaker is doing; the tile colour follows it. */
     _mood(s){
       const c=s.connection??{},state=this._hass?.states?.[s.media_entity],np=c.now_playing,alice=({listening:'LISTENING',thinking:'BUSY',speaking:'SPEAKING'})[c.alice_state]??String(state?.attributes?.alice_state??'').toUpperCase();
+      const busy=this._stationBusy?.has(s.id)?this._stationRuns?.[s.id]?.action:'',phase=this._rebootPhase?.(s);
+      if(phase)return ['off','Перезагружается'];
+      if(busy)return [c.status==='offline'?'off':'idle',({restart:'Перезапуск моста…',install:'Обновление моста…',rollback:'Откат моста…',check:'Проверка…',reboot:'Перезагружается',report:'Сбор отчёта…'})[busy]??'Выполняется…'];
       if(c.status==='offline')return ['off','Нет связи'];
       if(['LISTENING','SPEAKING','BUSY'].includes(alice))return ['talk',alice==='LISTENING'?'Слушает':alice==='BUSY'?'Думает':'Отвечает'];
       if(state?.state==='playing'||np?.status==='playing')return ['play','Играет'];
@@ -1160,7 +1176,41 @@ button:active:not(:disabled){transform:scale(.97)}
       const p=a.phrases,saved=await this._api('/api/phrases','PUT',{items:p.items??[],disabled:p.disabled??[],disabled_rules:p.disabled_rules??[],replies:p.replies??{}});
       if(this._admin===a)a.phrases=saved;
     }
-    _renderService(id){if(this._admin?.tab==='service'&&this._admin.speakerId===id&&this._section==='speaker')this._render();}
+    /* Every running or just finished action, for the strip that stays visible on any page. */
+    _operations(){
+      const now=Date.now(),list=[];
+      for(const s of this._speakers??[]){
+        const run=this._stationRuns?.[s.id];if(!run)continue;
+        const rebooting=this._rebootPhase(s);
+        if(this._stationBusy.has(s.id))list.push({s,run,state:'run',stage:this._stationMessages[s.id]});
+        else if(rebooting)list.push({s,run,state:'run',stage:rebooting});
+        else if(run.done&&now-run.at<8000)list.push({s,run,state:run.ok?'ok':'fail',stage:this._stationMessages[s.id]});
+      }
+      return list;
+    }
+    /* After a reboot request: off the air, then back with a fresh uptime. */
+    _rebootPhase(s){
+      const run=this._stationRuns?.[s.id];if(!run?.rebootAt)return '';
+      const c=s.connection??{},since=(Date.now()-run.rebootAt)/1000,uptime=c.metrics?.uptime_s;
+      if(c.status==='online'&&typeof uptime==='number'&&uptime<since+20&&since>5){this._stationRuns[s.id]={...run,rebootAt:undefined,done:true,ok:true,at:Date.now()};this._stationMessages[s.id]='Колонка снова на связи.';return '';}
+      if(since>300){this._stationRuns[s.id]={...run,rebootAt:undefined,done:true,ok:false,at:Date.now()};this._stationMessages[s.id]='Колонка не вернулась за пять минут. Проверьте питание и сеть.';return '';}
+      if(c.status==='online'&&since<60)return 'Выключается';
+      if(c.status!=='online')return 'Загружается';
+      return 'Подключается мост';
+    }
+    _opsStrip(){
+      const list=this._operations();if(!list.length)return '';
+      const seconds=t=>{const n=Math.max(0,Math.round((Date.now()-t)/1000));return n<60?n+' с':Math.floor(n/60)+':'+String(n%60).padStart(2,'0');};
+      return list.map(({s,run,state,stage})=>`<div class="op ${state}" role="status">${state==='run'?'<span class="svc-spin" aria-hidden="true"></span>':icon(state==='ok'?'check-circle-outline':'alert-circle-outline')}<div><b>${escape(s.name)} · ${this._jobTitle(run.action)}${state==='run'?'…':state==='ok'?': готово':': не получилось'}</b><small>${escape(stage??'')}</small></div>${state==='run'?`<span class="time">${seconds(run.started)}</span>`:''}</div>`).join('');
+    }
+    _tickOps(){
+      const region=this.shadowRoot?.getElementById('ops-region');if(region){const markup=this._opsStrip();if(region.innerHTML!==markup)region.innerHTML=markup;}
+      this._applyMoods();
+      const live=this._operations().length>0;
+      if(live&&!this._opsTimer)this._opsTimer=setInterval(()=>this._tickOps(),1000);
+      if(!live&&this._opsTimer){clearInterval(this._opsTimer);this._opsTimer=undefined;}
+    }
+    _renderService(id){if(this._admin?.tab==='service'&&this._admin.speakerId===id&&this._section==='speaker')this._render();this._tickOps();}
     _jobTitle(action){return ({check:'Проверка колонки',restart:'Перезапуск моста',reboot:'Перезагрузка колонки',rollback:'Возврат прошлой версии',install:'Обновление моста',configure:'Применение настроек',report:'Сбор отчёта'})[action]??'Операция';}
     _help(page,label='Подробнее в справке'){return `<button type="button" class="help-link" data-action="wiki" data-page="${page}">${icon('help-circle-outline')}<span>${label}</span></button>`;}
     _houseHead(active){const tabs=[['commands','Команды'],['devices','Устройства'],['dictionary','Словарь']];return `<div class="page-intro"><div><h2 id="admin-title" class="admin-title">Дом</h2><p class="help">Что Алиса умеет делать в вашем доме</p></div></div><div class="seg page-seg" role="tablist" aria-label="Разделы">${tabs.map(([id,label])=>`<button type="button" role="tab" aria-selected="${active===id}" data-action="house-tab" data-tab="${id}" ${this._admin?.busy?'disabled':''}>${label}</button>`).join('')}</div>`;}
@@ -1179,16 +1229,16 @@ button:active:not(:disabled){transform:scale(.97)}
       return `<div class="music-page"><div class="page-intro"><div><h3>Музыка</h3><p class="help">Что включается по голосу и на каких колонках это доступно.</p></div>${this._help('Music','Музыка в справке')}</div>${choice}${matrix}${spotifyPanel}</div>`;
     }
     _servicePage(speaker,files,shell,blocked){
-      const a=this._admin,s=speaker??{},c=s.connection??{},m=c.metrics??{},id=escape(s.id??''),running=this._stationBusy.has(s.id),busy=blocked||(running?'disabled':''),open=a.svcOpen??{};
-      const run=this._stationRuns?.[s.id],rebooting=(this._rebootingUntil?.[s.id]??0)>Date.now()&&c.status!=='online';
-      const seconds=t=>{const n=Math.max(0,Math.round((Date.now()-t)/1000));return n<60?n+' с':Math.floor(n/60)+' мин '+(n%60)+' с';};
-      const status=rebooting?'<span class="svc-spin" style="width:12px;height:12px;border-width:2px"></span>Перезагружается':c.status==='online'?'<i class="m-dot on"></i>На связи':c.status==='offline'?'<i class="m-dot"></i>Не отвечает':'Проверяется';
+      const a=this._admin,s=speaker??{},c=s.connection??{},m=c.metrics??{},id=escape(s.id??''),running=this._stationBusy.has(s.id)||!!this._rebootPhase(s),busy=blocked||(running?'disabled':''),open=a.svcOpen??{};
+      const run=this._stationRuns?.[s.id];
+      const seconds=t=>{const n=Math.max(0,Math.round((Date.now()-t)/1000));return n<60?n+' с':Math.floor(n/60)+' мин '+(n%60)+' с';},phase=this._rebootPhase(s);
+      const status=phase?'<span class="svc-spin" style="width:12px;height:12px;border-width:2px"></span>Перезагружается':c.status==='online'?'<i class="m-dot on"></i>На связи':c.status==='offline'?'<i class="m-dot"></i>Не отвечает':'Проверяется';
       const target=String(s.bridge_update?.target??s.install?.version??''),build=/^[0-9a-f]{12,}$/i.test(target)?target.slice(0,7):target||'—';
       const update=({updating:'обновляется',verifying:'проверяется',awaiting_voice:'ждёт голосовой проверки',rolling_back:'откатывается',failed:'обновление не прошло',current:'актуальна'})[s.bridge_update?.state]??'';
       const fact=(label,value)=>`<div class="svc-fact"><small>${label}</small><b>${value}</b></div>`;
-      const facts=`<div class="svc-facts">${fact('Связь',status)}${fact('Мост',escape(build)+(update?`<small style="display:inline;color:var(--muted);font-weight:400"> · ${update}</small>`:''))}${fact('Работает',m.uptime_s!=null?this._metricDuration(m.uptime_s):'—')}${fact('Свободно на флеше',m.data_free_kb!=null?this._metricBytes(m.data_free_kb):'—')}</div>`;
+      const facts=`<div class="svc-facts">${fact('Связь',status)}${fact('Мост',escape(build)+(update?`<small class="fact-note ${s.bridge_update?.state==='failed'?'bad':''}">${update}</small>`:''))}${fact('Работает',m.uptime_s!=null?this._metricDuration(m.uptime_s):'—')}${fact('Свободно на флеше',m.data_free_kb!=null?this._metricBytes(m.data_free_kb):'—')}</div>`;
       // What runs now, and how the last action ended: the owner must never guess.
-      const progress=running&&run?`<div class="svc-run" role="status"><span class="svc-spin" aria-hidden="true"></span><div><b>${this._jobTitle(run.action)}…</b><small>${escape(this._stationMessages[s.id]??'Начинаем')}</small></div><span class="time">${seconds(run.started)}</span></div>`
+      const progress=phase&&run?`<div class="svc-run" role="status"><span class="svc-spin" aria-hidden="true"></span><div><b>Перезагрузка колонки…</b><small>${phase}</small></div><span class="time">${seconds(run.started)}</span></div>`:running&&run?`<div class="svc-run" role="status"><span class="svc-spin" aria-hidden="true"></span><div><b>${this._jobTitle(run.action)}…</b><small>${escape(this._stationMessages[s.id]??'Начинаем')}</small></div><span class="time">${seconds(run.started)}</span></div>`
         :run?.done&&Date.now()-run.at<10*60*1000?`<div class="svc-run ${run.ok?'ok':'fail'}" role="status">${icon(run.ok?'check-circle-outline':'alert-circle-outline')}<div><b>${this._jobTitle(run.action)}: ${run.ok?'готово':'не получилось'}</b><small>${escape(this._stationMessages[s.id]??'')}</small></div><span class="time">${new Date(run.at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span></div>`:'';
       const setupNeeded=!s.trusted_fingerprint||!s.last_check?.root||!['ready','current',undefined].includes(s.install?.state)&&s.install?.state!=='awaiting_acceptance'&&c.status!=='online';
       const setup=setupNeeded?`<div class="svc-run"><span class="badge">${icon('rocket-launch-outline')}</span><div><b>Мост ещё не подключён</b><small>Мастер проведёт по шагам: адрес, доступ, установка и голосовая проверка.</small></div><button type="button" class="primary small" data-action="setup" data-id="${id}">Открыть мастер</button></div>`:'';
@@ -1677,7 +1727,7 @@ button:active:not(:disabled){transform:scale(.97)}
           }
         }
       }catch(error){u.message=error.message??'Не удалось выполнить запрос. Повторите ещё раз.';}finally{u.busy=false;this._utilityMessage();}}
-    async _stationJob(id,action,body={}){if(this._stationBusy.has(id)||this._managerError)return false;this._stationBusy.add(id);this._stationRuns??={};this._stationRuns[id]={action,started:Date.now()};this._renderService(id);const u=this._utility;try{const response=await this._api('/api/speakers/'+encodeURIComponent(id)+'/'+action,'POST',body);if(!response.job_id)throw Error('Сервис не вернул операцию');for(let n=0;n<60;n++){const job=await this._api('/api/jobs/'+encodeURIComponent(response.job_id));this._stationMessages[id]=job.error??job.stage??'Выполнение…';this._renderService(id);if(u&&this._utility===u){u.message=this._stationMessages[id];this._utilityMessage();}if(job.status==='failed')throw Error(job.error??'Операция не выполнена. Предыдущие настройки сохранены.');if(job.status==='succeeded'){this._stationMessages[id]=({configure:'Настройки применены и проверены.',restart:'Мост перезапущен. Проверка выполнена.',reboot:'Колонка перезагружается. Вернётся примерно через две минуты.',check:'Колонка на связи, доступ по SSH и мост в порядке.',install:'Мост обновлён и проверен.',rollback:'Прошлая версия моста возвращена.'})[action]??'Операция завершена.';this._stationRuns[id]={...this._stationRuns[id],done:true,ok:true,at:Date.now()};if(action==='reboot'){this._rebootingUntil??={};this._rebootingUntil[id]=Date.now()+180000;}await this._loadManager();return true;}await new Promise(resolve=>setTimeout(resolve,2000));}throw Error('Операция продолжается. Обновите состояние позже.');}catch(error){this._stationMessages[id]=error.message;this._stationRuns[id]={...this._stationRuns[id],done:true,ok:false,at:Date.now()};return false;}finally{this._stationBusy.delete(id);this._renderService(id);if(u&&this._utility===u){u.message=this._stationMessages[id];this._utilityMessage();if(u.type==='control'||u.type==='settings'&&u.section==='bridge'){u.setupStep=undefined;const old=this.shadowRoot.querySelector('.utility-dialog')?.parentElement;if(old){const template=document.createElement('template');template.innerHTML=this._utilityDialog();old.replaceWith(template.content);}}}this._refreshMedia();}}
+    async _stationJob(id,action,body={}){if(this._stationBusy.has(id)||this._managerError)return false;this._stationBusy.add(id);this._stationRuns??={};this._stationRuns[id]={action,started:Date.now()};this._renderService(id);const u=this._utility;try{const response=await this._api('/api/speakers/'+encodeURIComponent(id)+'/'+action,'POST',body);if(!response.job_id)throw Error('Сервис не вернул операцию');for(let n=0;n<60;n++){const job=await this._api('/api/jobs/'+encodeURIComponent(response.job_id));this._stationMessages[id]=job.error??job.stage??'Выполнение…';this._renderService(id);if(u&&this._utility===u){u.message=this._stationMessages[id];this._utilityMessage();}if(job.status==='failed')throw Error(job.error??'Операция не выполнена. Предыдущие настройки сохранены.');if(job.status==='succeeded'){this._stationMessages[id]=({configure:'Настройки применены и проверены.',restart:'Мост перезапущен. Проверка выполнена.',reboot:'Колонка перезагружается. Вернётся примерно через две минуты.',check:'Колонка на связи, доступ по SSH и мост в порядке.',install:'Мост обновлён и проверен.',rollback:'Прошлая версия моста возвращена.'})[action]??'Операция завершена.';this._stationRuns[id]={...this._stationRuns[id],done:true,ok:true,at:Date.now()};if(action==='reboot'){this._rebootingUntil??={};this._rebootingUntil[id]=Date.now()+300000;this._stationRuns[id]={action:'reboot',started:this._stationRuns[id].started,rebootAt:Date.now()};this._stationMessages[id]='Колонка выключается';}await this._loadManager();return true;}await new Promise(resolve=>setTimeout(resolve,2000));}throw Error('Операция продолжается. Обновите состояние позже.');}catch(error){this._stationMessages[id]=error.message;this._stationRuns[id]={...this._stationRuns[id],done:true,ok:false,at:Date.now()};return false;}finally{this._stationBusy.delete(id);this._renderService(id);if(u&&this._utility===u){u.message=this._stationMessages[id];this._utilityMessage();if(u.type==='control'||u.type==='settings'&&u.section==='bridge'){u.setupStep=undefined;const old=this.shadowRoot.querySelector('.utility-dialog')?.parentElement;if(old){const template=document.createElement('template');template.innerHTML=this._utilityDialog();old.replaceWith(template.content);}}}this._refreshMedia();}}
     _speakerEditor(disabled){return `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="speaker-title"><header class="dialog-head"><h2 id="speaker-title">Новая колонка</h2>${iconButton('close-speaker','close','Закрыть',disabled)}</header><form id="speaker-form"><div class="dialog-body"><div class="form-grid"><label>Название<input name="name" required placeholder="Алиса на кухне"></label><label>Комната<input name="area" required placeholder="Кухня"></label><label>IP-адрес<input name="host" required placeholder="192.168.10.20"></label><label>SSH-порт<input name="port" required type="number" min="1" max="65535" value="2222"></label><label class="span">Модель<select name="profile"><option value="default">Станция Lite 2</option><option value="midi">Станция MIDI</option></select></label></div><p class="help" style="margin-top:12px">После добавления откроется настройка моста.</p></div><footer class="dialog-foot"><button type="button" data-action="close-speaker" ${disabled}>Отмена</button><button class="primary" type="submit" ${disabled||this._managerError?'disabled':''}>Добавить</button></footer></form></section></div>`;}
     async _fingerprint(id){this._busy=true;try{const data=await this._api('/api/speakers/'+encodeURIComponent(id)+'/fingerprint','POST',{});this._fingerprintData={...data,id};this._message='Сравните отпечаток SSH-ключа перед подтверждением доверия.';if(this._utility?.section==='bridge')this._utility.message=this._message;}catch(error){this._message=error.message;if(this._utility?.section==='bridge')this._utility.message=this._message;}finally{this._busy=false;this._render();}}
     async _trust(id){if(this._fingerprintData?.id!==id)return;this._busy=true;try{await this._api('/api/speakers/'+encodeURIComponent(id)+'/trust','POST',{fingerprint:this._fingerprintData.fingerprint,nonce:this._fingerprintData.nonce});this._fingerprintData=undefined;this._message='Отпечаток подтверждён. Теперь проверим вход с ключом приложения.';if(this._utility?.section==='bridge'){this._utility.message=this._message;this._utility.setupStep=2;}await this._loadManager();}catch(error){this._message=error.message;if(this._utility?.section==='bridge')this._utility.message=error.message;}finally{this._busy=false;this._render();}}

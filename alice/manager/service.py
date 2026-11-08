@@ -353,6 +353,10 @@ class Manager:
         """Read cached observations only; never connect to a speaker in HTTP GET."""
         import updater
         auto_update = updater.enabled(self)
+        try:
+            shipped = updater.target(self)
+        except OSError:
+            shipped = None
         records = self.store.read('speakers.json')
         now = time.time()
         with self.connection_lock:
@@ -367,7 +371,10 @@ class Manager:
                     connection['now_playing'] = None
                     connection['error'] = 'Статус устарел. Ожидается следующая проверка.'
                     connection['delivery'] = {**connection.get('delivery', {}), 'status': 'unknown', 'message': 'Статус колонки устарел.'}
-                result.append({**speaker, 'connection': connection, 'auto_update': auto_update})
+                update = speaker.get('bridge_update') or {}
+                # Whether the bridge on the speaker is the one this app version ships.
+                current = None if not shipped or not update.get('target') else update['target'] == shipped and update.get('state') != 'failed'
+                result.append({**speaker, 'connection': connection, 'auto_update': auto_update, 'bridge_current': current})
         return self._fresh_now_playing(result, now)
 
     def _fresh_now_playing(self, result, now):
@@ -858,6 +865,12 @@ class Manager:
                     result = self._configure(speaker, job, params or {})
                 else:
                     result = getattr(self, '_' + job['operation'])(speaker, job)
+            if job['operation'] == 'install':
+                # A manual update that passed its checks settles a failed automatic one.
+                import updater
+                version = updater.target(self)
+                if version:
+                    updater._set(self, speaker, version, 'current')
             job.update(status='succeeded', stage='Готово', result=result)
         except Error as error:
             if job['operation'] == 'check':

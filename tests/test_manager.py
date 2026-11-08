@@ -446,6 +446,16 @@ class ManagerTests(unittest.TestCase):
         ssh.assert_not_called()
         self.assertEqual(connection['status'], 'offline')
 
+    def test_manual_update_settles_failed_automatic_one(self):
+        import updater
+        self.manager.store.metadata(self.speaker['id'], bridge_update={'state': 'failed', 'target': 'abc'})
+        job = {'operation': 'install', 'status': 'running'}
+        with patch.object(self.manager, '_install', return_value={'ok': True}), patch.object(updater, 'target', return_value='abc'):
+            self.manager._job(job, self.speaker)
+            self.assertEqual(job['status'], 'succeeded')
+            self.assertEqual(self.manager.store.speaker(self.speaker['id'])['bridge_update']['state'], 'current')
+            self.assertTrue(self.manager.speakers()[0]['bridge_current'])
+
     def test_reboot_works_outside_installation(self):
         self.manager.store.metadata(self.speaker['id'], install={'state': 'ready'})
         with patch.object(self.manager, 'ssh') as ssh:

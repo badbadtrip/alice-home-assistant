@@ -1233,8 +1233,8 @@ button:active:not(:disabled){transform:scale(.97)}
       const run=this._stationRuns?.[s.id];
       const seconds=t=>{const n=Math.max(0,Math.round((Date.now()-t)/1000));return n<60?n+' с':Math.floor(n/60)+' мин '+(n%60)+' с';},phase=this._rebootPhase(s);
       const status=phase?'<span class="svc-spin" style="width:12px;height:12px;border-width:2px"></span>Перезагружается':c.status==='online'?'<i class="m-dot on"></i>На связи':c.status==='offline'?'<i class="m-dot"></i>Не отвечает':'Проверяется';
-      const target=String(s.bridge_update?.target??s.install?.version??''),build=/^[0-9a-f]{12,}$/i.test(target)?target.slice(0,7):target||'—';
-      const update=({updating:'обновляется',verifying:'проверяется',awaiting_voice:'ждёт голосовой проверки',rolling_back:'откатывается',failed:'обновление не прошло',current:'актуальна'})[s.bridge_update?.state]??'';
+      const build=s.bridge_update?.state==='failed'?'Нужно обновить':s.bridge_current===true?'Актуальный':s.bridge_current===false?'Устарел':'—';
+      const update=({updating:'обновляется',verifying:'проверяется',awaiting_voice:'ждёт голосовой проверки',rolling_back:'откатывается',failed:'прошлое обновление не прошло'})[s.bridge_update?.state]??'';
       const fact=(label,value)=>`<div class="svc-fact"><small>${label}</small><b>${value}</b></div>`;
       const facts=`<div class="svc-facts">${fact('Связь',status)}${fact('Мост',escape(build)+(update?`<small class="fact-note ${s.bridge_update?.state==='failed'?'bad':''}">${update}</small>`:''))}${fact('Работает',m.uptime_s!=null?this._metricDuration(m.uptime_s):'—')}${fact('Свободно на флеше',m.data_free_kb!=null?this._metricBytes(m.data_free_kb):'—')}</div>`;
       // What runs now, and how the last action ended: the owner must never guess.

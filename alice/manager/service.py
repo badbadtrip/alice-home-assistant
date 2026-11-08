@@ -398,6 +398,13 @@ class Manager:
         """Routine calls go over HTTP. SSH is the fallback for a bridge that predates it."""
         if not re.fullmatch(r'/[a-z-]+(\?[A-Za-z0-9_=&.-]*)?', path):
             raise Error('Некорректный адрес моста.', 500)
+        # A speaker that just failed both ways is off the air: answer at once instead of
+        # waiting out the HTTP and SSH timeouts again on every call for the next 20 s.
+        down = getattr(self, '_bridge_down', None)
+        if down is None:
+            down = self._bridge_down = {}
+        if down.get(speaker['host'], 0) > time.monotonic():
+            raise Error('Колонка не отвечает по сети.', 502)
         try:
             request = Request('http://' + lan_ip(speaker['host']) + ':18862' + path, headers={'Authorization': 'Bearer ' + self._hf_token()})
             with urlopen(request, timeout=min(timeout, 6)) as response:
@@ -408,6 +415,11 @@ class Manager:
         except (OSError, Error):
             if not ssh_fallback:
                 raise Error('Колонка не отвечает по сети.', 502) from None
+            try:
+                return self.ssh(speaker, 'wget -T 4 -q -O - "http://127.0.0.1:18861' + path + '"', timeout=timeout)
+            except Exception:
+                down[speaker['host']] = time.monotonic() + 20
+                raise
         return self.ssh(speaker, 'wget -T 4 -q -O - "http://127.0.0.1:18861' + path + '"', timeout=timeout)
 
     def _metrics(self, speaker):

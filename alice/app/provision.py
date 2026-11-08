@@ -1,7 +1,9 @@
 """Own HA dashboard/label registration via supported WebSocket APIs."""
 import base64
+import hashlib
 import json
 import os
+import urllib.request
 from pathlib import Path
 from websockets.sync.client import connect
 from bootstrap import write_private
@@ -34,6 +36,27 @@ class HA:
         raise RuntimeError('HA WS response limit')
 
 
+def card_url(source,slug,config=Path('/homeassistant')):
+    """A cached file under /local when HA serves it; otherwise the inline module as before."""
+    body=source.encode()
+    inline='data:text/javascript;base64,'+base64.b64encode(body).decode()
+    digest=hashlib.sha256(body).hexdigest()[:12]
+    name='alice-app-card.js' if slug=='local_alice' else 'alice-'+slug.replace('_','-')+'-card.js'
+    try:
+        if not config.is_dir():return inline
+        folder=config/'www'/'alice';folder.mkdir(parents=True,exist_ok=True)
+        target=folder/name;tmp=folder/(name+'.tmp')
+        if not target.is_file() or target.read_bytes()!=body:
+            tmp.write_bytes(body);os.replace(tmp,target)
+        # HA serves /local only when www existed at its start; check before switching.
+        request=urllib.request.Request('http://supervisor/core/local/alice/'+name+'?v='+digest,headers={'Authorization':'Bearer '+os.environ.get('SUPERVISOR_TOKEN','')})
+        with urllib.request.urlopen(request,timeout=10) as reply:
+            if hashlib.sha256(reply.read()).hexdigest()[:12]!=digest:return inline
+        return '/local/alice/'+name+'?v='+digest
+    except Exception:
+        return inline
+
+
 def dashboard_path(slug):
     # Local and repository installations may coexist during a clean-install test.
     return 'alice-app' if slug=='local_alice' else 'alice-'+slug.replace('_','-')
@@ -61,7 +84,7 @@ def provision(value,slug,data=Path('/data'),root=Path('/app')):
             ha.call('lovelace/dashboards/create',url_path=path,title='Алиса',show_in_sidebar=False,require_admin=True,icon='mdi:account-voice')
         source=(root/'ui/alice-voice-card.js').read_text()
         source=source.replace('alice-voice-card','alice-app-card')
-        url='data:text/javascript;base64,'+base64.b64encode(source.encode()).decode()
+        url=card_url(source,slug)
         resources=ha.call('lovelace/resources')
         record_path=data/'resource.json'
         record=json.loads(record_path.read_text()) if record_path.exists() else {}

@@ -1,5 +1,5 @@
 name: Алиса
-version: "0.54.3"
+version: "0.54.4"
 image: ghcr.io/badbadtrip/alice-home-assistant-{arch}
 slug: alice
 description: Колонки Алисы, голосовые команды, установка мостов и встроенная Wiki
@@ -26,6 +26,8 @@ ports_description:
 backup: cold
 map:
   - type: app_config
+    read_only: false
+  - type: homeassistant_config
     read_only: false
 options:
   advertised_url: ""

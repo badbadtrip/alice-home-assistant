@@ -333,6 +333,24 @@ main{max-width:1360px;padding:0 24px 48px}
 .reply-row span{font-size:13px;font-weight:500;color:var(--text)}
 .reply-row input{height:40px}
 @media(max-width:700px){.phrase-bar{flex-wrap:wrap}.phrase-bar input{flex-basis:100%}.phrase-bar select{flex:1;max-width:none}.reply-row{grid-template-columns:minmax(0,1fr)}.phrases-page .page-intro{flex-direction:column}}
+.help-view{--fg:var(--text);--bar:var(--surface);--muted:var(--muted);--line:var(--line);--tint:var(--tint);--accent:var(--accent);max-width:1280px;margin:0 auto}
+.help-bar{display:flex;align-items:center;gap:12px;margin-bottom:4px}.help-bar span{color:var(--muted);font-size:13px}
+.help-view .docs-layout{padding:16px 0 40px}
+.help-view .docs-search,.help-view #docs-search-results,.help-view .docs-offline{display:none}
+.svc-run{display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:14px 16px;border-radius:16px;background:var(--accent-tint)}
+.svc-run.ok{background:color-mix(in srgb,var(--ok) 14%,transparent)}.svc-run.fail{background:color-mix(in srgb,var(--err) 14%,transparent)}
+.svc-run b{display:block;font-weight:500}.svc-run small{display:block;color:var(--muted);font-size:12.5px}.svc-run>div{flex:1;min-width:0}
+.svc-run .time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;white-space:nowrap}
+.svc-spin{flex:none;width:22px;height:22px;border-radius:50%;border:2.5px solid color-mix(in srgb,var(--accent) 30%,transparent);border-top-color:var(--accent);animation:svc-spin .9s linear infinite}
+@keyframes svc-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.svc-spin{animation-duration:3s}}
+.svc-run ha-icon{flex:none;--mdc-icon-size:22px}.svc-run.ok ha-icon{color:var(--ok)}.svc-run.fail ha-icon{color:var(--err)}
+.svc-switches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.svc-switch{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:var(--tint)}
+.svc-switch>span{flex:1;min-width:0}.svc-switch b{display:block;font-weight:500}.svc-switch small{display:block;color:var(--muted);font-size:12.5px}
+.svc-ssh code{display:block;padding:10px 12px;border-radius:10px;background:var(--tint);overflow-wrap:anywhere;font-size:12px}
+.svc-ssh .actions{margin-top:10px}
+@media(max-width:700px){.svc-switches{grid-template-columns:minmax(0,1fr)}}
 .spk-mood{display:none}
 .look-tile,.look-wide{--ink:#151515;--ink-soft:rgb(0 0 0/.66);--well:rgb(0 0 0/.12);--well-fill:rgb(0 0 0/.28)}
 .look-tile .spk,.look-wide .spk{--mood:var(--c-idle);position:relative;gap:10px;padding:18px;border-radius:26px;box-shadow:none;overflow:hidden}
@@ -1142,6 +1160,8 @@ button:active:not(:disabled){transform:scale(.97)}
       const p=a.phrases,saved=await this._api('/api/phrases','PUT',{items:p.items??[],disabled:p.disabled??[],disabled_rules:p.disabled_rules??[],replies:p.replies??{}});
       if(this._admin===a)a.phrases=saved;
     }
+    _renderService(id){if(this._admin?.tab==='service'&&this._admin.speakerId===id&&this._section==='speaker')this._render();}
+    _jobTitle(action){return ({check:'Проверка колонки',restart:'Перезапуск моста',reboot:'Перезагрузка колонки',rollback:'Возврат прошлой версии',install:'Обновление моста',configure:'Применение настроек',report:'Сбор отчёта'})[action]??'Операция';}
     _help(page,label='Подробнее в справке'){return `<button type="button" class="help-link" data-action="wiki" data-page="${page}">${icon('help-circle-outline')}<span>${label}</span></button>`;}
     _houseHead(active){const tabs=[['commands','Команды'],['devices','Устройства'],['dictionary','Словарь']];return `<div class="page-intro"><div><h2 id="admin-title" class="admin-title">Дом</h2><p class="help">Что Алиса умеет делать в вашем доме</p></div></div><div class="seg page-seg" role="tablist" aria-label="Разделы">${tabs.map(([id,label])=>`<button type="button" role="tab" aria-selected="${active===id}" data-action="house-tab" data-tab="${id}" ${this._admin?.busy?'disabled':''}>${label}</button>`).join('')}</div>`;}
     _musicPage(blocked){
@@ -1159,27 +1179,39 @@ button:active:not(:disabled){transform:scale(.97)}
       return `<div class="music-page"><div class="page-intro"><div><h3>Музыка</h3><p class="help">Что включается по голосу и на каких колонках это доступно.</p></div>${this._help('Music','Музыка в справке')}</div>${choice}${matrix}${spotifyPanel}</div>`;
     }
     _servicePage(speaker,files,shell,blocked){
-      const a=this._admin,s=speaker??{},c=s.connection??{},m=c.metrics??{},id=escape(s.id??''),busy=blocked||(this._stationBusy.has(s.id)?'disabled':''),open=a.svcOpen??{};
+      const a=this._admin,s=speaker??{},c=s.connection??{},m=c.metrics??{},id=escape(s.id??''),running=this._stationBusy.has(s.id),busy=blocked||(running?'disabled':''),open=a.svcOpen??{};
+      const run=this._stationRuns?.[s.id],rebooting=(this._rebootingUntil?.[s.id]??0)>Date.now()&&c.status!=='online';
+      const seconds=t=>{const n=Math.max(0,Math.round((Date.now()-t)/1000));return n<60?n+' с':Math.floor(n/60)+' мин '+(n%60)+' с';};
+      const status=rebooting?'<span class="svc-spin" style="width:12px;height:12px;border-width:2px"></span>Перезагружается':c.status==='online'?'<i class="m-dot on"></i>На связи':c.status==='offline'?'<i class="m-dot"></i>Не отвечает':'Проверяется';
+      const target=String(s.bridge_update?.target??s.install?.version??''),build=/^[0-9a-f]{12,}$/i.test(target)?target.slice(0,7):target||'—';
+      const update=({updating:'обновляется',verifying:'проверяется',awaiting_voice:'ждёт голосовой проверки',rolling_back:'откатывается',failed:'обновление не прошло',current:'актуальна'})[s.bridge_update?.state]??'';
       const fact=(label,value)=>`<div class="svc-fact"><small>${label}</small><b>${value}</b></div>`;
-      const status=c.status==='online'?'<i class="m-dot on"></i>На связи':c.status==='offline'?'<i class="m-dot"></i>Не отвечает':'Проверяется';
-      const facts=`<div class="svc-facts">${fact('Связь',status)}${fact('Мост',escape(s.bridge_update?.target??s.install?.version??'—'))}${fact('Работает',m.uptime_s!=null?this._metricDuration(m.uptime_s):'—')}${fact('Свободно на флеше',m.data_free_kb!=null?this._metricBytes(m.data_free_kb):'—')}</div>`;
-      const tile=(action,glyph,title,text,label,tone='')=>`<div class="svc-tile ${tone}"><span class="badge">${icon(glyph)}</span><h4>${title}</h4><p>${text}</p><button type="button" class="secondary small" data-action="${action}" data-id="${id}" ${busy}>${label}</button></div>`;
-      const tiles=`<div class="svc-tiles">${tile('check','stethoscope','Проверить колонку','Связь, доступ по SSH и ответ моста.','Проверить')}${tile('restart','restart','Перезапустить мост','Если Алиса не отвечает. Музыка прервётся на пару секунд.','Перезапустить')}${tile('reboot','power','Перезагрузить колонку','Полный перезапуск, около двух минут.','Перезагрузить')}${tile('rollback','backup-restore','Вернуть прошлую версию','Если после обновления моста что-то сломалось.','Откатить','warn')}${tile('metrics','chart-areaspline','Метрики','Процессор, память, температура и сеть за сутки.','Открыть')}${tile('svc-report','file-document-outline','Отчёт для поддержки','Состояние моста, памяти и процессов одним файлом.','Скачать')}</div>`;
-      const note=this._stationMessages[s.id]?`<p class="notice" role="status">${escape(this._stationMessages[s.id])}</p>`:'';
+      const facts=`<div class="svc-facts">${fact('Связь',status)}${fact('Мост',escape(build)+(update?`<small style="display:inline;color:var(--muted);font-weight:400"> · ${update}</small>`:''))}${fact('Работает',m.uptime_s!=null?this._metricDuration(m.uptime_s):'—')}${fact('Свободно на флеше',m.data_free_kb!=null?this._metricBytes(m.data_free_kb):'—')}</div>`;
+      // What runs now, and how the last action ended: the owner must never guess.
+      const progress=running&&run?`<div class="svc-run" role="status"><span class="svc-spin" aria-hidden="true"></span><div><b>${this._jobTitle(run.action)}…</b><small>${escape(this._stationMessages[s.id]??'Начинаем')}</small></div><span class="time">${seconds(run.started)}</span></div>`
+        :run?.done&&Date.now()-run.at<10*60*1000?`<div class="svc-run ${run.ok?'ok':'fail'}" role="status">${icon(run.ok?'check-circle-outline':'alert-circle-outline')}<div><b>${this._jobTitle(run.action)}: ${run.ok?'готово':'не получилось'}</b><small>${escape(this._stationMessages[s.id]??'')}</small></div><span class="time">${new Date(run.at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span></div>`:'';
+      const setupNeeded=!s.trusted_fingerprint||!s.last_check?.root||!['ready','current',undefined].includes(s.install?.state)&&s.install?.state!=='awaiting_acceptance'&&c.status!=='online';
+      const setup=setupNeeded?`<div class="svc-run"><span class="badge">${icon('rocket-launch-outline')}</span><div><b>Мост ещё не подключён</b><small>Мастер проведёт по шагам: адрес, доступ, установка и голосовая проверка.</small></div><button type="button" class="primary small" data-action="setup" data-id="${id}">Открыть мастер</button></div>`:'';
+      const tile=(action,glyph,title,text,label,tone='')=>`<div class="svc-tile ${tone}"><span class="badge">${icon(glyph)}</span><h4>${title}</h4><p>${text}</p><button type="button" class="secondary small" data-action="${action}" data-id="${id}" ${busy}>${running&&run?.action===action?'Выполняется…':label}</button></div>`;
+      const tiles=`<div class="svc-tiles">${tile('check','stethoscope','Проверить колонку','Связь, доступ по SSH и ответ моста.','Проверить')}${tile('restart','restart','Перезапустить мост','Если Алиса не отвечает. Колонка не перезагружается, музыка прервётся на пару секунд.','Перезапустить')}${tile('reboot','power','Перезагрузить колонку','Полный перезапуск колонки, около двух минут.','Перезагрузить')}${tile('install','update','Обновить мост','Поставить мост из текущей версии приложения и проверить его.','Обновить')}${tile('rollback','backup-restore','Вернуть прошлую версию','Если после обновления моста что-то сломалось.','Откатить','warn')}${tile('svc-report','file-document-outline','Отчёт для поддержки','Состояние моста, памяти и процессов одним файлом.','Скачать')}</div>`;
+      const airplay=c.airplay?`<div class="svc-switch"><span><b>AirPlay</b><small>${c.airplay.enabled?'Колонка видна как AirPlay-приёмник':'Выключен'}</small></span><button type="button" class="phrase-switch" role="switch" aria-checked="${!!c.airplay.enabled}" data-action="airplay" data-id="${id}" aria-label="AirPlay" ${busy}><i></i></button></div>`:'';
+      const auto=`<div class="svc-switch"><span><b>Автообновление моста</b><small>Сразу после обновления приложения, по одной колонке</small></span><button type="button" class="phrase-switch" role="switch" aria-checked="${s.auto_update!==false}" data-action="auto-update" aria-label="Автообновление" ${busy}><i></i></button></div>`;
       const more=(key,glyph,title,text,body)=>`<section class="svc-more"><button type="button" class="svc-more-head" data-action="admin-svc-toggle" data-key="${key}" aria-expanded="${!!open[key]}"><span class="badge">${icon(glyph)}</span><span><b>${title}</b><small>${text}</small></span>${icon(open[key]?'chevron-up':'chevron-down')}</button>${open[key]?`<div class="svc-more-body">${body}</div>`:''}</section>`;
       const chips=`<div class="svc-chips">${['ps w','df -h','free','logread | tail -n 50'].map(command=>`<button type="button" class="chip" data-action="admin-command" data-command="${escape(command)}" ${blocked}>${escape(command)}</button>`).join('')}</div>`;
-      return `<div class="service-page">${facts}${note}${tiles}<h3 class="svc-sub">Для опытных</h3>${more('files','file-cog-outline','Файлы на колонке','Правка конфигурации вручную, с резервной копией',files)}${more('console','console','Консоль','Команда от root прямо на колонке, до 10 секунд',`<div class="svc-warn">${icon('alert-outline')}<span>Неверная команда может нарушить работу колонки. Если что-то пошло не так, поможет откат или восстановление.</span>${this._help('Recovery','Восстановление')}</div>${chips}${shell}`)}</div>`;
+      const ssh=`<div class="svc-ssh"><p class="help">Адрес: <code style="display:inline">${escape(s.host??'')}:${escape(s.port??2222)}</code></p><p class="help" style="margin-top:8px">Публичный ключ приложения:</p><code>${escape(this._key??'')}</code><div class="actions"><button type="button" class="secondary small" data-action="fingerprint" data-id="${id}" ${busy}>Показать SSH-отпечаток колонки</button></div>${this._fingerprintData?.id===s.id?`<code style="margin-top:8px">${escape(this._fingerprintData.fingerprint)}</code><div class="actions"><button type="button" class="primary small" data-action="trust" data-id="${id}" ${busy}>Отпечаток совпадает</button></div>`:''}</div>`;
+      if(running&&!this._serviceTick){this._serviceTick=setInterval(()=>{if(!this._stationBusy.size&&!Object.keys(this._rebootingUntil??{}).some(k=>this._rebootingUntil[k]>Date.now())){clearInterval(this._serviceTick);this._serviceTick=undefined;}const el=this.shadowRoot.querySelector('.svc-run .time');const r=this._stationRuns?.[this._admin?.speakerId];if(el&&r&&!r.done)el.textContent=seconds(r.started);},1000);}
+      return `<div class="service-page">${facts}${progress}${setup}${tiles}<div class="svc-switches">${airplay}${auto}</div><h3 class="svc-sub">Для опытных</h3>${more('ssh','key-outline','SSH и подключение','Адрес колонки, ключ приложения и отпечаток',ssh)}${more('files','file-cog-outline','Файлы на колонке','Правка конфигурации вручную, с резервной копией',files)}${more('console','console','Консоль','Команда от root прямо на колонке, до 10 секунд',`<div class="svc-warn">${icon('alert-outline')}<span>Неверная команда может нарушить работу колонки. Если что-то пошло не так, поможет откат или восстановление.</span>${this._help('Recovery','Восстановление')}</div>${chips}${shell}`)}</div>`;
     }
     async _serviceReport(id){
       const s=this._speakers.find(item=>item.id===id);if(!s||this._stationBusy.has(id))return;
-      this._stationBusy.add(id);this._stationMessages[id]='Собираем отчёт…';this._render();
+      this._stationBusy.add(id);this._stationRuns??={};this._stationRuns[id]={action:'report',started:Date.now()};this._stationMessages[id]='Собираем отчёт…';this._render();
       try{
         const command='echo "== Мост"; wget -qO- http://127.0.0.1:18861/healthz; echo; echo "== Система"; uname -a; uptime; free; df -h /data; echo "== Процессы"; ps w';
         const result=await this._api('/api/speakers/'+encodeURIComponent(id)+'/console','POST',{command});
         const stamp=new Date().toISOString().slice(0,16).replace(/[:T]/g,'-'),link=document.createElement('a');
         link.href=URL.createObjectURL(new Blob(['Алиса · '+s.name+' · '+s.host+'\n\n'+result.output],{type:'text/plain;charset=utf-8'}));link.download='alice-'+s.id+'-'+stamp+'.txt';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);
-        this._stationMessages[id]='Отчёт сохранён в загрузки.';
-      }catch(error){this._stationMessages[id]=error.message;}
+        this._stationMessages[id]='Отчёт сохранён в загрузки.';this._stationRuns[id]={...this._stationRuns[id],done:true,ok:true,at:Date.now()};
+      }catch(error){this._stationMessages[id]=error.message;this._stationRuns[id]={...this._stationRuns[id],done:true,ok:false,at:Date.now()};}
       finally{this._stationBusy.delete(id);this._render();}
     }
     _relayPage(blocked){
@@ -1259,7 +1291,7 @@ button:active:not(:disabled){transform:scale(.97)}
         body=a.options?`<section class="group"><h3>Колонки</h3>${field('advertised_url','Локальный адрес приложения','http://192.168.…:18081')}<details><summary>Дополнительно</summary><div class="fields">${field('speaker_network','Сеть колонок (CIDR)')}${field('voice_command_label','Метка голосовых команд')}</div></details></section><div class="actions"><button type="button" class="primary" data-action="admin-save-app" ${blocked}>Сохранить</button><button type="button" class="secondary" data-action="admin-restart-app" ${blocked}>Перезапустить приложение</button></div><p class="help">Новые значения начинают работать после перезапуска. Подключённые колонки обновляются через настройки моста.</p>`:'<p>Загрузка…</p>';
       }
       const inline=a.tab==='general'||a.tab==='bridge',solo=this._section!=='settings',seg=tabs=>`<div class="seg page-seg" role="tablist" aria-label="Разделы">${tabs.map(([id,label])=>`<button type="button" role="tab" aria-selected="${a.tab===id}" data-action="admin-tab" data-tab="${id}" ${blocked}>${label}</button>`).join('')}</div>`;
-      const head=page?`<div class="speaker-head"><button type="button" class="icon" data-action="admin-close" aria-label="К колонкам" title="К колонкам">${icon('arrow-left')}</button><div><h2 id="admin-title">${escape(speaker?.name??'Колонка')}</h2><p>${escape([speaker?.area,speaker?.host].filter(Boolean).join(' · '))}</p></div></div>${seg([['general','Колонка'],['indicator','Подсветка'],['bridge','Мост'],['service','Обслуживание']])}`:this._section==='house'?this._houseHead(a.tab):this._section==='music'?'<h2 id="admin-title" class="admin-title">Музыка</h2>':'<h2 id="admin-title" class="admin-title">Настройки</h2>';
+      const head=page?`<div class="speaker-head"><button type="button" class="icon" data-action="admin-close" aria-label="К колонкам" title="К колонкам">${icon('arrow-left')}</button><div><h2 id="admin-title">${escape(speaker?.name??'Колонка')}</h2><p>${escape([speaker?.area,speaker?.host].filter(Boolean).join(' · '))}</p></div></div>${seg([['general','Колонка'],['indicator','Подсветка'],['service','Обслуживание']])}`:this._section==='house'?this._houseHead(a.tab):this._section==='music'?'<h2 id="admin-title" class="admin-title">Музыка</h2>':'<h2 id="admin-title" class="admin-title">Настройки</h2>';
       return `<section class="dialog admin-dialog admin-page ${solo?'admin-solo':''}" aria-labelledby="admin-title">${head}<div class="admin-shell ${solo?'solo':''}">${solo?'':`<nav class="rail" role="tablist" aria-orientation="vertical" aria-label="Разделы настроек">${groups.map(([name,tabs])=>`<h3>${name}</h3>${tabs.map(([id,label,glyph])=>`<button type="button" role="tab" aria-selected="${a.tab===id}" data-action="admin-tab" data-tab="${id}" ${blocked}>${icon(glyph)}${label}</button>`).join('')}`).join('')}</nav>`}<div class="admin-main"><div class="admin-scroll">${a.message?`<div class="notice" role="status">${escape(a.message)}</div>`:''}${inline?body:`<form id="admin-form">${body}</form>`}</div><footer id="admin-footer" class="admin-footer" aria-live="polite">${this._adminFooter()}</footer></div></div></section>`;
     }
     _leaveAdmin(section='speakers'){if(this._utility?.inline)this._utility=null;this._stopAdminHA();this._admin=null;this._section=section;this._journalOpen=section==='journal';this._render();if(section==='journal')this._loadActivity();this.shadowRoot.querySelector('[data-section="'+section+'"]')?.focus();}
@@ -1426,6 +1458,7 @@ button:active:not(:disabled){transform:scale(.97)}
     _home(rows,disabled){
       const section=this._section,shown=rows.slice(0,3);let body;
       if(section==='commands')body=`<section class="page-narrow" aria-labelledby="commands-title">${this._commandsHead(rows,'Команды')}${this._commandList(rows,disabled)}<p class="foot">Скажите «Алиса» и любую из фраз.</p></section>`;
+      else if(section==='help')body=this._helpView();
       else if(section==='metrics')body=this._metricsPage();
       else if(section==='journal')body=`<section class="page-narrow" aria-labelledby="journal-title"><div class="sec"><h2 id="journal-title">Журнал</h2></div>${this._diagnostics()}</section>`;
       else if(section==='house'&&!this._admin)body=`<section class="page-narrow house-page" aria-labelledby="admin-title">${this._houseHead('commands')}<div class="house-intro"><p>Своя фраза запускает автоматизацию или скрипт Home Assistant. Скажите «Алиса» и любую из фраз.</p>${this._help('Commands','Как это работает')}</div>${this._commandsHead(rows,'Свои команды','h3')}${this._commandList(rows,disabled)}</section>`;
@@ -1455,7 +1488,29 @@ button:active:not(:disabled){transform:scale(.97)}
       if(!this._admin){this._section='speakers';this._render();return;}
       this._admin.speakerId=id;await this._adminAction('admin-tab',{dataset:{tab}});
     }
-    async _openGuide(page='Home'){try{const base=await this._managerBase(),target=(base??'')+'/wiki/'+(/^[A-Za-z-]+$/.test(page)?page:'Home');if(window!==window.top&&this._config.app_embedded)window.parent.location.href=target;else window.location.href=target;}catch(error){this._message=error.message;this._render();}}
+    async _openGuide(page='Home'){
+      page=/^[A-Za-z-]+$/.test(page)?page:'Home';const [slug,anchor]=[page,''];
+      if(this._admin){if(this._adminDirty()){this._admin.message='Сначала сохраните или отмените изменения.';this._renderAdminFooter();return;}this._stopAdminHA();this._admin=null;}
+      if(this._section!=='help')this._helpReturn=this._section;
+      this._section='help';this._helpPage=slug;this._helpHtml=null;this._render();
+      return this._loadHelp(slug,anchor);
+    }
+    async _loadHelp(slug,anchor){
+      try{
+        const base=await this._managerBase(),response=await fetch(base+'/wiki/'+slug,{credentials:'same-origin'});
+        if(!response.ok)throw Error('Страница справки недоступна.');
+        const doc=new DOMParser().parseFromString(await response.text(),'text/html');
+        doc.querySelectorAll('script,link,iframe,object,embed').forEach(el=>el.remove());
+        doc.querySelectorAll('*').forEach(el=>{for(const attr of [...el.attributes])if(/^on/i.test(attr.name))el.removeAttribute(attr.name);});
+        const style=[...doc.querySelectorAll('main style')].map(el=>el.textContent).join('\n'),layout=doc.querySelector('.docs-layout');
+        this._helpHtml={style,body:layout?layout.outerHTML:'<p class="help">Страница справки пуста.</p>'};
+      }catch(error){this._helpHtml={style:'',body:`<p class="help">${escape(error.message)}</p>`};}
+      if(this._section==='help'&&this._helpPage===slug){this._render();if(anchor)this.shadowRoot.getElementById(anchor)?.scrollIntoView();else this.shadowRoot.querySelector('.help-view')?.scrollIntoView({block:'start'});}
+    }
+    _helpView(){
+      const h=this._helpHtml;
+      return `<section class="help-view" aria-label="Справка"><div class="help-bar"><button type="button" class="secondary small" data-action="help-back">${icon('arrow-left')}Назад</button><span>Справка</span></div>${h?`<style>${h.style}</style>${h.body}`:'<p class="help">Загрузка…</p>'}</section>`;
+    }
     _command(item,disabled){
       const phrases=[...new Map(aliases(item).map(p=>[normalize(p),p])).values()],state=this._hass?.states[item.entity_id]?.state;
       const ready=!!state&&state!=='unavailable'&&state!=='unknown'&&(!item.entity_id.startsWith('automation.')||state==='on');
@@ -1622,7 +1677,7 @@ button:active:not(:disabled){transform:scale(.97)}
           }
         }
       }catch(error){u.message=error.message??'Не удалось выполнить запрос. Повторите ещё раз.';}finally{u.busy=false;this._utilityMessage();}}
-    async _stationJob(id,action,body={}){if(this._stationBusy.has(id)||this._managerError)return false;this._stationBusy.add(id);const u=this._utility;try{const response=await this._api('/api/speakers/'+encodeURIComponent(id)+'/'+action,'POST',body);if(!response.job_id)throw Error('Сервис не вернул операцию');for(let n=0;n<60;n++){const job=await this._api('/api/jobs/'+encodeURIComponent(response.job_id));this._stationMessages[id]=job.error??job.stage??'Выполнение…';if(u&&this._utility===u){u.message=this._stationMessages[id];this._utilityMessage();}if(job.status==='failed')throw Error(job.error??'Операция не выполнена. Предыдущие настройки сохранены.');if(job.status==='succeeded'){this._stationMessages[id]=({configure:'Настройки применены и проверены.',restart:'Мост перезапущен. Проверка выполнена.'})[action]??'Операция завершена.';await this._loadManager();return true;}await new Promise(resolve=>setTimeout(resolve,2000));}throw Error('Операция продолжается. Обновите состояние позже.');}catch(error){this._stationMessages[id]=error.message;return false;}finally{this._stationBusy.delete(id);if(u&&this._utility===u){u.message=this._stationMessages[id];this._utilityMessage();if(u.type==='control'||u.type==='settings'&&u.section==='bridge'){u.setupStep=undefined;const old=this.shadowRoot.querySelector('.utility-dialog')?.parentElement;if(old){const template=document.createElement('template');template.innerHTML=this._utilityDialog();old.replaceWith(template.content);}}}this._refreshMedia();}}
+    async _stationJob(id,action,body={}){if(this._stationBusy.has(id)||this._managerError)return false;this._stationBusy.add(id);this._stationRuns??={};this._stationRuns[id]={action,started:Date.now()};this._renderService(id);const u=this._utility;try{const response=await this._api('/api/speakers/'+encodeURIComponent(id)+'/'+action,'POST',body);if(!response.job_id)throw Error('Сервис не вернул операцию');for(let n=0;n<60;n++){const job=await this._api('/api/jobs/'+encodeURIComponent(response.job_id));this._stationMessages[id]=job.error??job.stage??'Выполнение…';this._renderService(id);if(u&&this._utility===u){u.message=this._stationMessages[id];this._utilityMessage();}if(job.status==='failed')throw Error(job.error??'Операция не выполнена. Предыдущие настройки сохранены.');if(job.status==='succeeded'){this._stationMessages[id]=({configure:'Настройки применены и проверены.',restart:'Мост перезапущен. Проверка выполнена.',reboot:'Колонка перезагружается. Вернётся примерно через две минуты.',check:'Колонка на связи, доступ по SSH и мост в порядке.',install:'Мост обновлён и проверен.',rollback:'Прошлая версия моста возвращена.'})[action]??'Операция завершена.';this._stationRuns[id]={...this._stationRuns[id],done:true,ok:true,at:Date.now()};if(action==='reboot'){this._rebootingUntil??={};this._rebootingUntil[id]=Date.now()+180000;}await this._loadManager();return true;}await new Promise(resolve=>setTimeout(resolve,2000));}throw Error('Операция продолжается. Обновите состояние позже.');}catch(error){this._stationMessages[id]=error.message;this._stationRuns[id]={...this._stationRuns[id],done:true,ok:false,at:Date.now()};return false;}finally{this._stationBusy.delete(id);this._renderService(id);if(u&&this._utility===u){u.message=this._stationMessages[id];this._utilityMessage();if(u.type==='control'||u.type==='settings'&&u.section==='bridge'){u.setupStep=undefined;const old=this.shadowRoot.querySelector('.utility-dialog')?.parentElement;if(old){const template=document.createElement('template');template.innerHTML=this._utilityDialog();old.replaceWith(template.content);}}}this._refreshMedia();}}
     _speakerEditor(disabled){return `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="speaker-title"><header class="dialog-head"><h2 id="speaker-title">Новая колонка</h2>${iconButton('close-speaker','close','Закрыть',disabled)}</header><form id="speaker-form"><div class="dialog-body"><div class="form-grid"><label>Название<input name="name" required placeholder="Алиса на кухне"></label><label>Комната<input name="area" required placeholder="Кухня"></label><label>IP-адрес<input name="host" required placeholder="192.168.10.20"></label><label>SSH-порт<input name="port" required type="number" min="1" max="65535" value="2222"></label><label class="span">Модель<select name="profile"><option value="default">Станция Lite 2</option><option value="midi">Станция MIDI</option></select></label></div><p class="help" style="margin-top:12px">После добавления откроется настройка моста.</p></div><footer class="dialog-foot"><button type="button" data-action="close-speaker" ${disabled}>Отмена</button><button class="primary" type="submit" ${disabled||this._managerError?'disabled':''}>Добавить</button></footer></form></section></div>`;}
     async _fingerprint(id){this._busy=true;try{const data=await this._api('/api/speakers/'+encodeURIComponent(id)+'/fingerprint','POST',{});this._fingerprintData={...data,id};this._message='Сравните отпечаток SSH-ключа перед подтверждением доверия.';if(this._utility?.section==='bridge')this._utility.message=this._message;}catch(error){this._message=error.message;if(this._utility?.section==='bridge')this._utility.message=this._message;}finally{this._busy=false;this._render();}}
     async _trust(id){if(this._fingerprintData?.id!==id)return;this._busy=true;try{await this._api('/api/speakers/'+encodeURIComponent(id)+'/trust','POST',{fingerprint:this._fingerprintData.fingerprint,nonce:this._fingerprintData.nonce});this._fingerprintData=undefined;this._message='Отпечаток подтверждён. Теперь проверим вход с ключом приложения.';if(this._utility?.section==='bridge'){this._utility.message=this._message;this._utility.setupStep=2;}await this._loadManager();}catch(error){this._message=error.message;if(this._utility?.section==='bridge')this._utility.message=error.message;}finally{this._busy=false;this._render();}}
@@ -1675,6 +1730,9 @@ button:active:not(:disabled){transform:scale(.97)}
       finally {this._busy=false;this._render();}
     }
     async _click(event) {
+      // Links inside the help pages stay inside the panel.
+      const link=event.target.closest?.('.help-view a[href]');
+      if(link){const href=link.getAttribute('href')??'',match=/^wiki\/([A-Za-z-]+)(?:#([\w-]+))?$/.exec(href);if(match){event.preventDefault();if(match[1]===this._helpPage&&match[2]){this.shadowRoot.getElementById(match[2])?.scrollIntoView();return;}this._helpPage=match[1];this._helpHtml=null;this._render();return this._loadHelp(match[1],match[2]??'');}if(!/^https?:/.test(href)){event.preventDefault();return;}link.target='_blank';link.rel='noopener';return;}
       const button = event.target.closest('button[data-action]');
       if (!button || button.disabled || this._busy) return;
       const {action,id}=button.dataset;
@@ -1707,6 +1765,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(action==='close'){this._dialog=false;this._render();return;}
       if(action==='metrics'&&id){this._metricsSpeaker=id;return this._go('metrics');}
       if(action==='wiki')return this._openGuide(button.dataset.page);
+      if(action==='help-back'){const back=this._helpReturn&&this._helpReturn!=='help'?this._helpReturn:'speakers';this._section='speakers';return back==='speakers'?this._render():this._go(back);}
       if(action==='house-tab'){const tab=button.dataset.tab,a=this._admin;if(a?.busy)return;if(tab==='commands'){if(!a)return;if(this._adminDirty()){a.closeConfirm=true;a.pendingSection='house';this._renderAdminFooter();return;}this._stopAdminHA();this._admin=null;this._render();return;}if(!a){await this._openAdmin(tab);return;}return this._adminAction('admin-tab',{dataset:{tab}});}
       if(action==='svc-report')return this._serviceReport(id);
       if(['check','install','adopt','reboot','confirm','rollback'].includes(action))return this._job(id,action);

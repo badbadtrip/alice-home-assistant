@@ -2,6 +2,8 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import z from 'zod'
 
+import { PhrasesSchema } from './phrases'
+
 // Accepts a spotify: URI or an open.spotify.com link and keeps the URI.
 const SpotifyUri = z.string().trim().max(300).transform((value, context) => {
   const match = /^spotify:(playlist|album):([A-Za-z0-9]+)$/u.exec(value) ??
@@ -14,6 +16,7 @@ const SpotifyPlaylist = z.object({ name: z.string().trim().min(1).max(80), uri: 
 
 // "spotify" is the older name of the alternative sources; anything else is stock music.
 export const MusicSettingsSchema = z.object({
+  phrases: PhrasesSchema.default({ items: [], replies: {} }),
   provider: z.preprocess(value => value === 'youtube' ? value : 'spotify', z.enum(['spotify', 'youtube'])),
   relay_intro: z.string().trim().max(100).default(''),
   source: z.preprocess(

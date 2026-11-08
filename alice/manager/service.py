@@ -617,7 +617,7 @@ class Manager:
         return token
 
     def _hf_request(self, path, speaker=None, payload=None):
-        if path not in ('/now-playing', '/voice-phrases', '/preview', '/events', '/inventory', '/dictionary', '/dictionary/alias', '/music', '/spotify', '/spotify/login', '/spotify/callback', '/spotify/sync'):
+        if path not in ('/now-playing', '/phrases', '/voice-phrases', '/preview', '/events', '/inventory', '/dictionary', '/dictionary/alias', '/music', '/spotify', '/spotify/login', '/spotify/callback', '/spotify/sync'):
             raise Error('Неизвестный внутренний маршрут.', 500)
         parsed = urlsplit(self.config.get('home_functions_url', ''))
         if parsed.scheme not in ('http', 'https') or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ('', '/'):
@@ -1481,6 +1481,10 @@ class Handler(BaseHTTPRequestHandler):
             return 200, manager._hf_request('/spotify/' + path[2], None, payload or {})
         if path == ['api', 'ai-check'] and method == 'POST':
             return 200, ai_check(payload)
+        if path == ['api', 'phrases'] and method == 'GET':
+            return 200, manager._hf_request('/phrases')
+        if path == ['api', 'phrases'] and method == 'PUT':
+            return 200, manager._hf_request('/phrases', None, payload)
         if path == ['api', 'music'] and method == 'GET':
             return 200, manager._hf_request('/music')
         if path == ['api', 'music'] and method == 'PUT':

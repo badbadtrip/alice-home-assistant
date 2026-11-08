@@ -132,6 +132,13 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
   Commands []struct {Enabled *bool `json:"enabled"`; Phrases []string `json:"phrases"`; Target string `json:"target"`} `json:"commands"`
   DeviceNames []string `json:"device_names"`
   Routing json.RawMessage `json:"routing"`
+  Phrases struct {
+   Spotify []string `json:"spotify"`
+   YouTube []string `json:"youtube"`
+   Relay []string `json:"relay"`
+   Commands map[string][]string `json:"commands"`
+   Replies map[string]string `json:"replies"`
+  } `json:"phrases"`
   Playlists []playback.Playlist `json:"playlists"`
   MusicSource string `json:"music_source"`
   MusicProvider string `json:"music_provider"`
@@ -170,6 +177,9 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  previous:=f.voice.snapshot.Load()
  f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names,Playlists:response.Playlists,MusicSource:response.MusicSource,RelayRooms:response.RelayRooms,MusicProvider:response.MusicProvider})
  f.applyRouting(response.Routing)
+ // The owner's words and replies arrive with the table; an old server sends none.
+ playback.SetCustom(playback.Custom{Spotify:response.Phrases.Spotify,YouTube:response.Phrases.YouTube,Relay:response.Phrases.Relay,Commands:response.Phrases.Commands})
+ if f.OnReplies!=nil {f.OnReplies(response.Phrases.Replies)}
  if previous==nil || previous.Revision!=response.Revision {
   slog.Info("voice_phrase_cache_updated","phrases",len(phrases),"revision",response.Revision)
  }

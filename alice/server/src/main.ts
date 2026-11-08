@@ -18,6 +18,7 @@ import { executeFunction } from './execution'
 import { createHomeAssistantApi, HomeAssistantApi } from './home-assistant'
 import { getLogger } from './logger'
 import { MusicSettingsSchema, readMusicSettings, writeMusicSettings } from './music'
+import { bridgePhrases, ownRules, PhrasesSchema } from './phrases'
 import { previewCommand } from './preview'
 import { callReadTool, READ_TOOLS } from './read-tools'
 import { readSpeakers, RelayRequestSchema, relayRooms, relaySpeaker, relayText } from './relay'
@@ -228,9 +229,25 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     if (!process.env.ALICE_ROUTING_PATH) return undefined
     try {
       const config = JSON.parse(await readFile(process.env.ALICE_ROUTING_PATH, 'utf8')) as { routing?: { rules?: unknown[] } }
-      return config.routing
+      if (!config.routing) return undefined
+      const { phrases } = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
+      return { ...config.routing, rules: [...ownRules(phrases), ...(config.routing.rules ?? [])] }
     } catch { return undefined }
   }
+  // The panel edits the owner's phrases; the routing comes along so it can tell where a phrase goes.
+  app.get('/phrases', async (_, response) => {
+    const { phrases } = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
+    response.json({ ...phrases, routing: await publishedRouting() })
+  })
+  app.post('/phrases', async (request, response) => {
+    const parsed = PhrasesSchema.safeParse(request.body)
+    if (!parsed.success) { response.status(400).json({ error: 'Проверьте фразы: 2–60 букв или цифр.' }); return }
+    try {
+      const settings = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
+      await writeMusicSettings(process.env.ALICE_MUSIC_PATH, { ...settings, phrases: parsed.data })
+      response.json({ ...parsed.data, routing: await publishedRouting() })
+    } catch { response.status(503).json({ error: 'Не удалось сохранить фразы.' }) }
+  })
   app.get('/music', async (_, response) => {
     response.json(await readMusicSettings(process.env.ALICE_MUSIC_PATH))
   })
@@ -349,6 +366,7 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
       device_names: deviceVoiceNames(allowed),
       music_provider: music.provider,
       music_source: music.source,
+      phrases: bridgePhrases(music.phrases),
       playlists: music.spotify_playlists,
       relay_rooms: relayRooms(await readSpeakers(process.env.ALICE_SPEAKERS_PATH)),
       revision,

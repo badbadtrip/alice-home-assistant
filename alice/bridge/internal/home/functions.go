@@ -32,6 +32,8 @@ type Functions struct {
 	Planner   Planner
 	HTTP      *http.Client
 	OnRouting func([]byte) error
+	// OnReplies receives the owner's reply texts from the panel.
+	OnReplies func(map[string]string)
 	pendingMu sync.Mutex
 	pending   map[string]homeClarification
 }

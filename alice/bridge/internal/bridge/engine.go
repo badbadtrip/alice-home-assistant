@@ -144,9 +144,9 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 	case "playback":
 		if decision.Source == "relay" {
 			room, message, _ := playback.Relay(text)
-			result.Answer = "Передала."
+			result.Answer = Reply("relay_sent", "Передала.")
 			if err := e.Home.(SpeakerRelay).Relay(ctx, room, message); err != nil {
-				result.Answer = "Не получилось передать: колонка не отвечает."
+				result.Answer = Reply("relay_failed", "Не получилось передать: колонка не отвечает.")
 			}
 			return result, nil
 		}
@@ -157,7 +157,7 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 		}
 		if decision.Source == "playback_youtube" {
 			if e.YouTube == nil || !e.YouTube.Available() {
-				result.Answer = "YouTube Music на этой колонке не установлен."
+				result.Answer = Reply("youtube_missing", "YouTube Music на этой колонке не установлен.")
 				return result, nil
 			}
 			if e.Playback != nil && e.Playback.Active(ctx) {
@@ -168,7 +168,7 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 				query = "мои лайки"
 			}
 			if err := e.YouTube.Play(ctx, query); err != nil {
-				result.Answer = "Не нашла это в YouTube Music."
+				result.Answer = Reply("youtube_not_found", "Не нашла это в YouTube Music.")
 			}
 			return result, nil
 		}
@@ -180,18 +180,18 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 			_, _ = e.YouTube.Control(ctx, "stop")
 		}
 		if decision.Source == "playback_missing" {
-			result.Answer = "Не нашла такой плейлист в Spotify."
+			result.Answer = Reply("spotify_playlist_missing", "Не нашла такой плейлист в Spotify.")
 			return result, nil
 		}
 		if player, ok := e.Playback.(PlaylistPlayer); ok && decision.Source == "playback_search" {
 			kind, query, _, _ := playback.Search(text)
 			uri, next, err := e.Home.(SpotifyFinder).FindSpotify(ctx, kind, query)
 			if err != nil {
-				result.Answer = "Spotify сейчас не отвечает."
+				result.Answer = Reply("spotify_down", "Spotify сейчас не отвечает.")
 				return result, nil
 			}
 			if uri == "" {
-				result.Answer = "Не нашла это в Spotify."
+				result.Answer = Reply("spotify_not_found", "Не нашла это в Spotify.")
 				return result, nil
 			}
 			answer, err := player.PlayURI(ctx, uri)

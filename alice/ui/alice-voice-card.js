@@ -302,11 +302,35 @@ main{max-width:1360px;padding:0 24px 48px}
 @media(min-width:1100px){.stage{grid-template-columns:minmax(0,1fr) 380px;gap:32px;align-items:start}}
 .page-narrow{max-width:820px;margin:0 auto}
 .page-wide{max-width:1280px;margin:0 auto}
+.phrases-page .page-intro .seg{margin:0;flex:none}
+.phrase-bar{display:flex;gap:8px;align-items:center}
+.phrase-bar input{flex:1;min-width:0;height:46px;font-size:15px}
+.phrase-bar select{flex:none;width:auto;max-width:44%;height:46px}
+.phrase-bar button{height:46px}
+.phrase-hint{display:flex;align-items:center;gap:8px;min-height:30px;margin:8px 2px 0;font-size:13px;color:var(--muted)}
+.phrase-hint b{color:var(--text);font-weight:500}.phrase-hint .badge{width:28px;height:28px}.phrase-hint .badge ha-icon{--mdc-icon-size:16px}
+.phrase-filters{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 8px}
+.phrase-filters button{min-height:30px;padding:0 12px;border-radius:999px;background:var(--tint);color:var(--muted);font-size:13px;gap:6px}
+.phrase-filters button[aria-pressed=true]{background:var(--accent-tint);color:var(--accent)}
+.phrase-filters i{font-style:normal;opacity:.7}
+.phrase-list{display:flex;flex-direction:column;gap:2px;border-radius:14px;overflow:hidden}
+.phrase-item{display:flex;align-items:center;gap:12px;padding:8px 8px 8px 10px;background:var(--tint)}
+.phrase-item b{flex:1;min-width:0;font-weight:500;overflow-wrap:anywhere}.phrase-item small{color:var(--muted);font-size:12.5px;white-space:nowrap}
+.phrase-item .badge{width:30px;height:30px}.phrase-item .badge ha-icon{--mdc-icon-size:16px}
+.phrase-item button.icon{width:32px;height:32px;min-height:32px;color:var(--muted)}
+.badge[data-kind=ai]{color:#b9a3ff}.badge[data-kind=alice]{color:#ffcc00}.badge[data-kind=music]{color:#1ed760}.badge[data-kind=player]{color:var(--accent)}.badge[data-kind=relay]{color:#f2b7d3}
+.phrase-empty{padding:14px 4px}
+.phrase-foot{margin-top:8px}
+.reply-list{display:flex;flex-direction:column;gap:2px;margin-top:10px;border-radius:14px;overflow:hidden}
+.reply-row{display:grid;grid-template-columns:minmax(160px,240px) minmax(0,1fr);align-items:center;gap:12px;padding:8px 10px;background:var(--tint);margin:0}
+.reply-row span{font-size:13px;font-weight:500;color:var(--text)}
+.reply-row input{height:40px}
+@media(max-width:700px){.phrase-bar{flex-wrap:wrap}.phrase-bar input{flex-basis:100%}.phrase-bar select{flex:1;max-width:none}.reply-row{grid-template-columns:minmax(0,1fr)}.phrases-page .page-intro{flex-direction:column}}
 .spk-mood{display:none}
 .look-tile,.look-wide{--ink:#151515;--ink-soft:rgb(0 0 0/.66);--well:rgb(0 0 0/.12);--well-fill:rgb(0 0 0/.28)}
 .look-tile .spk,.look-wide .spk{--mood:var(--c-idle);position:relative;gap:10px;padding:18px;border-radius:26px;box-shadow:none;overflow:hidden}
 :is(.look-tile,.look-wide) .spk[data-mood=play]{--mood:var(--c-play)}:is(.look-tile,.look-wide) .spk[data-mood=talk]{--mood:var(--c-talk)}:is(.look-tile,.look-wide) .spk[data-mood=off]{--mood:var(--c-off)}
-:is(.look-tile,.look-wide) .spk-mood{display:block;margin-top:10px;font-size:28px;font-weight:500;line-height:1.05;letter-spacing:-.01em}
+:is(.look-tile,.look-wide) .spk-mood{display:block;margin-top:12px;font-size:22px;font-weight:650;line-height:1.1;letter-spacing:-.02em;font-feature-settings:'ss01','cv11'}
 :is(.look-tile,.look-wide) .spk-name h3{font-size:16px;font-weight:600}
 :is(.look-tile,.look-wide) .spk-name .help{font-size:12.5px}
 :is(.look-tile,.look-wide) .spk-head{padding-right:70px}
@@ -356,26 +380,29 @@ main{max-width:1360px;padding:0 24px 48px}
 .style-dark .deck-volume button.icon{background:var(--mood);color:#151515}
 .style-dark .tool{background:var(--tint);color:var(--text)}
 /* customisation page */
-.look-presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
-.look-preset{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-height:0;padding:10px;border:2px solid transparent;border-radius:16px;background:var(--tint);color:var(--text);white-space:normal}
-.look-preset[aria-pressed=true]{border-color:var(--accent)}
-.look-preset b{font-weight:500;text-align:left}
-.look-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;height:46px}
-.look-mini.look-wide{grid-template-columns:1fr}.look-mini.look-classic{grid-template-columns:1fr 1fr}
-.look-mini i{border-radius:8px;background:var(--c-idle)}.look-mini i[data-mood=play]{background:var(--c-play)}.look-mini i[data-mood=off]{background:var(--c-off)}
-.look-mini.style-gradient i{background:linear-gradient(150deg,#fff,var(--c-idle))}.look-mini.style-gradient i[data-mood=play]{background:linear-gradient(150deg,#fff,var(--c-play))}.look-mini.style-gradient i[data-mood=off]{background:linear-gradient(150deg,#fff,var(--c-off))}
-.look-mini.style-dark i{background:var(--surface);box-shadow:inset 0 -6px 0 var(--c-idle)}.look-mini.style-dark i[data-mood=play]{box-shadow:inset 0 -6px 0 var(--c-play)}.look-mini.style-dark i[data-mood=off]{box-shadow:inset 0 -6px 0 var(--c-off)}
-.look-mini.look-classic i{background:var(--surface);box-shadow:none}
-.look-preview .speakers{margin-top:10px;pointer-events:none}
-.look-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}
-.look-row:first-of-type{border-top:0}.look-row.top{align-items:flex-start}.look-row>span{font-weight:500}
-.look-row .seg{margin:0}.look-row .seg button[aria-pressed=true]{background:var(--dialog);color:var(--text);box-shadow:0 1px 2px rgb(0 0 0/.2)}
-.look-colors{display:grid;grid-template-columns:repeat(2,minmax(150px,1fr));gap:8px}
-.look-color{display:flex;align-items:center;gap:10px;padding:6px 10px 6px 6px;border-radius:12px;background:var(--tint);cursor:pointer}
-.look-color input{width:36px;height:36px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
+.look-layout{display:flex;flex-direction:column-reverse;gap:14px}
+.look-controls .look-row,.look-controls .look-foot{margin:0;border-radius:0;background:none;box-shadow:none}
+.look-presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.look-chip{min-height:36px;padding:0 12px 0 8px;gap:8px;border-radius:999px;background:var(--tint);color:var(--text);font-weight:500;font-size:13px}
+.look-chip[aria-pressed=true]{background:var(--accent-tint);color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.look-chip>ha-icon{--mdc-icon-size:18px;margin-left:2px}
+.look-dots{display:inline-flex}.look-dots i{width:16px;height:16px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px var(--surface)}.look-dots i+i{margin-left:-5px}
+.look-dots[data-style=dark] i{background:var(--surface);box-shadow:0 0 0 2px var(--surface),inset 0 0 0 4px var(--c)}
+.look-dots[data-style=gradient] i{background:linear-gradient(150deg,#fff,var(--c))}
+.look-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line);background:none}
+.look-row>span{font-weight:500}
+.look-seg{margin:0}.look-seg button{min-height:32px;padding:0 12px;font-size:13px}.look-seg button[aria-pressed=true]{background:var(--dialog);color:var(--text);box-shadow:0 1px 2px rgb(0 0 0/.2)}
+.look-colors{display:flex;gap:14px}
+.look-color{display:flex;flex-direction:column;align-items:center;gap:4px;margin:0;cursor:pointer;font-size:11.5px;color:var(--muted)}
+.look-color input{width:34px;height:34px;min-height:0;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
 .look-color input::-webkit-color-swatch-wrapper{padding:0}.look-color input::-webkit-color-swatch{border:0;border-radius:50%;box-shadow:0 0 0 1.5px rgb(255 255 255/.35)}
-.look-color span{display:flex;flex-direction:column}.look-color b{font-weight:500;font-size:13px}.look-color small{color:var(--muted);font-size:12px;font-family:var(--ha-font-family-code,ui-monospace,monospace)}
-@media(max-width:700px){.speakers.look-tile{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.look-tile .spk{min-height:220px;padding:14px;border-radius:22px}.look-tile .spk-mood{font-size:22px}.look-tile .spk-head{padding-right:54px}.look-tile .art{width:46px;height:46px;top:12px;right:12px}.look-tile .art .indicator-photo{width:34px}.look-tile .deck-volume output{display:none}.look-tile .tools{gap:4px}.look-tile .tool{width:34px;height:34px;min-height:34px}.speakers.look-wide{grid-template-columns:minmax(0,1fr)}.look-colors{grid-template-columns:minmax(0,1fr)}}
+.look-color input::-moz-color-swatch{border:0;border-radius:50%}
+.look-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line)}
+.look-preview .speakers{margin-top:10px;pointer-events:none}
+.look-preview .speakers.look-tile{grid-template-columns:repeat(2,minmax(0,1fr))}
+.look-preview .speakers.look-wide{grid-template-columns:minmax(0,1fr)}
+.look-preview .speakers .spk{zoom:.82}
+@media(max-width:700px){.speakers.look-tile{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.look-tile .spk{min-height:220px;padding:14px;border-radius:22px}.look-tile .spk-mood{font-size:19px}.look-tile .spk-head{padding-right:54px}.look-tile .art{width:46px;height:46px;top:12px;right:12px}.look-tile .art .indicator-photo{width:34px}.look-tile .deck-volume output{display:none}.look-tile .tools{gap:4px}.look-tile .tool{width:34px;height:34px;min-height:34px}.speakers.look-wide{grid-template-columns:minmax(0,1fr)}}
 .badge{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;border-radius:50%;background:rgb(0 0 0/.3);color:var(--text);box-shadow:0 0 0 1.5px rgb(255 255 255/.25);filter:drop-shadow(0 2px 4px rgb(0 0 0/.5))}
 :host(:not([dark])) .badge{background:color-mix(in srgb,var(--text) 8%,transparent);box-shadow:0 0 0 1.5px rgb(255 255 255/.9);filter:drop-shadow(0 2px 4px rgb(0 0 0/.16))}
 .badge ha-icon{--mdc-icon-size:20px}
@@ -549,6 +576,7 @@ button:active:not(:disabled){transform:scale(.97)}
         if(e.key==='Escape'&&this._speakerDialog&&!this._busy){this._speakerDialog=false;this._render();}
       });
       this.shadowRoot.addEventListener('input', e => {
+        if(this._admin?.phrases&&(e.target.dataset?.phraseDraft!==undefined||e.target.dataset?.phraseTarget!==undefined)){const a=this._admin;if(e.target.dataset.phraseTarget!==undefined)a.phraseTarget=e.target.value;else a.phraseDraft=e.target.value;const hint=this.shadowRoot.getElementById('phrase-hint');if(hint)hint.innerHTML=this._phraseHint();return;}if(this._admin?.phrases&&e.target.dataset?.replyKey){const a=this._admin;a.phrases.replies={...a.phrases.replies,[e.target.dataset.replyKey]:e.target.value};clearTimeout(this._replySave);this._replySave=setTimeout(()=>this._savePhrases().catch(error=>{a.message=error.message;this._render();}),600);return;}
         if(e.target.dataset.journal){this[e.target.dataset.journal==='query'?'_journalQuery':'_journalSpeaker']=e.target.value;this._activityPage=0;const region=this.shadowRoot.getElementById('activity-region');if(region)region.innerHTML=this._activityMarkup();return;}
         if(e.target.id==='admin-search'){this._admin.search=e.target.value;this._admin.page=0;this._renderAdminDevices();return;}
         if(this._admin&&e.target.dataset.deviceField&&e.target.tagName==='INPUT'&&e.target.type!=='checkbox'){this._setAdminEntity(e.target);return;}
@@ -1025,31 +1053,81 @@ button:active:not(:disabled){transform:scale(.97)}
       const a=this._admin;
       if(a.look===undefined){a.look=null;this._api('/api/look').then(value=>{if(this._admin===a){a.look=value;this._look=value;this._render();}}).catch(()=>{if(this._admin===a){a.look=this._currentLook();this._render();}});}
       if(!a.look)return '<p class="help">Загрузка…</p>';
-      const look={...this._currentLook(),...a.look,colors:{...this._currentLook().colors,...a.look.colors}};
-      const presets=[['pastel','Пастель','tile','pastel'],['dark','Тёмная','tile','dark'],['gradient','Градиент','tile','gradient'],['wide','Широкая','wide','pastel'],['wide-dark','Широкая тёмная','wide','dark'],['classic','Классика','classic','pastel']];
-      const sample=(layout,style)=>{const {cls,style:vars}=this._lookClass({...look,layout,style});return `<span class="look-mini ${cls}" style="${vars}"><i data-mood="play"></i><i data-mood="idle"></i>${layout==='wide'?'':'<i data-mood="off"></i>'}</span>`;};
-      const preset=([id,label,layout,style])=>`<button type="button" class="look-preset" data-action="admin-look" data-layout="${layout}" data-style="${style}" aria-pressed="${look.layout===layout&&(layout==='classic'||look.style===style)}" ${blocked}>${sample(layout,style)}<b>${label}</b></button>`;
-      const seg=(key,items)=>`<div class="seg" role="group">${items.map(([value,label])=>`<button type="button" data-action="admin-look" data-${key}="${value}" aria-pressed="${look[key]===value}" ${blocked}>${label}</button>`).join('')}</div>`;
-      const color=(key,label)=>`<label class="look-color"><input type="color" data-look-color="${key}" value="${escape(look.colors[key])}" ${blocked}><span><b>${label}</b><small>${escape(look.colors[key])}</small></span></label>`;
+      const look={...this._currentLook(),...a.look,colors:{...this._currentLook().colors,...a.look.colors}},classic=look.layout==='classic';
+      const presets=[['Пастель','tile','pastel'],['Тёмная','tile','dark'],['Градиент','tile','gradient'],['Широкая','wide','pastel'],['Широкая тёмная','wide','dark'],['Классика','classic','pastel']];
+      const dots=style=>`<span class="look-dots" data-style="${style}">${['play','idle','off'].map(key=>`<i style="--c:${look.colors[key]}"></i>`).join('')}</span>`;
+      const preset=([label,layout,style])=>`<button type="button" class="look-chip" data-action="admin-look" data-layout="${layout}" data-style="${style}" aria-pressed="${look.layout===layout&&(layout==='classic'||look.style===style)}" ${blocked}>${layout==='classic'?icon('view-grid-outline'):dots(style)}${label}</button>`;
+      const seg=(key,items)=>`<div class="seg look-seg" role="group">${items.map(([value,label])=>`<button type="button" data-action="admin-look" data-${key}="${value}" aria-pressed="${look[key]===value}" ${blocked}>${label}</button>`).join('')}</div>`;
+      const color=(key,label)=>`<label class="look-color" title="${label}"><input type="color" data-look-color="${key}" value="${escape(look.colors[key])}" ${blocked}><span>${label}</span></label>`;
+      const row=(label,control)=>`<div class="look-row"><span>${label}</span>${control}</div>`;
       const {cls,style}=this._lookClass(look);
-      const demo=[{id:'demo-a',name:'Гостиная',area:'Комната',model:'midi',mood:['play','Играет'],track:'Кино — Группа крови',volume:30},{id:'demo-b',name:'Кухня',area:'Кухня',model:'lite2',mood:['idle','Тихо'],volume:60},{id:'demo-c',name:'Детская',area:'Детская',model:'lite2',mood:['off','Нет связи'],volume:0}];
+      const demo=[{id:'demo-a',name:'Гостиная',area:'Комната',model:'midi',mood:['play','Играет'],track:'Кино — Группа крови',volume:30},{id:'demo-b',name:'Кухня',area:'Кухня',model:'lite2',mood:['idle','Тихо'],volume:60}];
       const tool=(glyph,label)=>`<button type="button" class="tool" tabindex="-1">${icon(glyph)}<span>${label}</span></button>`;
       const card=d=>`<article class="spk" data-mood="${d.mood[0]}"><div class="spk-head"><div class="spk-name"><h3>${d.name}</h3><p class="help">${d.area}</p><div class="spk-mood">${d.mood[1]}</div><div class="state">${d.track?`<span class="now-pill" data-source="youtube_music"><span class="now-svc">${icon('youtube')}</span><span class="now-track"><span>${d.track}</span></span></span>`:''}</div></div><div class="art">${this._devicePhoto(d.model,d.id)}</div></div><div data-media><div class="deck-volume"><button type="button" class="icon" tabindex="-1">${icon(d.track?'pause':'stop')}</button><div class="range" style="--fill:${d.volume}%"><span class="range-fill"></span></div><output>${d.volume} %</output></div><div class="tools">${tool('message-text-outline','Сказать')}${tool('volume-high','Звук')}${tool('chart-areaspline','Метрики')}${tool('cog-outline','Настройки')}</div></div></article>`;
-      return `<div class="music-page look-page"><div class="page-intro"><div><h3>Кастомизация</h3><p class="help">Как выглядят карточки колонок. Настройка общая для всех, кто открывает панель.</p></div></div>
-        <section class="group music-card"><h3>Готовые варианты</h3><div class="look-presets">${presets.map(preset).join('')}</div></section>
-        <section class="group music-card look-preview"><div class="music-head"><h3>Предпросмотр</h3><span class="pill">Только на экране</span></div><div class="speakers ${cls}" style="${style}" inert>${demo.map(card).join('')}</div></section>
-        <section class="group music-card"><h3>Настроить вручную</h3>
-          <div class="look-row"><span>Раскладка</span>${seg('layout',[['tile','Плитка'],['wide','Широкая'],['classic','Классика']])}</div>
-          ${look.layout==='classic'?'':`<div class="look-row"><span>Стиль</span>${seg('style',[['pastel','Пастель'],['dark','Тёмный'],['gradient','Градиент']])}</div>
-          <div class="look-row top"><span>Цвета состояний</span><div class="look-colors">${color('play','Играет')}${color('idle','Тихо')}${color('talk','Алиса говорит')}${color('off','Нет связи')}</div></div>
-          <div class="look-row"><span>Кнопки на карточке</span><div class="seg" role="group"><button type="button" data-action="admin-look" data-tools="1" aria-pressed="${look.tools}" ${blocked}>Показывать</button><button type="button" data-action="admin-look" data-tools="0" aria-pressed="${!look.tools}" ${blocked}>Скрыть</button></div></div>`}
-          <div class="actions"><button type="button" class="secondary" data-action="admin-look-reset" ${blocked}>Вернуть как было</button></div></section></div>`;
+      const controls=`<section class="group music-card look-controls">
+          <div class="look-presets">${presets.map(preset).join('')}</div>
+          ${row('Раскладка',seg('layout',[['tile','Плитка'],['wide','Широкая'],['classic','Классика']]))}
+          ${classic?'':`${row('Стиль',seg('style',[['pastel','Пастель'],['dark','Тёмный'],['gradient','Градиент']]))}
+          ${row('Цвета',`<div class="look-colors">${color('play','Играет')}${color('idle','Тихо')}${color('talk','Говорит')}${color('off','Нет связи')}</div>`)}
+          ${row('Кнопки',seg('tools',[[true,'Показывать'],[false,'Скрыть']]).replaceAll('data-tools="true"','data-tools="1"').replaceAll('data-tools="false"','data-tools="0"'))}`}
+          <div class="look-foot"><button type="button" class="secondary small" data-action="admin-look-reset" ${blocked}>${icon('restore')}Вернуть как было</button><span class="help">Сохраняется сразу и одинаково для всех.</span></div></section>`;
+      const preview=`<section class="group music-card look-preview"><div class="music-head"><h3>Предпросмотр</h3><span class="pill">Только на экране</span></div>${classic?'<p class="help">Классическая карточка — как в прошлых версиях.</p>':`<div class="speakers ${cls}" style="${style}" inert>${demo.map(card).join('')}</div>`}</section>`;
+      return `<div class="music-page look-page"><div class="page-intro"><div><h3>Кастомизация</h3><p class="help">Как выглядят карточки колонок.</p></div></div><div class="look-layout">${controls}${preview}</div></div>`;
     }
     async _saveLook(change){
       const a=this._admin;if(!a?.look)return;
       a.look={...a.look,...change,colors:{...a.look.colors,...(change.colors??{})}};this._look=a.look;this._render();
       clearTimeout(this._lookTimer);
       this._lookTimer=setTimeout(async()=>{try{const saved=await this._api('/api/look','PUT',a.look);if(this._admin===a){a.look=saved;}this._look=saved;this._saveSnapshot();}catch(error){if(this._admin===a){a.message='Не удалось сохранить: '+error.message;this._render();}}},350);
+    }
+    _phraseTargets(){return {llm:['В AI','creation-outline','ai'],yandex:['Оставить Алисе','account-voice','alice'],spotify:['Название Spotify','spotify','music'],youtube:['Название YouTube','youtube','music'],pause:['Пауза','pause','player'],resume:['Продолжить','play','player'],next:['Дальше','skip-next','player'],previous:['Назад','skip-previous','player'],stop:['Стоп','stop','player'],relay:['Интерком','message-arrow-right-outline','relay']};}
+    _replyKeys(){return [['relay_sent','Интерком: сообщение передано','Передала.'],['relay_failed','Интерком: колонка не отвечает','Не получилось передать: колонка не отвечает.'],['youtube_missing','YouTube Music не установлен','YouTube Music на этой колонке не установлен.'],['youtube_not_found','YouTube Music ничего не нашёл','Не нашла это в YouTube Music.'],['spotify_not_found','Spotify ничего не нашёл','Не нашла это в Spotify.'],['spotify_playlist_missing','Нет такого плейлиста','Не нашла такой плейлист в Spotify.'],['spotify_down','Spotify не отвечает','Spotify сейчас не отвечает.'],['llm_down','Нейросеть не отвечает','Нейросеть сейчас не отвечает. Попробуйте ещё раз.']];}
+    /* The same first-match walk the bridge does, so the hint tells the truth without touching a speaker. */
+    _routeOf(text,routing){
+      const said=String(text).toLowerCase().trim();
+      for(const rule of routing?.rules??[]){
+        const m=rule.match??{};let ok=true;
+        try{if(m.regex&&!new RegExp(m.regex,'u').test(said))ok=false;}catch{ok=false;}
+        if(ok&&Array.isArray(m.contains_all_groups)&&!m.contains_all_groups.every(group=>group.some(word=>said.includes(word))))ok=false;
+        if(ok&&Array.isArray(m.contains_none)&&m.contains_none.some(word=>said.includes(word)))ok=false;
+        if(ok)return rule;
+      }
+      return {route:routing?.default_route??'yandex',name:'default'};
+    }
+    _phraseHint(){
+      const a=this._admin,draft=(a.phraseDraft??'').trim(),target=a.phraseTarget??'llm';if(!draft)return '<span>Напишите фразу — подскажем, куда она уходит сейчас.</span>';
+      if(['spotify','youtube'].includes(target))return `<span>Скажите: <b>«включи Кино ${['через','в'][target==='spotify'?1:0]} ${escape(draft)}»</b> — заиграет ${target==='spotify'?'Spotify':'YouTube Music'}.</span>`;
+      if(target==='relay')return `<span>Скажите: <b>«${escape(draft)} кухню ужин готов»</b> — сообщение прозвучит на кухне.</span>`;
+      if(this._phraseTargets()[target][2]==='player')return `<span>Скажите <b>«${escape(draft)}»</b>, пока играет Spotify или YouTube Music.</span>`;
+      const rule=this._routeOf(draft,a.phrases?.routing),where={llm:'в AI',yandex:'Алисе',home:'в умный дом'}[rule.route]??'Алисе',own=String(rule.name).startsWith('owner_');
+      const next=target==='llm'?'в AI':'Алисе',same=(rule.route==='llm')===(target==='llm');
+      return `<span class="badge">${icon(rule.route==='llm'?'creation-outline':rule.route==='home'?'home-outline':'account-voice')}</span><span>Сейчас уходит <b>${where}</b>${own?' по вашей фразе':''}.${same?'':` После добавления пойдёт ${next}.`}</span>`;
+    }
+    _phrasesPage(blocked){
+      const a=this._admin;
+      if(a.phrases===undefined){a.phrases=null;this._api('/api/phrases').then(value=>{if(this._admin===a){a.phrases=value;this._render();}}).catch(error=>{if(this._admin===a){a.phrases=false;a.phrasesError=error.message;this._render();}});}
+      if(!a.phrases)return `<p class="help">${a.phrases===false?escape(a.phrasesError??'Фразы недоступны.'):'Загрузка…'}</p>`;
+      const tab=a.phraseTab??'listen',targets=this._phraseTargets(),items=a.phrases.items??[],filter=a.phraseFilter??'all';
+      const head=`<div class="page-intro"><div><h3>Фразы</h3><p class="help">Свои слова для колонки. Встроенные фразы работают всегда, ваши добавляются к ним.</p></div><div class="seg" role="tablist"><button type="button" role="tab" data-action="admin-phrase-tab" data-tab="listen" aria-selected="${tab==='listen'}">Распознавание</button><button type="button" role="tab" data-action="admin-phrase-tab" data-tab="replies" aria-selected="${tab==='replies'}">Ответы</button></div></div>`;
+      if(tab==='replies'){
+        const rows=this._replyKeys().map(([key,label,text])=>`<label class="reply-row"><span>${label}</span><input data-reply-key="${key}" value="${escape(a.phrases.replies?.[key]??'')}" placeholder="${escape(text)}" maxlength="200" ${blocked}></label>`).join('');
+        return `<div class="music-page phrases-page">${head}<section class="group music-card"><p class="help">Пустое поле — стандартный ответ. Сохраняется само.</p><div class="reply-list">${rows}</div></section></div>`;
+      }
+      const groups=[['all','Все'],['ai','AI'],['alice','Алисе'],['music','Музыка'],['player','Плеер'],['relay','Интерком']];
+      const count=group=>group==='all'?items.length:items.filter(item=>targets[item.target]?.[2]===group).length;
+      const shown=items.map((item,index)=>({...item,index})).filter(item=>filter==='all'||targets[item.target]?.[2]===filter);
+      const list=shown.length?shown.map(item=>`<div class="phrase-item"><span class="badge" data-kind="${targets[item.target][2]}">${icon(targets[item.target][1])}</span><b>${escape(item.phrase)}</b><small>${targets[item.target][0]}</small><button type="button" class="icon" data-action="admin-phrase-remove" data-index="${item.index}" aria-label="Удалить «${escape(item.phrase)}»" ${blocked}>${icon('close')}</button></div>`).join(''):`<p class="help phrase-empty">${items.length?'В этой группе пока пусто.':'Своих фраз пока нет. Добавьте первую выше.'}</p>`;
+      return `<div class="music-page phrases-page">${head}<section class="group music-card">
+        <div class="phrase-bar"><input data-phrase-draft value="${escape(a.phraseDraft??'')}" placeholder="Например: разузнай в интернете" maxlength="60" autocomplete="off" ${blocked}><select data-phrase-target ${blocked}>${Object.entries(targets).map(([id,[label]])=>`<option value="${id}" ${id===(a.phraseTarget??'llm')?'selected':''}>${label}</option>`).join('')}</select><button type="button" class="primary" data-action="admin-phrase-add" ${blocked}>Добавить</button></div>
+        <div class="phrase-hint" id="phrase-hint">${this._phraseHint()}</div>
+        <div class="phrase-filters" role="group">${groups.map(([id,label])=>`<button type="button" data-action="admin-phrase-filter" data-filter="${id}" aria-pressed="${filter===id}">${label}<i>${count(id)}</i></button>`).join('')}</div>
+        <div class="phrase-list">${list}</div>
+        <div class="phrase-foot">${this._help('Commands','Встроенные фразы в справке')}</div></section></div>`;
+    }
+    async _savePhrases(){
+      const a=this._admin;if(!a?.phrases)return;
+      const saved=await this._api('/api/phrases','PUT',{items:a.phrases.items??[],replies:a.phrases.replies??{}});
+      if(this._admin===a)a.phrases=saved;
     }
     _help(page,label='Подробнее в справке'){return `<button type="button" class="help-link" data-action="wiki" data-page="${page}">${icon('help-circle-outline')}<span>${label}</span></button>`;}
     _houseHead(active){const tabs=[['commands','Команды'],['devices','Устройства'],['dictionary','Словарь']];return `<div class="page-intro"><div><h2 id="admin-title" class="admin-title">Дом</h2><p class="help">Что Алиса умеет делать в вашем доме</p></div></div><div class="seg page-seg" role="tablist" aria-label="Разделы">${tabs.map(([id,label])=>`<button type="button" role="tab" aria-selected="${active===id}" data-action="house-tab" data-tab="${id}" ${this._admin?.busy?'disabled':''}>${label}</button>`).join('')}</div>`;}
@@ -1147,7 +1225,7 @@ button:active:not(:disabled){transform:scale(.97)}
     }
 
     _adminDialog(){
-      const a=this._admin,blocked=a.busy?'disabled':'',groups=[['Алиса',[['setup','Быстрая настройка','rocket-launch-outline'],['ai','AI','creation-outline'],['music','Музыка','music-note'],['relay','Интерком','message-arrow-right-outline']]],['Вид',[['look','Кастомизация','palette-outline']]],['Приложение',[['app','Подключение','connection'],['advanced','Конфигурация','code-json']]]],page=this._section==='speaker',speaker=this._speakers.find(s=>s.id===a.speakerId);let body='';
+      const a=this._admin,blocked=a.busy?'disabled':'',groups=[['Алиса',[['setup','Быстрая настройка','rocket-launch-outline'],['ai','AI','creation-outline'],['music','Музыка','music-note'],['relay','Интерком','message-arrow-right-outline'],['phrases','Фразы','text-box-edit-outline']]],['Вид',[['look','Кастомизация','palette-outline']]],['Приложение',[['app','Подключение','connection'],['advanced','Конфигурация','code-json']]]],page=this._section==='speaker',speaker=this._speakers.find(s=>s.id===a.speakerId);let body='';
       const station=page?'':`<label>Колонка<select data-admin-field="speakerId" ${blocked}>${this._speakers.map(s=>`<option value="${escape(s.id)}" ${s.id===a.speakerId?'selected':''}>${escape(s.name)} · ${escape(s.host)}</option>`).join('')}</select></label>`;
       if(a.tab==='devices')body=`<div id="admin-access-body" class="fields">${this._adminAccessBody()}</div>`;
       if(a.tab==='indicator')body=this._indicatorBody(station,blocked);
@@ -1156,6 +1234,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(a.tab==='music')body=this._musicPage(blocked);
       if(a.tab==='relay')body=this._relayPage(blocked);
       if(a.tab==='look')body=this._lookPage(blocked);
+      if(a.tab==='phrases')body=this._phrasesPage(blocked);
       if(a.tab==='dictionary')body=this._dictionaryBody(station,blocked);
       const files=`<label>Путь<input data-admin-field="path" value="${escape(a.path)}" ${blocked}></label><div class="actions"><button type="button" class="secondary" data-action="admin-read" ${blocked}>Открыть</button><button type="button" data-action="admin-path" data-path="/data/opt/quasar-bridge/config.json" ${blocked}>Мост</button><button type="button" data-action="admin-path" data-path="/data/opt/quasar-bridge/runtime.env" ${blocked}>Окружение</button><button type="button" data-action="admin-path" data-path="/data/opt/quasar-bridge/start.sh" ${blocked}>Запуск</button></div><label>Содержимое<textarea class="admin-code" data-admin-field="content" rows="16" spellcheck="false" ${blocked||!a.fileRevision?'disabled':''}>${escape(a.content)}</textarea></label><div class="actions"><button type="button" class="primary" data-action="admin-write" ${blocked||!a.fileRevision?'disabled':''}>Сохранить с копией</button><button type="button" class="secondary" data-action="admin-restart-bridge" ${blocked}>Перезапустить мост</button></div><p class="help">Текстовые файлы до 32 КБ. Перед записью создаётся копия, службы не перезапускаются. В окружении могут быть секреты.</p>`;
       const shell=`<label>Команда от root, до 10 секунд<textarea class="admin-code" data-admin-field="command" rows="4" spellcheck="false" placeholder="ps w" ${blocked}>${escape(a.command)}</textarea></label><div class="actions"><button type="button" class="primary" data-action="admin-run" ${blocked}>Выполнить</button><button type="button" class="secondary" data-action="admin-diagnostic" ${blocked}>Подставить диагностику</button></div><pre class="admin-output" tabindex="0">${escape(a.output||'Здесь появится вывод.')}</pre>`;
@@ -1213,6 +1292,10 @@ button:active:not(:disabled){transform:scale(.97)}
         if(action==='admin-ai-check'){const values={...a.options,...appFields};const result=await this._api('/api/ai-check','POST',{base_url:values.llm_base_url??'',api_key:appFields.llm_api_key??'',model:values.llm_model??''});a.aiStatus=result;a.aiModels=result.models??[];if(result.model)a.appDraft={...a.appDraft,llm_model:result.model};a.message='';return;}
         if(action==='admin-ytm-install'){const s=this._speakers.find(item=>item.id===button.dataset.speaker);await this._api('/api/speakers/'+s.id+'/ytm','POST',{});s.ytm_installed=true;a.message='Плеер установлен: '+s.name+'.';return;}
         if(action==='admin-music-view'){a.musicView=button.dataset.source;a.message='';return;}
+        if(action==='admin-phrase-tab'){a.phraseTab=button.dataset.tab;a.message='';return;}
+        if(action==='admin-phrase-filter'){a.phraseFilter=button.dataset.filter;a.message='';return;}
+        if(action==='admin-phrase-add'){const phrase=(a.phraseDraft??'').trim().toLowerCase().replace(/\s+/g,' '),target=a.phraseTarget??'llm';if(!/^[\p{L}\p{N} -]{2,60}$/u.test(phrase))throw Error('Фраза — от 2 до 60 букв или цифр.');if((a.phrases.items??[]).some(item=>item.phrase===phrase&&item.target===target))throw Error('Такая фраза уже есть.');a.phrases.items=[...(a.phrases.items??[]),{phrase,target}];await this._savePhrases();a.phraseDraft='';a.message='Фраза добавлена. Колонки подхватят её за несколько секунд.';return;}
+        if(action==='admin-phrase-remove'){const index=Number(button.dataset.index);a.phrases.items=(a.phrases.items??[]).filter((_,i)=>i!==index);await this._savePhrases();a.message='';return;}
         if(action==='admin-look'){const d=button.dataset,change={};if(d.layout)change.layout=d.layout;if(d.style)change.style=d.style;if(d.tools)change.tools=d.tools==='1';await this._saveLook(change);return;}
         if(action==='admin-look-reset'){await this._saveLook(this._lookDefault());return;}
         if(action==='admin-music-default'){const value=button.dataset.source;a.music=await this._api('/api/music','PUT',{...a.music,source:value==='yandex'?'yandex':'alternative',...(value==='yandex'?{}:{provider:value})});a.message='';return;}

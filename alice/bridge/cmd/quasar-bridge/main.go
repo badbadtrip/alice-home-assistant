@@ -179,6 +179,7 @@ func main() {
 			}
 			return engine.SetRouting(withoutModelFallback(next, llmDisabled))
 		}
+		hf.OnReplies = bridge.SetReplies
 		engine.Home = hf
 	}
 	if cfg.AssistantTools.Enabled {

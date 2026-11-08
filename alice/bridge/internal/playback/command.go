@@ -4,8 +4,41 @@ package playback
 import (
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"unicode"
 )
+
+// Custom holds the owner's own words from the panel. They extend the built-in
+// phrases and never replace them.
+type Custom struct {
+	Spotify  []string
+	YouTube  []string
+	Relay    []string
+	Commands map[string][]string
+}
+
+var custom atomic.Pointer[Custom]
+
+// SetCustom installs the owner's words, normalized the same way as speech.
+func SetCustom(c Custom) {
+	clean := func(list []string) []string {
+		out := make([]string, 0, len(list))
+		for _, item := range list {
+			if item = normalize(item); item != "" {
+				out = append(out, item)
+			}
+		}
+		return out
+	}
+	next := Custom{Spotify: clean(c.Spotify), YouTube: clean(c.YouTube), Relay: clean(c.Relay), Commands: map[string][]string{}}
+	for action, list := range c.Commands {
+		next.Commands[action] = clean(list)
+	}
+	custom.Store(&next)
+}
+
+var servicePrepositions = []string{"в", "на", "из", "через", "по"}
+var searchHead = regexp.MustCompile(`^(?:включи|поставь|запусти|сыграй|играй|найди)(?: мне)? `)
 
 var commands = []struct {
 	action  string
@@ -92,6 +125,24 @@ func service(text string) (string, string) {
 	if match := serviceHead.FindStringSubmatch(text); match != nil {
 		return strings.Fields(text)[0] + " " + strings.TrimPrefix(text, match[0]), provider(match)
 	}
+	if c := custom.Load(); c != nil {
+		for _, named := range []struct {
+			provider string
+			names    []string
+		}{{"spotify", c.Spotify}, {"youtube", c.YouTube}} {
+			for _, name := range named.names {
+				for _, preposition := range servicePrepositions {
+					said := preposition + " " + name
+					if strings.HasSuffix(text, " "+said) {
+						return strings.TrimSuffix(text, " "+said), named.provider
+					}
+					if head := searchHead.FindString(text); head != "" && strings.HasPrefix(text[len(head):], said+" ") {
+						return strings.Fields(text)[0] + " " + text[len(head)+len(said)+1:], named.provider
+					}
+				}
+			}
+		}
+	}
 	return text, ""
 }
 
@@ -117,11 +168,20 @@ var relayAsk = regexp.MustCompile(`^(?:скажи|передай)(?: на| в| �
 // Relay splits "скажи на кухню ужин готов" into the spoken room and the message.
 // The message stays word for word: "что покушать" loses its meaning without "что".
 func Relay(text string) (room, message string, ok bool) {
-	match := relayAsk.FindStringSubmatch(normalize(text))
-	if match == nil {
-		return "", "", false
+	text = normalize(text)
+	if match := relayAsk.FindStringSubmatch(text); match != nil {
+		return match[1], match[2], true
 	}
-	return match[1], match[2], true
+	if c := custom.Load(); c != nil {
+		for _, verb := range c.Relay {
+			if rest, found := strings.CutPrefix(text, verb+" "); found {
+				if room, message, found := strings.Cut(rest, " "); found && message != "" {
+					return room, message, true
+				}
+			}
+		}
+	}
+	return "", "", false
 }
 
 // RoomStem drops the case ending, the same way the server does.
@@ -141,6 +201,15 @@ func Command(text string) string {
 	for _, c := range commands {
 		if c.pattern.MatchString(text) {
 			return c.action
+		}
+	}
+	if c := custom.Load(); c != nil {
+		for action, phrases := range c.Commands {
+			for _, phrase := range phrases {
+				if text == phrase {
+					return action
+				}
+			}
 		}
 	}
 	return ""

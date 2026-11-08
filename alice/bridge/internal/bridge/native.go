@@ -507,7 +507,7 @@ func (n *Native) Server(ctx context.Context, k websocket.MessageType, data []byt
 				}
 				if err != nil {
 					n.discardSound(p)
-					result.Answer = "Нейросеть сейчас не отвечает. Попробуйте ещё раз."
+					result.Answer = Reply("llm_down", "Нейросеть сейчас не отвечает. Попробуйте ещё раз.")
 				}
 				_ = n.sendCancel(p.ctx, p.id)
 				if err := n.reply(p, result.Answer); err != nil {
@@ -623,7 +623,7 @@ func (n *Native) maybeResolve(p *nativeRequest) {
 				result.Answer = "Не удалось включить музыку с этой страницы."
 			} else {
 				result.Route = "llm"
-				result.Answer = "Нейросеть сейчас не отвечает. Попробуйте ещё раз."
+				result.Answer = Reply("llm_down", "Нейросеть сейчас не отвечает. Попробуйте ещё раз.")
 			}
 		}
 		n.mu.Lock()

@@ -446,6 +446,18 @@ class ManagerTests(unittest.TestCase):
         ssh.assert_not_called()
         self.assertEqual(connection['status'], 'offline')
 
+    def test_reboot_works_outside_installation(self):
+        self.manager.store.metadata(self.speaker['id'], install={'state': 'ready'})
+        with patch.object(self.manager, 'ssh') as ssh:
+            result = self.manager._reboot(self.speaker, {})
+        self.assertIn('reboot', ssh.call_args.args[1])
+        self.assertEqual(self.manager.store.speaker(self.speaker['id'])['install']['state'], 'ready')
+        self.assertIn('две минуты', result['message'])
+        self.manager.store.metadata(self.speaker['id'], install={'state': 'adopting'})
+        with patch.object(self.manager, 'ssh') as ssh, self.assertRaises(Error):
+            self.manager._reboot(self.speaker, {})
+        ssh.assert_not_called()
+
     def test_metrics_history_keeps_one_sample_per_step(self):
         metrics = {'cpu_pct': 12.34, 'mem_total_kb': 1000, 'mem_available_kb': 400, 'data_total_kb': 50, 'data_free_kb': 20, 'temp_c': 51.0}
         for at in (1000, 1010, 1031, 1000 + 86400):

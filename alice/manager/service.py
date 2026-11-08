@@ -1295,10 +1295,13 @@ class Manager:
         return install
 
     def _reboot(self, speaker, job):
-        install = self._managed_install(speaker)
-        if install['state'] != 'awaiting_reboot':
-            raise Error('Колонка не ожидает первой перезагрузки.', 409)
+        install = self.store.speaker(speaker['id']).get('install') or {}
+        if install.get('state') == 'adopting':
+            raise Error('Сейчас подключается мост. Дождитесь окончания и повторите перезагрузку.', 409)
         self.ssh(speaker, 'sync; (sleep 2; reboot) </dev/null >/dev/null 2>&1 &')
+        if install.get('state') != 'awaiting_reboot':
+            # An ordinary restart from Maintenance: the bridge comes back by itself.
+            return {'state': install.get('state'), 'message': 'Колонка перезагружается. Вернётся примерно через две минуты.'}
         self.store.metadata(speaker['id'], install={**install, 'state': 'awaiting_acceptance'})
         return {'state': 'awaiting_acceptance', 'message': 'Перезагрузка запрошена. Дождитесь запуска и проверьте голос, ответ и остановку. Затем подтвердите проверку в течение 10 минут.'}
 

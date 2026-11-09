@@ -361,7 +361,16 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 	if len(results) == 0 {
 		if actions > 0 && allAccepted {
 			if done := f.doneReply.Load(); done != nil && *done != "" {
-				return *done, nil
+				// "#chime" is a short wordless signal; anything else is spoken.
+				if *done != "#chime" {
+					return *done, nil
+				}
+				if sound.HasPlayer(ctx) {
+					if err := sound.Play(ctx, sound.Request{Sound: "notification"}); err != nil {
+						return "", err
+					}
+					return "", nil
+				}
 			}
 		}
 		if actions > 0 && allAccepted && sound.HasPlayer(ctx) {

@@ -21,7 +21,7 @@
   const iconButton=(action,name,label,attrs='')=>`<button type="button" class="icon" data-action="${action}" aria-label="${escape(label)}" title="${escape(label)}" ${attrs}>${icon(name)}</button>`;
   /* All colour, radius and type come from the active HA theme. Device colours are the only literals. */
   const STYLES=String.raw`
-:host{display:block;color:var(--primary-text-color);font-family:var(--ha-font-family-body,Roboto,system-ui,sans-serif);font-size:14px;line-height:1.45;
+:host{display:block;color:var(--primary-text-color);font-family:Onest,var(--ha-font-family-body,Roboto),system-ui,sans-serif;font-size:14px;line-height:1.45;
   --surface:var(--ha-card-background,var(--card-background-color,#fff));--dialog:var(--ha-dialog-surface-background,var(--surface));
   --text:var(--primary-text-color,#212121);--muted:var(--secondary-text-color,#727272);--line:var(--divider-color,rgba(127,127,127,.25));
   --accent:var(--primary-color,#03a9f4);--on-accent:var(--text-primary-color,#fff);
@@ -1869,6 +1869,8 @@ button:active:not(:disabled){transform:scale(.97)}
       finally {this._busy=false;this._render();}
     }
   }
+  /* Onest reads friendlier in Russian than Roboto; offline the card falls back to the HA font. */
+if(!document.getElementById('alice-font')){const link=document.createElement('link');link.id='alice-font';link.rel='stylesheet';link.href='https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap';document.head.append(link);}
   if (!customElements.get('alice-voice-card')) customElements.define('alice-voice-card',AliceVoiceCard);
   window.customCards=window.customCards ?? [];
   window.customCards.push({type:'alice-voice-card',name:'Алиса — голосовые команды',description:'Связать точную фразу с автоматизацией или скриптом HA'});

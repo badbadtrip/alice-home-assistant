@@ -14,6 +14,10 @@ from service import Manager, Error, STARTUP_FILES
 
 class AdoptionTests(unittest.TestCase):
     def setUp(self):
+        # Health waits are real seconds in the manager; tests need not sit through them.
+        sleeper = patch('service.time.sleep')
+        sleeper.start()
+        self.addCleanup(sleeper.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)

@@ -21,6 +21,10 @@ from service import Error, Handler, Manager, Store, STARTUP_FILES, authenticate,
 
 class ManagerTests(unittest.TestCase):
     def setUp(self):
+        # Health waits are real seconds in the manager; tests need not sit through them.
+        sleeper = patch('service.time.sleep')
+        sleeper.start()
+        self.addCleanup(sleeper.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.manager = Manager({'state_dir': str(self.root / 'state'), 'ssh_key': '/private/key',

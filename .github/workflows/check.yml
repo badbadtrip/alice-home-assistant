@@ -1,6 +1,9 @@
 name: Check
 on:
   push:
+    # main only receives commits already checked on their claude/ branch.
+    branches-ignore:
+      - main
   pull_request:
 jobs:
   source:
@@ -21,8 +24,32 @@ jobs:
           cache-dependency-path: alice/bridge/go.sum
       - run: go test ./...
         working-directory: alice/bridge
-  image:
+  ytm:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t alice-ha-app:ci ./alice
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: alice/ytm/go.mod
+          cache-dependency-path: alice/ytm/go.sum
+      - run: go test .
+        working-directory: alice/ytm
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: alice/server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: pnpm
+          cache-dependency-path: alice/server/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test

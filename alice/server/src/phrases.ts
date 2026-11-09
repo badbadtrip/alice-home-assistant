@@ -6,7 +6,7 @@ export const PHRASE_TARGETS = [
   'llm', 'yandex', 'spotify', 'youtube', 'pause', 'resume', 'next', 'previous', 'stop', 'relay'
 ] as const
 export const REPLY_KEYS = [
-  'relay_sent', 'relay_failed', 'youtube_missing', 'youtube_not_found',
+  'home_done', 'relay_sent', 'relay_failed', 'youtube_missing', 'youtube_not_found',
   'spotify_playlist_missing', 'spotify_down', 'spotify_not_found', 'llm_down'
 ] as const
 type Target = typeof PHRASE_TARGETS[number]

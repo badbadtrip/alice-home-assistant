@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"sync"
 	"time"
 
@@ -34,6 +35,8 @@ type Functions struct {
 	OnRouting func([]byte) error
 	// OnReplies receives the owner's reply texts from the panel.
 	OnReplies func(map[string]string)
+	// doneReply is the owner's word for a done command; empty means the stock sound.
+	doneReply atomic.Pointer[string]
 	pendingMu sync.Mutex
 	pending   map[string]homeClarification
 }
@@ -356,6 +359,11 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 	}
 	// An accepted service call does not prove a physical device changed state.
 	if len(results) == 0 {
+		if actions > 0 && allAccepted {
+			if done := f.doneReply.Load(); done != nil && *done != "" {
+				return *done, nil
+			}
+		}
 		if actions > 0 && allAccepted && sound.HasPlayer(ctx) {
 			if err := sound.Play(ctx, sound.Request{Sound: "success"}); err != nil {
 				return "", err

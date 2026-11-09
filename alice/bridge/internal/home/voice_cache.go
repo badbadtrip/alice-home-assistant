@@ -180,6 +180,7 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  f.applyRouting(response.Routing)
  // The owner's words and replies arrive with the table; an old server sends none.
  playback.SetCustom(playback.Custom{Spotify:response.Phrases.Spotify,YouTube:response.Phrases.YouTube,Relay:response.Phrases.Relay,Commands:response.Phrases.Commands,Replace:response.Phrases.Replace})
+ done:=strings.TrimSpace(response.Phrases.Replies["home_done"]);f.doneReply.Store(&done)
  if f.OnReplies!=nil {f.OnReplies(response.Phrases.Replies)}
  if previous==nil || previous.Revision!=response.Revision {
   slog.Info("voice_phrase_cache_updated","phrases",len(phrases),"revision",response.Revision)

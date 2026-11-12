@@ -53,6 +53,9 @@ KEEPALIVE_S = 5.0
 RECONNECT_S = (2, 5, 10, 30)
 MANUFACTURER = 'Alice for Home Assistant'
 MEDIA_TYPES = {'track': 'track', 'artist': 'artist', 'album': 'album', 'playlist': 'playlist'}
+# How long the speaker waits for Music Assistant before the search goes on in the background.
+PLAY_ANSWER_S = 8
+PLAY_TIMEOUT_S = 60
 COMMANDS = {'pause': MediaCommand.PAUSE, 'play': MediaCommand.PLAY, 'resume': MediaCommand.PLAY,
             'stop': MediaCommand.STOP, 'next': MediaCommand.NEXT, 'previous': MediaCommand.PREVIOUS}
 
@@ -110,6 +113,8 @@ class Player:
         self.service = service
         self.id = speaker['id']
         self.name = player_name(speaker)
+        # The speaker's stock media player: Alice's own voice for a late "not found".
+        self.media_entity = speaker.get('media_entity') if isinstance(speaker.get('media_entity'), str) else None
         self.dir = service.data / self.id
         self.client: SendspinClient | None = None
         self.task: asyncio.Task | None = None
@@ -331,6 +336,7 @@ class Service:
         self.urls = [u.strip() for u in url.split(',') if u.strip()]
         self.players: dict[str, Player] = {}
         self.notified: dict[str, str | None] = {}
+        self.tasks: set[asyncio.Task] = set()
 
     def read_speakers(self) -> list[dict[str, Any]]:
         try:
@@ -344,6 +350,9 @@ class Service:
         for speaker_id in [i for i in self.players if i not in wanted or player_name(wanted[i]) != self.players[i].name]:
             await self.players.pop(speaker_id).stop()
         for speaker_id, speaker in wanted.items():
+            if speaker_id in self.players:
+                media = speaker.get('media_entity')
+                self.players[speaker_id].media_entity = media if isinstance(media, str) else None
             if speaker_id not in self.players:
                 player = Player(self, speaker)
                 self.players[speaker_id] = player
@@ -417,12 +426,35 @@ class Service:
         data: dict[str, Any] = {'entity_id': entity, 'media_id': query, 'enqueue': 'replace'}
         if kind in MEDIA_TYPES:
             data['media_type'] = MEDIA_TYPES[kind]
-        status, _ = await self.home('POST', '/services/music_assistant/play_media', data)
+        # A slow provider can hold Music Assistant's search for many seconds. The speaker
+        # waits a short while; after that the request goes on here, and only a real
+        # failure is spoken, late, in Alice's own voice.
+        task = asyncio.create_task(self.home('POST', '/services/music_assistant/play_media', data, timeout=PLAY_TIMEOUT_S))
+        done, _ = await asyncio.wait({task}, timeout=PLAY_ANSWER_S)
+        if not done:
+            self.background(self.finish_play(player, task))
+            return web.json_response({'ok': True, 'pending': True})
+        status, _ = task.result()
         if status == 401 or status == 0:
             raise web.HTTPServiceUnavailable(text='Home Assistant did not answer')
         if status >= 300:  # Music Assistant refuses a query it cannot resolve
             raise web.HTTPNotFound(text='nothing found')
         return web.json_response({'ok': True})
+
+    async def finish_play(self, player: Player, task: asyncio.Task) -> None:
+        status, _ = await task
+        if status == 200:
+            return
+        text = 'Не нашла это в Music Assistant.' if status >= 300 else 'Music Assistant не ответил.'
+        log.info('%s: поиск в Music Assistant завершился с ошибкой %s', player.name, status)
+        if player.media_entity:
+            await self.home('POST', '/services/media_player/play_media',
+                            {'entity_id': player.media_entity, 'media_content_id': text, 'media_content_type': 'text'})
+
+    def background(self, coroutine: Any) -> None:
+        task = asyncio.create_task(coroutine)
+        self.tasks.add(task)
+        task.add_done_callback(self.tasks.discard)
 
     async def entity(self, player: Player) -> tuple[str, str]:
         # The HA entity belongs to Music Assistant's own player id, not the Sendspin id,
@@ -436,13 +468,13 @@ class Service:
         rows = [row.split('|', 1) for row in text.split(';') if '|' in row]
         return (rows[0][0], rows[0][1]) if len(rows) == 1 else ('', '')
 
-    async def home(self, method: str, path: str, data: Any) -> tuple[int, str]:
+    async def home(self, method: str, path: str, data: Any, timeout: float = 15) -> tuple[int, str]:
         token = os.environ.get('ALICE_HA_TOKEN') or os.environ.get('SUPERVISOR_TOKEN')
         base = os.environ.get('ALICE_HA_URL') or 'http://supervisor/core/api'
         if not token:
             return 0, ''
         try:
-            async with ClientSession(timeout=ClientTimeout(total=15)) as session:
+            async with ClientSession(timeout=ClientTimeout(total=timeout)) as session:
                 async with session.request(method, base + path, json=data, headers={'Authorization': f'Bearer {token}'}) as reply:
                     return reply.status, (await reply.text())[:65536]
         except (OSError, TimeoutError):

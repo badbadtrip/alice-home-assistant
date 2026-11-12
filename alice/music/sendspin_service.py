@@ -418,25 +418,38 @@ class Service:
                 raise web.HTTPNotFound(text='nothing to play')
             await player.command('play')
             return web.json_response({'ok': True})
+        clock = asyncio.get_running_loop().time
+        started = clock()
         entity, state, entry = await self.entity(player)
+        found_entity = clock()
         if not entity:
             raise web.HTTPServiceUnavailable(text='Music Assistant player is not in Home Assistant')
         if state == 'unavailable':
             raise web.HTTPServiceUnavailable(text='Music Assistant player is unavailable')
         data: dict[str, Any] = {'entity_id': entity, 'media_id': query, 'enqueue': 'replace'}
+        rest: list[str] = []
         if kind in MEDIA_TYPES:
             data['media_type'] = MEDIA_TYPES[kind]
         if kind == 'artist' and entry:
             # Playing an artist makes Music Assistant fetch the whole discography first,
             # which takes Apple Music half a minute. Its top tracks from search start at once.
             tracks = await self.artist_tracks(entry, query)
+            log.info('%s: треки исполнителя найдены за %.0f мс (%d)', player.name, (clock() - found_entity) * 1000, len(tracks))
             if tracks:
-                data = {'entity_id': entity, 'media_id': tracks, 'enqueue': 'replace'}
+                # Music Assistant loads every listed track before it starts, so the first
+                # one plays alone and the rest join the queue while it already sounds.
+                data = {'entity_id': entity, 'media_id': tracks[0], 'enqueue': 'replace'}
+                rest = tracks[1:]
         # A slow provider can hold Music Assistant's search for many seconds. The speaker
         # waits a short while; after that the request goes on here, and only a real
         # failure is spoken, late, in Alice's own voice.
         task = asyncio.create_task(self.home('POST', '/services/music_assistant/play_media', data, timeout=PLAY_TIMEOUT_S))
+        if rest:
+            self.background(self.queue_rest(task, data['entity_id'], rest))
+        asked = clock()
         done, _ = await asyncio.wait({task}, timeout=PLAY_ANSWER_S)
+        log.info('%s: Music Assistant: сущность %.0f мс, запуск %s за %.0f мс', player.name, (found_entity - started) * 1000,
+                 'ещё идёт' if not done else 'ответил', (clock() - asked) * 1000)
         if not done:
             self.background(self.finish_play(player, task))
             return web.json_response({'ok': True, 'pending': True})
@@ -446,6 +459,12 @@ class Service:
         if status >= 300:  # Music Assistant refuses a query it cannot resolve
             raise web.HTTPNotFound(text='nothing found')
         return web.json_response({'ok': True})
+
+    async def queue_rest(self, first: asyncio.Task, entity: str, rest: list[str]) -> None:
+        status, _ = await first
+        if status == 200:
+            await self.home('POST', '/services/music_assistant/play_media',
+                            {'entity_id': entity, 'media_id': rest, 'enqueue': 'add'}, timeout=PLAY_TIMEOUT_S)
 
     async def finish_play(self, player: Player, task: asyncio.Task) -> None:
         status, _ = await task

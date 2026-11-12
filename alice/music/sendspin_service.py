@@ -418,7 +418,7 @@ class Service:
                 raise web.HTTPNotFound(text='nothing to play')
             await player.command('play')
             return web.json_response({'ok': True})
-        entity, state = await self.entity(player)
+        entity, state, entry = await self.entity(player)
         if not entity:
             raise web.HTTPServiceUnavailable(text='Music Assistant player is not in Home Assistant')
         if state == 'unavailable':
@@ -426,6 +426,12 @@ class Service:
         data: dict[str, Any] = {'entity_id': entity, 'media_id': query, 'enqueue': 'replace'}
         if kind in MEDIA_TYPES:
             data['media_type'] = MEDIA_TYPES[kind]
+        if kind == 'artist' and entry:
+            # Playing an artist makes Music Assistant fetch the whole discography first,
+            # which takes Apple Music half a minute. Its top tracks from search start at once.
+            tracks = await self.artist_tracks(entry, query)
+            if tracks:
+                data = {'entity_id': entity, 'media_id': tracks, 'enqueue': 'replace'}
         # A slow provider can hold Music Assistant's search for many seconds. The speaker
         # waits a short while; after that the request goes on here, and only a real
         # failure is spoken, late, in Alice's own voice.
@@ -461,12 +467,29 @@ class Service:
         # so it is found by the device this service describes and the player's name.
         template = ("{%- for e in integration_entities('music_assistant') if e.startswith('media_player.') "
                     "and device_attr(e, 'manufacturer') == '" + MANUFACTURER + "' "
-                    "and device_attr(e, 'name') == name -%}{{ e }}|{{ states(e) }};{%- endfor -%}")
+                    "and device_attr(e, 'name') == name -%}{{ e }}|{{ states(e) }}|{{ config_entry_id(e) }};{%- endfor -%}")
         status, text = await self.home('POST', '/template', {'template': template, 'variables': {'name': player.name}})
         if status != 200:
-            return '', ''
-        rows = [row.split('|', 1) for row in text.split(';') if '|' in row]
-        return (rows[0][0], rows[0][1]) if len(rows) == 1 else ('', '')
+            return '', '', ''
+        rows = [row.split('|', 2) for row in text.split(';') if row.count('|') == 2]
+        return (rows[0][0], rows[0][1], rows[0][2]) if len(rows) == 1 else ('', '', '')
+
+    async def artist_tracks(self, entry: str, artist: str) -> list[str]:
+        status, text = await self.home('POST', '/services/music_assistant/search?return_response',
+                                       {'config_entry_id': entry, 'name': artist, 'media_type': ['track'], 'limit': 25})
+        if status != 200:
+            return []
+        try:
+            found = json.loads(text).get('service_response', {}).get('tracks') or []
+        except (ValueError, AttributeError):
+            return []
+        wanted = artist.casefold()
+        def by_artist(track: dict[str, Any]) -> bool:
+            return any(wanted in str(a.get('name', '')).casefold() for a in track.get('artists') or [] if isinstance(a, dict))
+        tracks = [t for t in found if isinstance(t, dict) and isinstance(t.get('uri'), str)]
+        chosen = [t['uri'] for t in tracks if by_artist(t)] or [t['uri'] for t in tracks]
+        # Library entries may point to a provider that is now off: streaming ones go first.
+        return sorted(chosen, key=lambda uri: uri.startswith('library://'))
 
     async def home(self, method: str, path: str, data: Any, timeout: float = 15) -> tuple[int, str]:
         token = os.environ.get('ALICE_HA_TOKEN') or os.environ.get('SUPERVISOR_TOKEN')

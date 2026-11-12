@@ -11,8 +11,6 @@ import (
 // Custom holds the owner's own words from the panel. They extend the built-in
 // phrases and never replace them.
 type Custom struct {
-	Spotify  []string
-	YouTube  []string
 	Relay    []string
 	Commands map[string][]string
 	// Replace means the lists are the whole phrase base from the server: the built-in
@@ -38,14 +36,12 @@ func SetCustom(c Custom) {
 		}
 		return out
 	}
-	next := Custom{Spotify: clean(c.Spotify), YouTube: clean(c.YouTube), Relay: clean(c.Relay), Commands: map[string][]string{}, Replace: c.Replace}
+	next := Custom{Relay: clean(c.Relay), Commands: map[string][]string{}, Replace: c.Replace}
 	for action, list := range c.Commands {
 		next.Commands[action] = clean(list)
 	}
 	custom.Store(&next)
 }
-
-var servicePrepositions = []string{"в", "на", "из", "через", "по"}
 
 // wordsAt reports whether phrase matches text word by word from the start; a phrase word
 // ending in "*" matches any ending.
@@ -72,8 +68,6 @@ func replacing() *Custom {
 	return nil
 }
 
-var searchHead = regexp.MustCompile(`^(?:включи|поставь|запусти|сыграй|играй|найди)(?: мне)? `)
-
 var commands = []struct {
 	action  string
 	pattern *regexp.Regexp
@@ -96,109 +90,28 @@ func MusicAsk(text string) bool { return musicAsk.MatchString(normalize(text)) }
 // Start recognizes a plain request for music with nothing named.
 func Start(text string) bool { return start.MatchString(normalize(text)) }
 
-// Playlist is a Spotify source the user named in the panel.
-type Playlist struct {
-	Name string `json:"name"`
-	URI  string `json:"uri"`
-}
-
-var (
-	namedPlaylist = regexp.MustCompile(`^(?:включи|поставь|запусти)(?: мне| мой)? плейлист (.+)$`)
-	playlistURI   = regexp.MustCompile(`^spotify:(?:playlist|album):[A-Za-z0-9]+$`)
-)
-
-// PickPlaylist finds the URI for a spoken request. Plain "включи музыку" takes the first entry.
-func PickPlaylist(text string, playlists []Playlist) string {
-	if len(playlists) == 0 {
-		return ""
-	}
-	if Start(text) {
-		if playlistURI.MatchString(playlists[0].URI) {
-			return playlists[0].URI
-		}
-		return ""
-	}
-	match := namedPlaylist.FindStringSubmatch(normalize(text))
-	if match == nil {
-		return ""
-	}
-	for _, playlist := range playlists {
-		if playlistName(playlist.Name) == playlistName(match[1]) && playlistURI.MatchString(playlist.URI) {
-			return playlist.URI
-		}
-	}
-	return ""
-}
-
 var (
 	searchVerb  = `^(?:включи|поставь|запусти|сыграй|играй|найди)(?: мне)?`
 	namedSearch = regexp.MustCompile(searchVerb + `(?: мою| мой)? (песню|трек|композицию|группу|исполнителя|артиста|альбом|плейлист) (.+)$`)
 	likedSearch = regexp.MustCompile(searchVerb + ` (?:мои лайки|избранное|любимую музыку|мою любимую музыку|любимые (?:песни|треки)|понравившиеся(?: песни| треки)?)$`)
-	bareSearch  = regexp.MustCompile(searchVerb + ` (.+)$`)
 	searchKinds = map[string]string{
 		"песню": "track", "трек": "track", "композицию": "track",
 		"группу": "artist", "исполнителя": "artist", "артиста": "artist",
 		"альбом": "album", "плейлист": "playlist",
 	}
-	serviceName = `(?:в|на|из|через|по) (?:(спотифа[йеяю]|спотик[еа]?|spotify)|(ют[ьу]+б[еау]?(?: музык[еау])?|youtube(?: music)?))`
-	serviceTail = regexp.MustCompile(` ` + serviceName + `$`)
-	serviceHead = regexp.MustCompile(searchVerb + ` ` + serviceName + ` `)
 )
 
-// service finds a spoken service at either end and returns the phrase without it.
-func service(text string) (string, string) {
-	provider := func(match []string) string {
-		if match[1] != "" {
-			return "spotify"
-		}
-		return "youtube"
-	}
-	if replacing() == nil {
-		if match := serviceTail.FindStringSubmatch(text); match != nil {
-			return serviceTail.ReplaceAllString(text, ""), provider(match)
-		}
-		if match := serviceHead.FindStringSubmatch(text); match != nil {
-			return strings.Fields(text)[0] + " " + strings.TrimPrefix(text, match[0]), provider(match)
-		}
-	}
-	if c := custom.Load(); c != nil {
-		words := strings.Fields(text)
-		head := len(strings.Fields(searchHead.FindString(text)))
-		for _, named := range []struct {
-			provider string
-			names    []string
-		}{{"spotify", c.Spotify}, {"youtube", c.YouTube}} {
-			for _, name := range named.names {
-				for _, preposition := range servicePrepositions {
-					said := append([]string{preposition}, strings.Fields(name)...)
-					if len(words) > len(said) && wordsAt(words[len(words)-len(said):], said) {
-						return strings.Join(words[:len(words)-len(said)], " "), named.provider
-					}
-					if head > 0 && len(words) > head+len(said) && wordsAt(words[head:], said) {
-						return words[0] + " " + strings.Join(words[head+len(said):], " "), named.provider
-					}
-				}
-			}
-		}
-	}
-	return text, ""
-}
-
-// Search reads a request to find music. A bare "включи кино" may name a lamp or a
-// Yandex skill, so it counts only when a service was said out loud. The provider is
-// empty unless named.
-func Search(text string) (kind, query, provider string, ok bool) {
-	text, provider = service(normalize(text))
+// Search reads a request to find music by name. A bare "включи кино" may name a lamp or
+// a Yandex skill, so only a request that says what it is counts.
+func Search(text string) (kind, query string, ok bool) {
+	text = normalize(text)
 	if likedSearch.MatchString(text) {
-		return "liked", "", provider, true
+		return "liked", "", true
 	}
 	if match := namedSearch.FindStringSubmatch(text); match != nil {
-		return searchKinds[match[1]], match[2], provider, true
+		return searchKinds[match[1]], match[2], true
 	}
-	if match := bareSearch.FindStringSubmatch(text); provider != "" && match != nil {
-		return "any", match[1], provider, true
-	}
-	return "", "", "", false
+	return "", "", false
 }
 
 var relayAsk = regexp.MustCompile(`^(?:скажи|передай)(?: на| в| во) ([^ ]+) (.+)$`)
@@ -227,13 +140,6 @@ func Relay(text string) (room, message string, ok bool) {
 // RoomStem drops the case ending, the same way the server does.
 func RoomStem(room string) string {
 	return strings.TrimRight(room, "аеиоуыюя")
-}
-
-var spokenDigits = strings.NewReplacer("один", "1", "первый", "1", "два", "2", "второй", "2", "три", "3", "третий", "3", "четыре", "4", "пять", "5")
-
-// playlistName compares what was said with a panel name: "плейлист номер 1" equals "номер один".
-func playlistName(name string) string {
-	return spokenDigits.Replace(strings.TrimPrefix(normalize(name), "плейлист "))
 }
 
 func Command(text string) string {

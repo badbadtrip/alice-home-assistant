@@ -107,9 +107,6 @@ def remote_path(value):
     return shlex.quote(value)
 
 
-YTM_FREE_KB = 40 * 1024
-
-
 def station(manager, speaker_id, operation, payload):
     from service import Error
     speaker = manager.store.speaker(speaker_id)
@@ -132,8 +129,7 @@ def station(manager, speaker_id, operation, payload):
                 raise Error('Выберите: включить или выключить AirPlay.')
             url = 'http://127.0.0.1:18861/airplay?action='
             # Both receivers need UDP 319/320. The disabled file also stops the old
-            # service from returning at boot. Lite 2 keeps ctl.sh without shairport:
-            # the same boot hook also starts Soloist.
+            # service from returning at boot.
             if action == 'on':
                 script = ('if [ -x /data/airplay/ctl.sh ]; then touch /data/airplay/disabled; /data/airplay/ctl.sh stop; sleep 1; fi; '
                           'wget -T 12 -q -O - "' + url + 'start"')
@@ -150,24 +146,6 @@ def station(manager, speaker_id, operation, payload):
                 raise Error('Неизвестная команда плеера.')
             manager.bridge_get(speaker, '/player?action=' + action, timeout=10)
             return {'ok': True}
-        if operation == 'ytm':
-            # Other people's speakers differ: say why before anything is written.
-            check = manager.ssh(speaker, 'if [ -f /system/vendor/quasar/libquasar_gstreamer.so ] || [ -f /system/vendor/quasar/libs/libquasar_gstreamer.so ]; '
-                                'then echo player=yes; else echo player=no; fi; df -k /data | tail -1', timeout=15).decode()
-            fields = check.split()
-            if 'player=no' in fields:
-                raise Error('Эта модель колонки не поддерживает плеер YouTube Music: нет штатной библиотеки звука.', 409)
-            if len(fields) < 4 or not fields[-3].isdigit() or int(fields[-3]) < YTM_FREE_KB:
-                raise Error('На колонке мало места: для плеера нужно 40 МБ свободных.', 409)
-            # The bridge notices the file and starts the player by itself.
-            try:
-                bundle = (Path(manager.config['artifact_dir']) / 'ytm-alice.tar.gz').read_bytes()
-            except OSError:
-                raise Error('Плеера нет в этой версии приложения. Обновите приложение.', 503) from None
-            manager.ssh(speaker, 'mkdir -p /data/opt/ytm-alice/var && cd /data/opt/ytm-alice && gzip -dc | tar -xf - '
-                        '&& chmod 755 bin/*', bundle, timeout=120)
-            manager.store.metadata(speaker_id, ytm_installed=True)
-            return {'installed': True}
         if operation == 'console':
             command = payload.get('command')
             if not isinstance(command, str) or not command.strip() or len(command) > 8000 or '\x00' in command:

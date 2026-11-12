@@ -1,17 +1,28 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { MusicSettingsSchema } from '../src/music'
+import { MusicSettingsSchema, speakerSource } from '../src/music'
 
-test('spotify playlists keep a URI from a shared link and reject others', () => {
-  const parsed = MusicSettingsSchema.parse({ spotify_playlists: [{ name: 'Утро', uri: 'https://open.spotify.com/intl-ru/playlist/abc123?si=x' }, { name: 'Альбом', uri: 'spotify:album:def' }] })
-  assert.deepEqual(parsed.spotify_playlists.map(item => item.uri), ['spotify:playlist:abc123', 'spotify:album:def'])
-  assert.equal(MusicSettingsSchema.safeParse({ spotify_playlists: [{ name: 'Нет', uri: 'https://example.com/playlist/abc' }] }).success, false)
+test('a speaker follows its own choice, then the default', () => {
+  const settings = MusicSettingsSchema.parse({ default_source: 'yandex', speaker_sources: { da0f9d59a1e1ad66: 'music_assistant' } })
+  assert.equal(speakerSource(settings, 'da0f9d59a1e1ad66'), 'music_assistant')
+  assert.equal(speakerSource(settings, 'f9459e66ca6904f7'), 'yandex')
+  assert.equal(speakerSource(settings, undefined), 'yandex')
+  assert.equal(MusicSettingsSchema.safeParse({ speaker_sources: { a: 'spotify' } }).success, false)
 })
 
-test('settings from the Music Assistant era keep playlists and fall back to stock', () => {
-  const parsed = MusicSettingsSchema.parse({ default_media: 'x', players: {}, source: 'music_assistant', spotify_playlists: [{ name: 'Утро', uri: 'spotify:playlist:a' }] })
-  assert.equal(parsed.source, 'yandex')
-  assert.equal(parsed.spotify_playlists.length, 1)
-  assert.equal(MusicSettingsSchema.parse({ source: 'spotify' }).source, 'alternative')
+test('settings from before 0.58 keep the owner phrases and map the old choice', () => {
+  const old = {
+    phrases: { items: [{ phrase: 'шпотифай', target: 'spotify' }, { phrase: 'расскажи сказку', target: 'yandex' }], replies: { llm_down: 'Нет связи', spotify_down: 'x' } },
+    provider: 'music_assistant',
+    source: 'alternative',
+    spotify_playlists: [{ name: 'Утро', uri: 'spotify:playlist:a' }]
+  }
+  const parsed = MusicSettingsSchema.parse(old)
+  assert.equal(parsed.default_source, 'music_assistant')
+  assert.deepEqual(parsed.phrases.items, [{ phrase: 'расскажи сказку', target: 'yandex' }])
+  assert.deepEqual(parsed.phrases.replies, { llm_down: 'Нет связи' })
+  assert.ok(!('spotify_playlists' in parsed))
+  assert.equal(MusicSettingsSchema.parse({ provider: 'youtube', source: 'alternative' }).default_source, 'yandex')
+  assert.equal(MusicSettingsSchema.parse({ source: 'spotify' }).default_source, 'yandex')
 })

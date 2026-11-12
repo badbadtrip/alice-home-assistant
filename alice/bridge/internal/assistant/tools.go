@@ -18,7 +18,6 @@ type Tools struct {
 	Config        Config
 	JournalConfig func() journal.Config
 	WebReader     *WebReader
-	Playback      *MusicPlayback
 	Now           func() time.Time
 }
 
@@ -38,9 +37,6 @@ func (t *Tools) Definitions() []llm.Tool {
 	}
 	if t.Config.PlaySound {
 		tools = append(tools, soundDefinition())
-		if t.Config.Web && t.Playback != nil {
-			tools = append(tools, musicDefinition())
-		}
 	}
 	return tools
 }
@@ -52,8 +48,6 @@ func (t *Tools) Call(ctx context.Context, name, args string) (any, error) {
 		return nil, errors.New("tool arguments exceed limit")
 	}
 	switch {
-	case name == "play_music" && t.Config.PlaySound && t.Config.Web && t.Playback != nil:
-		return t.playMusic(ctx, args)
 	case name == "play_sound" && t.Config.PlaySound:
 		return playSound(ctx, args)
 	case name == "read_webpage" && t.Config.Web:
@@ -141,7 +135,7 @@ func (t *Tools) InitialCallsForConversation(messages []llm.Message) []llm.Functi
 	return t.initialCalls(text, history)
 }
 func (t *Tools) initialCalls(text string, history bool) []llm.FunctionCall {
-	if strings.Contains(strings.ToLower(text), "сайт") || webaddress.MusicRequest(text) {
+	if strings.Contains(strings.ToLower(text), "сайт") {
 		text = webaddress.Normalize(text)
 	}
 	original := text
@@ -153,6 +147,7 @@ func (t *Tools) initialCalls(text string, history bool) []llm.FunctionCall {
 	text = dialogue.Normalize(text)
 	// A request that explicitly combines a page with history must read the page first.
 	web := strings.Contains(text, "https://") || strings.Contains(text, "http://") || strings.Contains(text, "страниц") || strings.Contains(text, "сайт")
+	// A direct audio URL is for play_sound, not a page to read.
 	playback := t.Config.PlaySound && (webaddress.MusicRequest(original) || strings.Contains(text, "воспроизведи") || strings.Contains(text, "проиграй") || strings.Contains(text, "включи аудио"))
 	if t.Config.Web && !playback {
 		if raw := explicitURL.FindString(original); raw != "" {

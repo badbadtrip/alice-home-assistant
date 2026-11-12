@@ -33,9 +33,7 @@ import (
 	"quasarbridge/internal/metrics"
 	"quasarbridge/internal/nowplaying"
 	"quasarbridge/internal/sendspin"
-	"quasarbridge/internal/soloist"
 	"quasarbridge/internal/wire"
-	"quasarbridge/internal/ytm"
 )
 
 func main() {
@@ -166,7 +164,6 @@ func main() {
 		planner = noLLMPlanner{}
 	}
 	engine := &bridge.Engine{LLM: planner, Dialogue: dialogue.New(cfg.DialogueContext), SystemPrompt: cfg.SystemPrompt}
-	var musicQueue *assistant.MusicQueue
 	var hc *home.Controller
 	if endpoint := os.Getenv("QUASAR_HOME_MCP_URL"); endpoint != "" {
 		hc = &home.Controller{Tools: &home.MCP{URL: endpoint}, Planner: planner}
@@ -194,35 +191,11 @@ func main() {
 			return c
 		}
 		reader := assistant.NewWebReader(cfg.AssistantTools)
-		if cfg.AssistantTools.PlaySound && cfg.AssistantTools.Web {
-			if base := musicBaseURL(cfg); base != "" {
-				var err error
-				musicQueue, err = assistant.NewMusicQueue(base, reader)
-				if err != nil {
-					slog.Error("music queue configuration rejected", "error", err)
-					os.Exit(1)
-				}
-			} else {
-				slog.Warn("music playback needs assistant_tools.music_base_url reachable by the speaker")
-			}
-		}
-		var musicPlayback *assistant.MusicPlayback
-		if musicQueue != nil {
-			musicPlayback = assistant.NewMusicPlayback(musicQueue)
-			engine.Playback = musicPlayback
-		}
-		tools := &assistant.Tools{Config: cfg.AssistantTools, JournalConfig: source, WebReader: reader, Playback: musicPlayback}
-		engine.Music = tools
+		tools := &assistant.Tools{Config: cfg.AssistantTools, JournalConfig: source, WebReader: reader}
 		engine.Assistant = &assistant.Agent{Client: lc, Tools: tools, MaxRounds: cfg.AssistantTools.MaxRounds, MaxCalls: cfg.AssistantTools.MaxCalls}
 	}
-	// A speaker with its own Spotify client answers playback commands directly.
-	if local := (&soloist.Client{StateDir: "/data/soloist/state"}); engine.Playback == nil && local.Available() {
-		engine.Playback = local
-	}
 	engine.Silencer = proxy
-	youtube := ytm.New()
 	var playing nowplaying.Tracker
-	engine.YouTube = youtube
 	if err := engine.SetRouting(withoutModelFallback(cfg.Routing, llmDisabled)); err != nil {
 		slog.Error("routing rejected", "error", err)
 		os.Exit(1)
@@ -334,12 +307,6 @@ func main() {
 		if airPlay != nil {
 			sources = append(sources, airPlay.now)
 		}
-		if local := (&soloist.Client{StateDir: "/data/soloist/state"}); local.Available() {
-			sources = append(sources, local.Now)
-		}
-		if youtube.Available() {
-			sources = append(sources, youtube.Now)
-		}
 		return sources
 	}
 	// One look at the players a second serves the state report, the ring and /metrics.
@@ -363,9 +330,6 @@ func main() {
 		})
 	}
 	mux := http.NewServeMux()
-	if musicQueue != nil {
-		mux.Handle("/music-stream/", musicQueue)
-	}
 	mcpConfigured := 0
 	if cfg.Mode == "hybrid" && cfg.AssistantTools.Enabled {
 		for _, server := range cfg.AssistantTools.MCPServers {
@@ -402,7 +366,7 @@ func main() {
 				return hf.VoicePhraseCount()
 			}
 			return 0
-		}(), "music_playback_enabled": musicQueue != nil, "volume_push": true, "music_assistant": func() map[string]any {
+		}(), "volume_push": true, "music_assistant": func() map[string]any {
 			if musicAssistant == nil {
 				return nil
 			}
@@ -454,7 +418,6 @@ func main() {
 	server := &http.Server{Addr: cfg.Listen, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go youtube.Supervise(ctx)
 	go localstate.WatchVolume(ctx, func(v localstate.Volume) {
 		first := volume.Swap(&v) == nil
 		if ring != nil && !first {
@@ -465,7 +428,13 @@ func main() {
 	// Built before the watchers start so that they only ever read a settled pointer.
 	if hf != nil && hf.URL != "" {
 		// QUASAR_SENDSPIN_URL points a development bridge at a separately run service.
-		musicAssistant = &sendspin.Player{URL: cmp.Or(os.Getenv("QUASAR_SENDSPIN_URL"), hf.URL), Token: hf.Token, Speaker: hf.SpeakerID, OnChange: changed}
+		musicAssistant = &sendspin.Player{URL: cmp.Or(os.Getenv("QUASAR_SENDSPIN_URL"), hf.URL), Token: hf.Token, Speaker: hf.SpeakerID}
+		musicAssistant.OnChange = func() {
+			if ring != nil {
+				ring.SetMusic(musicAssistant.Streaming())
+			}
+			changed()
+		}
 	}
 	go localstate.WatchAlice(ctx, localstate.AliceSocket, func(state string) {
 		voice.Store(state)
@@ -503,12 +472,6 @@ func main() {
 		}
 		if airPlay != nil {
 			players["airplay"] = airPlay.now
-		}
-		if local := (&soloist.Client{StateDir: "/data/soloist/state"}); local.Available() {
-			players["spotify"] = local.Now
-		}
-		if youtube.Available() {
-			players["youtube_music"] = youtube.Now
 		}
 		return metrics.Snapshot{Status: "ok", SpeakerID: os.Getenv("QUASAR_HOME_SPEAKER_ID"), BridgeUptimeS: int64(time.Since(started).Seconds()),
 			System: metrics.Device.System(), NowPlaying: currentTrack(ctx), Players: metrics.Players(ctx, players),

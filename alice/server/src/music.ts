@@ -4,30 +4,26 @@ import z from 'zod'
 
 import { PhrasesSchema } from './phrases'
 
-// Accepts a spotify: URI or an open.spotify.com link and keeps the URI.
-const SpotifyUri = z.string().trim().max(300).transform((value, context) => {
-  const match = /^spotify:(playlist|album):([A-Za-z0-9]+)$/u.exec(value) ??
-    /^https:\/\/open\.spotify\.com\/(?:intl-[a-z]+\/)?(playlist|album)\/([A-Za-z0-9]+)(?:[/?#].*)?$/u.exec(value)
-  if (!match) { context.addIssue({ code: 'custom', message: 'Invalid Spotify link' }); return z.NEVER }
-  return `spotify:${match[1] ?? ''}:${match[2] ?? ''}`
-})
+// Music on each speaker is stock Yandex Music or Music Assistant; services live in Music Assistant.
+export const MUSIC_SOURCES = ['yandex', 'music_assistant'] as const
+const Source = z.enum(MUSIC_SOURCES)
+const SpeakerId = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/u)
 
-const SpotifyPlaylist = z.object({ name: z.string().trim().min(1).max(80), uri: SpotifyUri }).strict()
+// Before 0.58 a single "source"/"provider" pair chose the music for every speaker.
+const legacySource = (value: unknown): unknown => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  const old = value as Record<string, unknown>
+  if (old.default_source !== undefined) return value
+  return { ...old, default_source: old.source === 'alternative' && old.provider === 'music_assistant' ? 'music_assistant' : 'yandex' }
+}
 
-// "spotify" is the older name of the alternative sources; anything else is stock music.
-export const MusicSettingsSchema = z.object({
+export const MusicSettingsSchema = z.preprocess(legacySource, z.object({
+  default_source: Source.catch('yandex').default('yandex'),
   phrases: PhrasesSchema.default({ disabled: [], disabled_rules: [], items: [], replies: {} }),
-  provider: z.preprocess(
-    value => value === 'youtube' || value === 'music_assistant' ? value : 'spotify',
-    z.enum(['spotify', 'youtube', 'music_assistant'])
-  ),
   relay_intro: z.string().trim().max(100).default(''),
-  source: z.preprocess(
-    value => value === 'spotify' || value === 'alternative' ? 'alternative' : 'yandex',
-    z.enum(['alternative', 'yandex'])
-  ),
-  spotify_playlists: z.array(SpotifyPlaylist).max(50).default([])
-})
+  // Speaker id -> its own choice; a speaker without one follows default_source.
+  speaker_sources: z.record(SpeakerId, Source).default({})
+}))
 
 export type MusicSettings = z.infer<typeof MusicSettingsSchema>
 
@@ -38,6 +34,10 @@ export async function readMusicSettings (file: string | undefined): Promise<Musi
   } catch {
     return MusicSettingsSchema.parse({})
   }
+}
+
+export function speakerSource (settings: MusicSettings, speaker: string | undefined): typeof MUSIC_SOURCES[number] {
+  return (speaker && settings.speaker_sources[speaker]) || settings.default_source
 }
 
 export async function writeMusicSettings (file: string | undefined, settings: MusicSettings): Promise<void> {

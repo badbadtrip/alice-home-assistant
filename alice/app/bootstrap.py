@@ -104,7 +104,7 @@ def configure(data, root, raw, overrides=Path('/config/functions-overrides.json'
     write_private(data/'functions.json', json.dumps(functions))
     artifacts=data/'artifacts'
     artifacts.mkdir(exist_ok=True,mode=0o700)
-    for name in ('quasar-bridge','ytm-alice.tar.gz','LICENSE','NOTICE','THIRD_PARTY_NOTICES'):
+    for name in ('quasar-bridge','LICENSE','NOTICE','THIRD_PARTY_NOTICES'):
         target=artifacts/name
         if target.exists() or target.is_symlink():
             target.unlink()

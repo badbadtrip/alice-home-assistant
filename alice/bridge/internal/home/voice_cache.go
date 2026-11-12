@@ -21,10 +21,8 @@ type voicePhraseSnapshot struct {
  Revision string
  Active int
  Names []string
- Playlists []playback.Playlist
  MusicSource string
  RelayRooms []string
- MusicProvider string
 }
 type voicePhraseCache struct {
  snapshot atomic.Pointer[voicePhraseSnapshot]
@@ -76,11 +74,6 @@ func (f *Functions) VoicePhraseCount() int {
  return 0
 }
 
-// Playlists returns the Spotify playlists named in the panel.
-func (f *Functions) Playlists() []playback.Playlist {
- if snapshot:=f.voice.snapshot.Load();snapshot!=nil {return snapshot.Playlists}
- return nil
-}
 
 // RelayRoom reports whether a spoken room has a speaker that can talk.
 func (f *Functions) RelayRoom(room string) bool {
@@ -105,21 +98,7 @@ func (f *Functions) ReportState(ctx context.Context,state map[string]any) error 
  return f.request(ctx,http.MethodPost,"/now-playing",state,&done)
 }
 
-// FindSpotify asks the server, which holds the account, for something to play.
-func (f *Functions) FindSpotify(ctx context.Context,kind,query string) (string,[]string,error) {
- ctx,cancel:=context.WithTimeout(ctx,5*time.Second);defer cancel()
- var found struct {URI string `json:"uri"`; Next []string `json:"next"`}
- err:=f.request(ctx,http.MethodPost,"/spotify/search",map[string]string{"kind":kind,"query":query},&found)
- return found.URI,found.Next,err
-}
-
-// MusicProvider returns the alternative service used when the phrase names none.
-func (f *Functions) MusicProvider() string {
- if snapshot:=f.voice.snapshot.Load();snapshot!=nil {return snapshot.MusicProvider}
- return ""
-}
-
-// MusicSource returns the source picked in the panel: "alternative" or "yandex".
+// MusicSource returns the source picked in the panel: "yandex" or "music_assistant".
 func (f *Functions) MusicSource() string {
  if snapshot:=f.voice.snapshot.Load();snapshot!=nil {return snapshot.MusicSource}
  return ""
@@ -133,16 +112,12 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
   DeviceNames []string `json:"device_names"`
   Routing json.RawMessage `json:"routing"`
   Phrases struct {
-   Spotify []string `json:"spotify"`
-   YouTube []string `json:"youtube"`
    Relay []string `json:"relay"`
    Commands map[string][]string `json:"commands"`
    Replace bool `json:"replace"`
    Replies map[string]string `json:"replies"`
   } `json:"phrases"`
-  Playlists []playback.Playlist `json:"playlists"`
   MusicSource string `json:"music_source"`
-  MusicProvider string `json:"music_provider"`
   RelayRooms []string `json:"relay_rooms"`
  }
  // The table is only parsed when it changed; a weak speaker skips thousands of phrases.
@@ -176,10 +151,10 @@ func (f *Functions) RefreshVoiceCache(ctx context.Context) error {
  names:=make([]string,0,len(response.DeviceNames))
  for _,name:=range response.DeviceNames {if name=normalizeVoicePhrase(name);name!="" {names=append(names,name)}}
  previous:=f.voice.snapshot.Load()
- f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names,Playlists:response.Playlists,MusicSource:response.MusicSource,RelayRooms:response.RelayRooms,MusicProvider:response.MusicProvider})
+ f.voice.snapshot.Store(&voicePhraseSnapshot{Phrases:phrases,Revision:response.Revision,Active:active,Names:names,MusicSource:response.MusicSource,RelayRooms:response.RelayRooms})
  f.applyRouting(response.Routing)
  // The owner's words and replies arrive with the table; an old server sends none.
- playback.SetCustom(playback.Custom{Spotify:response.Phrases.Spotify,YouTube:response.Phrases.YouTube,Relay:response.Phrases.Relay,Commands:response.Phrases.Commands,Replace:response.Phrases.Replace})
+ playback.SetCustom(playback.Custom{Relay:response.Phrases.Relay,Commands:response.Phrases.Commands,Replace:response.Phrases.Replace})
  done:=strings.TrimSpace(response.Phrases.Replies["home_done"]);f.doneReply.Store(&done)
  if f.OnReplies!=nil {f.OnReplies(response.Phrases.Replies)}
  if previous==nil || previous.Revision!=response.Revision {

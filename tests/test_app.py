@@ -62,7 +62,7 @@ class AppTests(unittest.TestCase):
             base=Path(directory);root=base/'app';data=base/'data'
             (root/'artifacts').mkdir(parents=True)
             (root/'bridge-config.json').write_text(json.dumps({'routing':{'default_route':'llm'}}))
-            for name in ('quasar-bridge','ytm-alice.tar.gz','LICENSE','NOTICE','THIRD_PARTY_NOTICES'):(root/'artifacts'/name).write_text('test')
+            for name in ('quasar-bridge','LICENSE','NOTICE','THIRD_PARTY_NOTICES'):(root/'artifacts'/name).write_text('test')
             def keygen(*args,**kwargs):
                 key=data/'ssh/id_ed25519';key.write_text('private-test-key');key.with_suffix('.pub').write_text('public-test-key')
             with patch('bootstrap.subprocess.run',side_effect=keygen) as run:

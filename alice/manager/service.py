@@ -45,7 +45,7 @@ def music_assistant_state(value):
     return {key: value.get(key) is True for key in ('linked', 'streaming')}
 
 
-NOW_SOURCES = ('airplay', 'spotify', 'youtube_music', 'yandex_music', 'music_assistant')
+NOW_SOURCES = ('airplay', 'yandex_music', 'music_assistant')
 NOW_STATUSES = ('playing', 'paused', 'buffering')
 
 
@@ -514,6 +514,24 @@ class Manager:
             finally:
                 self.operation_lock.release()
 
+    def music_assistant(self):
+        # Pairing codes and links of the Music Assistant players, for the panel.
+        try:
+            state = self._hf_request('/sendspin/state')
+        except Error:
+            return {'available': False, 'players': []}
+        names = {speaker['id']: speaker.get('name') or '' for speaker in self.store.read('speakers.json')}
+        players = []
+        for speaker_id, value in (state.items() if isinstance(state, dict) else []):
+            if speaker_id not in names or not isinstance(value, dict):
+                continue
+            code = value.get('pairing_code')
+            players.append({'speaker_id': speaker_id, 'speaker': names[speaker_id], 'player': str(value.get('name') or '')[:80],
+                            'connected': value.get('connected') is True, 'streaming': value.get('streaming') is True,
+                            'listening': value.get('listening') is True,
+                            'pairing_code': code if isinstance(code, str) and len(code) <= 16 else None})
+        return {'available': True, 'players': players}
+
     @staticmethod
     def _now_playing(speaker, reported):
         current = now_playing_state(reported)
@@ -656,7 +674,7 @@ class Manager:
         return token
 
     def _hf_request(self, path, speaker=None, payload=None):
-        if path not in ('/now-playing', '/phrases', '/voice-phrases', '/preview', '/events', '/inventory', '/dictionary', '/dictionary/alias', '/music', '/spotify', '/spotify/login', '/spotify/callback', '/spotify/sync'):
+        if path not in ('/now-playing', '/phrases', '/voice-phrases', '/preview', '/events', '/inventory', '/dictionary', '/dictionary/alias', '/music', '/sendspin/state'):
             raise Error('Неизвестный внутренний маршрут.', 500)
         parsed = urlsplit(self.config.get('home_functions_url', ''))
         if parsed.scheme not in ('http', 'https') or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ('', '/'):
@@ -1512,7 +1530,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == ['api', 'access'] and method in ('GET', 'PUT'):
             from admin import access
             return 200, access(manager, payload if method == 'PUT' else None)
-        if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] in ('file-read', 'file-write', 'console', 'indicator', 'volume', 'airplay', 'ytm', 'player') and method == 'POST':
+        if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] in ('file-read', 'file-write', 'console', 'indicator', 'volume', 'airplay', 'player') and method == 'POST':
             from admin import station
             return 200, station(manager, path[2], path[3], payload)
         if path == ['api', 'setup'] and method == 'GET':
@@ -1523,10 +1541,8 @@ class Handler(BaseHTTPRequestHandler):
             if not {'alias', 'entity_id'} <= set(payload) <= {'alias', 'entity_id', 'remove'}:
                 raise Error('Ожидаются alias и entity_id.')
             return 200, manager._hf_request('/dictionary/alias', None, {'alias': text(payload['alias'], 'alias', 60), 'entity_id': text(payload['entity_id'], 'entity_id', 200), 'remove': payload.get('remove') is True})
-        if path == ['api', 'spotify'] and method == 'GET':
-            return 200, manager._hf_request('/spotify')
-        if len(path) == 3 and path[:2] == ['api', 'spotify'] and path[2] in ('login', 'callback', 'sync') and method == 'POST':
-            return 200, manager._hf_request('/spotify/' + path[2], None, payload or {})
+        if path == ['api', 'music-assistant'] and method == 'GET':
+            return 200, manager.music_assistant()
         if path == ['api', 'ai-check'] and method == 'POST':
             return 200, ai_check(payload)
         if path == ['api', 'phrases'] and method == 'GET':

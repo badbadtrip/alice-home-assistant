@@ -24,16 +24,6 @@ jobs:
           cache-dependency-path: alice/bridge/go.sum
       - run: go test ./...
         working-directory: alice/bridge
-  ytm:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: alice/ytm/go.mod
-          cache-dependency-path: alice/ytm/go.sum
-      - run: go test .
-        working-directory: alice/ytm
   server:
     runs-on: ubuntu-latest
     defaults:

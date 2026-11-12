@@ -3,11 +3,10 @@ import z from 'zod'
 // One phrase base for the panel and every speaker. Built-in phrases ship with the app;
 // the owner's edits are stored on top: own phrases, built-ins switched off, rules switched off.
 export const PHRASE_TARGETS = [
-  'llm', 'yandex', 'spotify', 'youtube', 'pause', 'resume', 'next', 'previous', 'stop', 'relay'
+  'llm', 'yandex', 'pause', 'resume', 'next', 'previous', 'stop', 'relay'
 ] as const
 export const REPLY_KEYS = [
-  'home_done', 'relay_sent', 'relay_failed', 'youtube_missing', 'youtube_not_found',
-  'spotify_playlist_missing', 'spotify_down', 'spotify_not_found', 'llm_down'
+  'home_done', 'relay_sent', 'relay_failed', 'ma_not_found', 'ma_down', 'llm_down'
 ] as const
 type Target = typeof PHRASE_TARGETS[number]
 
@@ -24,10 +23,8 @@ export const BUILTIN: Record<Target, string[]> = {
   previous: ['предыдущий трек', 'предыдущий', 'предыдущую песню', 'предыдущая песня', 'назад', 'включи предыдущий трек'],
   relay: ['скажи на', 'скажи в', 'скажи во', 'передай на', 'передай в', 'передай во'],
   resume: ['продолжи', 'продолжай', 'возобнови', 'продолжи музыку', 'возобнови музыку', 'сними с паузы'],
-  spotify: ['спотифа*', 'спотик*', 'spotify'],
   stop: ['стоп', 'хватит', 'останови', 'останови музыку', 'выключи музыку', 'выключи песню'],
-  yandex: [],
-  youtube: ['ютуб*', 'ютьюб*', 'ютуб музык*', 'youtube', 'youtube music']
+  yandex: []
 }
 
 // Routing rules that are not plain phrases: shown as one line each, switched off whole.
@@ -48,11 +45,25 @@ const REPLACED_RULES = new Set(['ask_model'])
 const PhraseText = z.string().trim().toLowerCase().min(2).max(60).regex(/^[\p{L}\p{N} -]+\*?$/u)
 const PhraseItem = z.object({ phrase: PhraseText, target: z.enum(PHRASE_TARGETS) }).strict()
 
+// Saved settings may still hold phrases and replies of removed services (Spotify, YouTube).
+// They are dropped one by one, so the owner's other phrases survive the upgrade.
+const TARGET_NAMES: readonly string[] = PHRASE_TARGETS
+const REPLY_NAMES: readonly string[] = REPLY_KEYS
+const knownTargets = (value: unknown): unknown =>
+  Array.isArray(value) ? value.filter(item => TARGET_NAMES.includes((item as null | { target?: string })?.target ?? '')) : value
+const knownReplies = (value: unknown): unknown => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  const kept = Object.entries(value).filter(([key]) => REPLY_NAMES.includes(key))
+  return Object.fromEntries(kept)
+}
+const PhraseList = (limit: number) => z.preprocess(knownTargets, z.array(PhraseItem).max(limit))
+const Replies = z.preprocess(knownReplies, z.partialRecord(z.enum(REPLY_KEYS), z.string().trim().max(200)))
+
 export const PhrasesSchema = z.object({
-  disabled: z.array(PhraseItem).max(300).default([]),
+  disabled: PhraseList(300).default([]),
   disabled_rules: z.array(z.string().max(60)).max(50).default([]),
-  items: z.array(PhraseItem).max(200).default([]),
-  replies: z.partialRecord(z.enum(REPLY_KEYS), z.string().trim().max(200)).default({})
+  items: PhraseList(200).default([]),
+  replies: Replies.default({})
 }).strict()
 
 export type Phrases = z.infer<typeof PhrasesSchema>
@@ -61,8 +72,6 @@ type BridgePhrases = {
   relay: string[]
   replace: boolean
   replies: Record<string, string>
-  spotify: string[]
-  youtube: string[]
 }
 
 const COMMANDS = ['next', 'pause', 'previous', 'resume', 'stop'] as const
@@ -96,9 +105,7 @@ export function bridgePhrases (phrases: Phrases): BridgePhrases {
     commands,
     relay: effective(phrases, 'relay'),
     replace: true,
-    replies,
-    spotify: effective(phrases, 'spotify'),
-    youtube: effective(phrases, 'youtube')
+    replies
   }
 }
 

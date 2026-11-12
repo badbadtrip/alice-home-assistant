@@ -17,14 +17,13 @@ import { buildDevices, DeviceEntry, snapshotEntity } from './devices'
 import { executeFunction } from './execution'
 import { createHomeAssistantApi, HomeAssistantApi } from './home-assistant'
 import { getLogger } from './logger'
-import { MusicSettingsSchema, readMusicSettings, writeMusicSettings } from './music'
+import { MusicSettingsSchema, readMusicSettings, speakerSource, writeMusicSettings } from './music'
 import { bridgePhrases, BUILTIN, keptRules, phraseRules, PhrasesSchema, ruleList } from './phrases'
 import { previewCommand } from './preview'
 import { callReadTool, READ_TOOLS } from './read-tools'
 import { readSpeakers, RelayRequestSchema, relayRooms, relaySpeaker, relayText } from './relay'
 import { addSendspinRoutes } from './sendspin'
 import { isSpeakerAllowed, speakerDevices } from './speaker-access'
-import { ClientIdSchema, fetchPlaylists, finishLogin, loginRequest, mergePlaylists, readSpotify, refreshAccess, SearchRequestSchema, searchSpotify, writeSpotify } from './spotify'
 
 const logger = getLogger()
 
@@ -270,41 +269,6 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
       response.json(parsed.data)
     } catch { response.status(503).json({ error: 'Не удалось сохранить настройки музыки.' }) }
   })
-  const spotifyPath = process.env.ALICE_SPOTIFY_PATH
-  const spotifyStatus = async (): Promise<{ client_id: string; connected: boolean }> => {
-    const state = await readSpotify(spotifyPath)
-    return { client_id: state.client_id, connected: state.refresh_token !== '' }
-  }
-  app.get('/spotify', async (_, response) => { response.json(await spotifyStatus()) })
-  app.post('/spotify/login', async (request, response) => {
-    const clientId = ClientIdSchema.safeParse((request.body as { client_id?: unknown }).client_id)
-    if (!clientId.success) { response.status(400).json({ error: 'Проверьте Client ID.' }); return }
-    const { state, url } = loginRequest(clientId.data)
-    await writeSpotify(spotifyPath, state)
-    response.json({ url })
-  })
-  app.post('/spotify/callback', async (request, response) => {
-    try {
-      const address = z.object({ address: z.string().max(2000) }).parse(request.body).address
-      await writeSpotify(spotifyPath, await finishLogin(await readSpotify(spotifyPath), address))
-      response.json(await spotifyStatus())
-    } catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : 'Не удалось войти.' }) }
-  })
-  // Refresh tokens are single use, so two speakers must never refresh at the same time.
-  let spotifyToken: undefined | { access: string; expires: number }
-  let spotifyRefresh: Promise<string> | undefined
-  const spotifyAccess = (): Promise<string> => {
-    if (spotifyToken && spotifyToken.expires > Date.now()) return Promise.resolve(spotifyToken.access)
-    spotifyRefresh ??= (async () => {
-      try {
-        const { access, state } = await refreshAccess(await readSpotify(spotifyPath))
-        await writeSpotify(spotifyPath, state)
-        spotifyToken = { access, expires: Date.now() + 45 * 60_000 }
-        return access
-      } finally { spotifyRefresh = undefined }
-    })()
-    return spotifyRefresh
-  }
   app.post('/relay', async (request, response) => {
     const parsed = RelayRequestSchema.safeParse(request.body)
     if (!parsed.success) { response.status(400).json({ error: 'Invalid relay' }); return }
@@ -339,25 +303,6 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
   app.get('/now-playing', (_, response) => {
     response.json(Object.fromEntries([...nowPlaying].map(([speaker, entry]) => [speaker, entry])))
   })
-  app.post('/spotify/search', async (request, response) => {
-    const parsed = SearchRequestSchema.safeParse(request.body)
-    if (!parsed.success) { response.status(400).json({ error: 'Invalid search' }); return }
-    try {
-      const found = await searchSpotify(await spotifyAccess(), parsed.data)
-      response.json(found ?? { name: '', uri: '' })
-    } catch { response.status(502).json({ error: 'Spotify не ответил.' }) }
-  })
-  // The manager forwards every write as POST, and this one also rotates the token.
-  app.post('/spotify/sync', async (_, response) => {
-    try {
-      const access = await spotifyAccess()
-      const settings = await readMusicSettings(process.env.ALICE_MUSIC_PATH)
-      const playlists = mergePlaylists(settings.spotify_playlists, await fetchPlaylists(access))
-      const merged = { ...settings, spotify_playlists: playlists }
-      await writeMusicSettings(process.env.ALICE_MUSIC_PATH, merged)
-      response.json(merged)
-    } catch { response.status(502).json({ error: 'Не удалось получить плейлисты из Spotify.' }) }
-  })
   app.get('/voice-phrases', async (request, response) => {
     const commands = []
     const devices = await getDevices()
@@ -374,10 +319,8 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     const body = JSON.stringify({
       commands,
       device_names: deviceVoiceNames(allowed),
-      music_provider: music.provider,
-      music_source: music.source,
+      music_source: speakerSource(music, request.get('x-alice-speaker')),
       phrases: bridgePhrases(music.phrases),
-      playlists: music.spotify_playlists,
       relay_rooms: relayRooms(await readSpeakers(process.env.ALICE_SPEAKERS_PATH)),
       revision,
       routing: await publishedRouting()

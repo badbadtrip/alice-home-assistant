@@ -24,7 +24,9 @@ test('one base: built-ins on by default, owner edits on top', () => {
   assert.ok(!llm.test('загугли курс'))
   const bridge = bridgePhrases(phrases)
   assert.equal(bridge.replace, true)
-  assert.ok(bridge.spotify.includes('шпотифай') && bridge.spotify.includes('spotify'))
+  // A phrase of a removed service is dropped on its own; the rest of the base survives.
+  assert.deepEqual(phrases.items.map(item => item.target), ['llm', 'yandex'])
+  assert.ok(!('spotify' in bridge))
   assert.ok(!bridge.commands.stop?.includes('стоп'))
   assert.deepEqual(bridge.replies, { relay_failed: 'Не дошло' })
   const shipped = [{ name: 'weather_forecast' }, { name: 'ask_model' }, { name: 'clock_date' }]

@@ -14,8 +14,8 @@ import (
 	"quasarbridge/internal/llm"
 	"quasarbridge/internal/playback"
 	"quasarbridge/internal/sendspin"
+	"quasarbridge/internal/telemetry"
 	"quasarbridge/internal/webaddress"
- "quasarbridge/internal/telemetry"
 )
 
 type Completer interface {
@@ -24,54 +24,22 @@ type Completer interface {
 type HomeHandler interface {
 	Handle(context.Context, string) (string, error)
 }
-type PlaybackController interface {
-	Active(context.Context) bool
-	Control(context.Context, string) (string, error)
-}
-type MusicResumer interface {
-	StartPlayback(context.Context) (string, error)
-}
-type PlaylistPlayer interface {
-	PlayURI(context.Context, string) (string, error)
-}
-type YouTubePlayer interface {
-	Available() bool
-	Active(context.Context) bool
-	Play(context.Context, string) error
-	Control(context.Context, string) (string, error)
-}
 type SpeakerRelay interface {
 	RelayRoom(string) bool
 	Relay(context.Context, string, string) error
 }
-type SpotifyFinder interface {
-	FindSpotify(context.Context, string, string) (string, []string, error)
-}
-type TrackQueue interface {
-	Queue(context.Context, []string) error
-}
-type PlaylistSource interface {
-	Playlists() []playback.Playlist
-}
-type MusicStarter interface {
-	CanStartMusic(string) bool
-	StartMusic(context.Context, string) (string, error)
-}
 type Engine struct {
- Activity func(telemetry.Event)
+	Activity     func(telemetry.Event)
 	SystemPrompt string
 	LLM          Completer
 	Assistant    Completer
 	Home         HomeHandler
-	Playback     PlaybackController
-	Music        MusicStarter
-	YouTube      YouTubePlayer
 	// MusicAssistant plays Music Assistant on this speaker; nil without the app link.
 	MusicAssistant MusicAssistantPlayer
-	Silencer     interface{ Silence(context.Context) error }
-	Dialogue     *dialogue.Store
-	dialogueOnce sync.Once
-	routing      atomic.Pointer[RoutingPolicy]
+	Silencer       interface{ Silence(context.Context) error }
+	Dialogue       *dialogue.Store
+	dialogueOnce   sync.Once
+	routing        atomic.Pointer[RoutingPolicy]
 }
 
 func (e *Engine) dialogue() *dialogue.Store {
@@ -101,8 +69,16 @@ func (e *Engine) Resolve(ctx context.Context, text string) (Resolution, error) {
 	return e.ResolveDecision(ctx, text, e.Decide(ctx, text))
 }
 func (e *Engine) ResolveDecision(ctx context.Context, text string, decision RouteDecision) (resolution Resolution, resolveErr error) {
- ctx,activity:=telemetry.Begin(ctx,text,decision.Route,decision.Source)
- defer func(){if e.Activity!=nil {err:=resolveErr;if err==nil {err=ctx.Err()};e.Activity(activity.Finish(resolution.Route,err,resolution.Answer!=""))}}()
+	ctx, activity := telemetry.Begin(ctx, text, decision.Route, decision.Source)
+	defer func() {
+		if e.Activity != nil {
+			err := resolveErr
+			if err == nil {
+				err = ctx.Err()
+			}
+			e.Activity(activity.Finish(resolution.Route, err, resolution.Answer != ""))
+		}
+	}()
 	route := decision.Route
 	if decision.prepared {
 		ctx = e.dialogue().Use(ctx, decision.ticket)
@@ -134,16 +110,6 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 	}
 	result := Resolution{Route: route}
 	switch route {
-	case "music":
-		if e.Music == nil {
-			return result, errors.New("music playback is unavailable")
-		}
-		answer, err := e.Music.StartMusic(ctx, text)
-		if !e.dialogue().Current(ctx, ticket) {
-			return result, context.Canceled
-		}
-		result.Answer = answer
-		return result, err
 	case "playback":
 		if decision.Source == "relay" {
 			room, message, _ := playback.Relay(text)
@@ -160,14 +126,7 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 			return result, nil
 		}
 		if decision.Source == "ma_play" {
-			// Two players must not sound at once.
-			if e.YouTube != nil && e.YouTube.Active(ctx) {
-				_, _ = e.YouTube.Control(ctx, "stop")
-			}
-			if e.Playback != nil && e.Playback.Active(ctx) {
-				_, _ = e.Playback.Control(ctx, "pause")
-			}
-			kind, query, _, found := playback.Search(text)
+			kind, query, found := playback.Search(text)
 			if !found {
 				kind, query = "", ""
 			}
@@ -180,84 +139,7 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 			}
 			return result, nil
 		}
-		if decision.Source == "youtube_control" {
-			answer, err := e.YouTube.Control(ctx, playback.Command(text))
-			result.Answer = answer
-			return result, err
-		}
-		if decision.Source == "playback_youtube" {
-			if e.YouTube == nil || !e.YouTube.Available() {
-				result.Answer = Reply("youtube_missing", "YouTube Music на этой колонке не установлен.")
-				return result, nil
-			}
-			if e.Playback != nil && e.Playback.Active(ctx) {
-				_, _ = e.Playback.Control(ctx, "pause")
-			}
-			if e.maStreaming() {
-				_ = e.MusicAssistant.Control(ctx, "pause")
-			}
-			kind, query, _, _ := playback.Search(text)
-			if kind == "liked" {
-				query = "мои лайки"
-			}
-			if err := e.YouTube.Play(ctx, query); err != nil {
-				result.Answer = Reply("youtube_not_found", "Не нашла это в YouTube Music.")
-			}
-			return result, nil
-		}
-		if e.Playback == nil {
-			return Resolution{Route: "yandex"}, nil
-		}
-		if e.YouTube != nil && e.YouTube.Active(ctx) {
-			// Two players must not sound at once.
-			_, _ = e.YouTube.Control(ctx, "stop")
-		}
-		if e.maStreaming() && decision.Source != "playback" {
-			_ = e.MusicAssistant.Control(ctx, "pause")
-		}
-		if decision.Source == "playback_missing" {
-			result.Answer = Reply("spotify_playlist_missing", "Не нашла такой плейлист в Spotify.")
-			return result, nil
-		}
-		if player, ok := e.Playback.(PlaylistPlayer); ok && decision.Source == "playback_search" {
-			kind, query, _, _ := playback.Search(text)
-			uri, next, err := e.Home.(SpotifyFinder).FindSpotify(ctx, kind, query)
-			if err != nil {
-				result.Answer = Reply("spotify_down", "Spotify сейчас не отвечает.")
-				return result, nil
-			}
-			if uri == "" {
-				result.Answer = Reply("spotify_not_found", "Не нашла это в Spotify.")
-				return result, nil
-			}
-			answer, err := player.PlayURI(ctx, uri)
-			result.Answer = answer
-			if queue, ok := e.Playback.(TrackQueue); ok && err == nil && len(next) > 0 {
-				// The track already plays, so a lost queue only ends the music sooner.
-				_ = queue.Queue(ctx, next)
-			}
-			return result, err
-		}
-		if player, ok := e.Playback.(PlaylistPlayer); ok && decision.Source == "playback_playlist" {
-			answer, err := player.PlayURI(ctx, e.playlistURI(text))
-			result.Answer = answer
-			return result, err
-		}
-		if resumer, ok := e.Playback.(MusicResumer); ok && decision.Source == "playback_start" {
-			answer, err := resumer.StartPlayback(ctx)
-			result.Answer = answer
-			return result, err
-		}
-		action := playback.Command(text)
-		if action == "" {
-			return result, errors.New("unknown playback control")
-		}
-		answer, err := e.Playback.Control(ctx, action)
-		if !e.dialogue().Current(ctx, ticket) {
-			return result, context.Canceled
-		}
-		result.Answer = answer
-		return result, err
+		return Resolution{Route: "yandex"}, nil
 	case "home":
 		if e.Home == nil {
 			return Resolution{Route: "yandex"}, nil
@@ -291,12 +173,18 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 	}
 }
 func (e *Engine) Fallback(ctx context.Context, text string) (fallbackResult Resolution, fallbackErr error) {
- if e.Activity!=nil && !telemetry.HasTrace(ctx) {
-  var trace *telemetry.Trace
-  ctx,trace=telemetry.Begin(ctx,text,"llm","native_refusal")
-  defer func(){err:=fallbackErr;if err==nil {err=ctx.Err()};e.Activity(trace.Finish(fallbackResult.Route,err,fallbackResult.Answer!=""))}()
- }
-	if strings.Contains(strings.ToLower(text), "сайт") || webaddress.MusicRequest(text) {
+	if e.Activity != nil && !telemetry.HasTrace(ctx) {
+		var trace *telemetry.Trace
+		ctx, trace = telemetry.Begin(ctx, text, "llm", "native_refusal")
+		defer func() {
+			err := fallbackErr
+			if err == nil {
+				err = ctx.Err()
+			}
+			e.Activity(trace.Finish(fallbackResult.Route, err, fallbackResult.Answer != ""))
+		}()
+	}
+	if strings.Contains(strings.ToLower(text), "сайт") {
 		text = webaddress.Normalize(text)
 	}
 	r := Resolution{Route: "llm"}
@@ -354,6 +242,7 @@ func (e *Engine) SetRouting(cfg RoutingConfig) error {
 	e.routing.Store(p)
 	return nil
 }
+
 // MusicAssistantPlayer is the speaker's Music Assistant player.
 type MusicAssistantPlayer interface {
 	Streaming() bool
@@ -366,18 +255,13 @@ var maActions = map[string]string{"pause": "pause", "resume": "play", "next": "n
 
 func (e *Engine) maStreaming() bool { return e.MusicAssistant != nil && e.MusicAssistant.Streaming() }
 
-// wantsMusicAssistant: a music request without a named service goes to Music Assistant
-// when the panel chose it.
+// wantsMusicAssistant: a music request goes to Music Assistant when the panel chose it.
 func (e *Engine) wantsMusicAssistant(text string) bool {
-	if e.MusicAssistant == nil || e.musicSource() == "yandex" {
+	if e.MusicAssistant == nil || e.musicSource() != "music_assistant" {
 		return false
 	}
-	source, ok := e.Home.(interface{ MusicProvider() string })
-	if !ok || source.MusicProvider() != "music_assistant" {
-		return false
-	}
-	if _, _, provider, found := playback.Search(text); found {
-		return provider == ""
+	if _, _, found := playback.Search(text); found {
+		return true
 	}
 	return playback.Start(text) || playback.MusicAsk(text)
 }
@@ -388,30 +272,13 @@ func (e *Engine) musicSource() string {
 	}
 	return ""
 }
-// wantsYouTube follows the service named in the phrase, then the panel's default.
-func (e *Engine) wantsYouTube(text string) bool {
-	_, _, provider, found := playback.Search(text)
-	if found && provider != "" {
-		return provider == "youtube"
-	}
-	if !found && !playback.Start(text) {
-		return false
-	}
-	source, ok := e.Home.(interface{ MusicProvider() string })
-	return ok && source.MusicProvider() == "youtube"
-}
+
 // PlayerControl serves the panel: the player that owns the speaker takes the action.
 func (e *Engine) PlayerControl(ctx context.Context, action string) error {
 	switch action {
 	case "pause", "resume", "next", "previous":
 	case "silence":
 		// One button stops whatever sounds: every player and Alice herself.
-		if e.YouTube != nil && e.YouTube.Active(ctx) {
-			_, _ = e.YouTube.Control(ctx, "stop")
-		}
-		if e.Playback != nil && e.Playback.Active(ctx) {
-			_, _ = e.Playback.Control(ctx, "pause")
-		}
 		if e.maStreaming() {
 			_ = e.MusicAssistant.Control(ctx, "pause")
 		}
@@ -425,26 +292,7 @@ func (e *Engine) PlayerControl(ctx context.Context, action string) error {
 	if e.maStreaming() {
 		return e.MusicAssistant.Control(ctx, maActions[action])
 	}
-	if e.YouTube != nil && e.YouTube.Active(ctx) {
-		_, err := e.YouTube.Control(ctx, action)
-		return err
-	}
-	if e.Playback != nil && e.Playback.Active(ctx) {
-		_, err := e.Playback.Control(ctx, action)
-		return err
-	}
 	return errors.New("nothing is playing")
-}
-func (e *Engine) canSearch() bool {
-	_, ok := e.Home.(SpotifyFinder)
-	return ok
-}
-func (e *Engine) playlistURI(text string) string {
-	source, ok := e.Home.(PlaylistSource)
-	if !ok {
-		return ""
-	}
-	return playback.PickPlaylist(text, source.Playlists())
 }
 func (e *Engine) policy() *RoutingPolicy {
 	if p := e.routing.Load(); p != nil {
@@ -502,34 +350,9 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 	if e.wantsMusicAssistant(text) {
 		return RouteDecision{Route: "playback", Source: "ma_play"}
 	}
-	if e.YouTube != nil && playback.Command(text) != "" && e.YouTube.Active(ctx) {
-		return RouteDecision{Route: "playback", Source: "youtube_control"}
-	}
-	if e.musicSource() == "yandex" {
-		if e.YouTube != nil && playback.MusicAsk(text) && e.YouTube.Active(ctx) {
-			_, _ = e.YouTube.Control(ctx, "stop")
-		}
-	} else if e.wantsYouTube(text) {
-		return RouteDecision{Route: "playback", Source: "playback_youtube"}
-	}
-	if e.Playback != nil && playback.Command(text) != "" && e.Playback.Active(ctx) {
-		return RouteDecision{Route: "playback", Source: "playback"}
-	}
-	if _, ok := e.Playback.(PlaylistPlayer); ok {
-		if e.musicSource() == "yandex" {
-			// Stock music takes over, so Spotify must not keep playing under it.
-			if playback.MusicAsk(text) && e.Playback.Active(ctx) {
-				_, _ = e.Playback.Control(ctx, "pause")
-			}
-		} else if e.playlistURI(text) != "" {
-			return RouteDecision{Route: "playback", Source: "playback_playlist"}
-		} else if playback.Start(text) {
-			return RouteDecision{Route: "playback", Source: "playback_start"}
-		} else if _, _, _, found := playback.Search(text); found && e.canSearch() {
-			return RouteDecision{Route: "playback", Source: "playback_search"}
-		} else if playback.MusicAsk(text) {
-			return RouteDecision{Route: "playback", Source: "playback_missing"}
-		}
+	if e.musicSource() != "music_assistant" && e.maStreaming() && playback.MusicAsk(text) {
+		// Stock music takes over, so Music Assistant must not keep playing under it.
+		_ = e.MusicAssistant.Control(ctx, "pause")
 	}
 	if matcher, ok := e.Home.(interface {
 		MatchDevice(context.Context, string) bool
@@ -537,9 +360,6 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 		return RouteDecision{Route: "home", Source: "device_name"}
 	}
 	if d, ok := p.match(text); ok {
-		if d.Route == "llm" && e.Music != nil && e.Music.CanStartMusic(text) {
-			d.Route = "music"
-		}
 		return d
 	}
 	if h, ok := e.Home.(interface{ HasPending(context.Context) bool }); ok && h.HasPending(ctx) {

@@ -23,21 +23,6 @@ func TestVoicePlaybackCommands(t *testing.T) {
 	}
 }
 
-func TestPickPlaylist(t *testing.T) {
-	list := []Playlist{{"Утро", "spotify:playlist:first"}, {"Для бега", "spotify:album:run"}, {"Плохой", "https://evil"}, {"плейлист номер 1", "spotify:album:num"}}
-	for text, want := range map[string]string{
-		"Алиса, включи музыку": "spotify:playlist:first", "Включи плейлист для бега": "spotify:album:run",
-		"поставь плейлист Утро": "spotify:playlist:first", "включи плейлист номер один": "spotify:album:num", "включи плейлист номер 1": "spotify:album:num", "включи плейлист неизвестный": "", "включи плейлист плохой": "", "включи свет": "",
-	} {
-		if got := PickPlaylist(text, list); got != want {
-			t.Errorf("%q: got %q want %q", text, got, want)
-		}
-	}
-	if got := PickPlaylist("включи музыку", nil); got != "" {
-		t.Errorf("empty list: %q", got)
-	}
-}
-
 func TestMusicAsk(t *testing.T) {
 	for text, want := range map[string]bool{"Включи группу Кино": true, "Алиса, поставь песню": true, "Включи плейлист бег": true, "Включи свет": false, "Включи следующий трек": false} {
 		if MusicAsk(text) != want {

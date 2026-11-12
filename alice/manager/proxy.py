@@ -30,8 +30,8 @@ def allowed_path(raw, method):
     if decoded != parsed.path:
         return None
     routes = {
-        'GET': [r'/api/spotify', r'/api/music', r'/api/inventory', r'/api/access', r'/api/setup', r'/api/speakers', r'/api/speakers-wait/\d{1,12}', r'/api/assignments', r'/api/activity', r'/api/metrics', r'/api/look', r'/api/phrases', r'/api/jobs/' + SPEAKER_ID, r'/api/speakers/' + SPEAKER_ID + r'/dictionary'],
-        'POST': [r'/api/auto-update', r'/api/ai-check', r'/api/spotify/(?:login|callback|sync)', r'/api/speakers', r'/api/phrase-check', r'/api/dictionary/alias', r'/api/speakers/' + SPEAKER_ID + r'/(?:file-read|file-write|console|indicator|volume|airplay|ytm|player|ai|fingerprint|trust|check|install|adopt|reboot|confirm|rollback|restart|configure)'],
+        'GET': [r'/api/music-assistant', r'/api/music', r'/api/inventory', r'/api/access', r'/api/setup', r'/api/speakers', r'/api/speakers-wait/\d{1,12}', r'/api/assignments', r'/api/activity', r'/api/metrics', r'/api/look', r'/api/phrases', r'/api/jobs/' + SPEAKER_ID, r'/api/speakers/' + SPEAKER_ID + r'/dictionary'],
+        'POST': [r'/api/auto-update', r'/api/ai-check', r'/api/speakers', r'/api/phrase-check', r'/api/dictionary/alias', r'/api/speakers/' + SPEAKER_ID + r'/(?:file-read|file-write|console|indicator|volume|airplay|ytm|player|ai|fingerprint|trust|check|install|adopt|reboot|confirm|rollback|restart|configure)'],
         'PATCH': [r'/api/speakers/' + SPEAKER_ID],
         'DELETE': [r'/api/speakers/' + SPEAKER_ID],
         'PUT': [r'/api/phrases', r'/api/look', r'/api/music', r'/api/access', r'/api/assignments/' + TARGET],

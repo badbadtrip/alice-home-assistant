@@ -7,11 +7,10 @@ import (
 	"quasarbridge/internal/sendspin"
 )
 
-type maHome struct{ source, provider string }
+type maHome struct{ source string }
 
 func (maHome) Handle(context.Context, string) (string, error) { return "", nil }
 func (h maHome) MusicSource() string                          { return h.source }
-func (h maHome) MusicProvider() string                        { return h.provider }
 
 type fakeMA struct {
 	streaming bool
@@ -32,7 +31,7 @@ func (f *fakeMA) Play(_ context.Context, kind, query string) error {
 
 func TestMusicAssistantTakesUnnamedMusicWhenChosen(t *testing.T) {
 	ma := &fakeMA{}
-	e := &Engine{Home: maHome{"alternative", "music_assistant"}, MusicAssistant: ma}
+	e := &Engine{Home: maHome{"music_assistant"}, MusicAssistant: ma}
 	ctx := context.Background()
 	for _, text := range []string{"включи песню богемская рапсодия", "включи группу кино", "включи музыку"} {
 		decision := e.Decide(ctx, text)
@@ -49,18 +48,18 @@ func TestMusicAssistantTakesUnnamedMusicWhenChosen(t *testing.T) {
 	}
 }
 
-func TestMusicAssistantLeavesNamedServicesAndStockMusic(t *testing.T) {
+func TestMusicAssistantLeavesBareNamesAndStockMusic(t *testing.T) {
 	ma := &fakeMA{}
 	ctx := context.Background()
-	chosen := &Engine{Home: maHome{"alternative", "music_assistant"}, MusicAssistant: ma}
-	if d := chosen.Decide(ctx, "включи кино в спотифай"); d.Source == "ma_play" {
-		t.Fatal("a named service must not go to Music Assistant")
+	chosen := &Engine{Home: maHome{"music_assistant"}, MusicAssistant: ma}
+	if d := chosen.Decide(ctx, "включи кино"); d.Source == "ma_play" {
+		t.Fatal("a bare name may be a lamp or a skill: it stays with Alice")
 	}
-	stock := &Engine{Home: maHome{"yandex", "music_assistant"}, MusicAssistant: ma}
+	stock := &Engine{Home: maHome{"yandex"}, MusicAssistant: ma}
 	if d := stock.Decide(ctx, "включи песню кино"); d.Source == "ma_play" {
 		t.Fatal("stock music must stay with Alice")
 	}
-	unset := &Engine{Home: maHome{"alternative", "music_assistant"}}
+	unset := &Engine{Home: maHome{"music_assistant"}}
 	if d := unset.Decide(ctx, "включи музыку"); d.Source == "ma_play" {
 		t.Fatal("no player, no Music Assistant route")
 	}
@@ -68,7 +67,7 @@ func TestMusicAssistantLeavesNamedServicesAndStockMusic(t *testing.T) {
 
 func TestMusicAssistantControlsOnlyWhilePlaying(t *testing.T) {
 	ma := &fakeMA{}
-	e := &Engine{Home: maHome{"yandex", ""}, MusicAssistant: ma}
+	e := &Engine{Home: maHome{"yandex"}, MusicAssistant: ma}
 	ctx := context.Background()
 	if d := e.Decide(ctx, "пауза"); d.Source == "ma_control" {
 		t.Fatal("pause while Music Assistant is silent belongs to Alice")
@@ -91,7 +90,7 @@ func TestMusicAssistantControlsOnlyWhilePlaying(t *testing.T) {
 
 func TestMusicAssistantNotFoundIsSpoken(t *testing.T) {
 	ma := &fakeMA{playErr: sendspin.ErrNotFound}
-	e := &Engine{Home: maHome{"alternative", "music_assistant"}, MusicAssistant: ma}
+	e := &Engine{Home: maHome{"music_assistant"}, MusicAssistant: ma}
 	ctx := context.Background()
 	r, err := e.ResolveDecision(ctx, "включи песню нет такой", RouteDecision{Route: "playback", Source: "ma_play"})
 	if err != nil || r.Answer == "" {

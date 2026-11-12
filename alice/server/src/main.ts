@@ -22,6 +22,7 @@ import { bridgePhrases, BUILTIN, keptRules, phraseRules, PhrasesSchema, ruleList
 import { previewCommand } from './preview'
 import { callReadTool, READ_TOOLS } from './read-tools'
 import { readSpeakers, RelayRequestSchema, relayRooms, relaySpeaker, relayText } from './relay'
+import { addSendspinRoutes } from './sendspin'
 import { isSpeakerAllowed, speakerDevices } from './speaker-access'
 import { ClientIdSchema, fetchPlaylists, finishLogin, loginRequest, mergePlaylists, readSpotify, refreshAccess, SearchRequestSchema, searchSpotify, writeSpotify } from './spotify'
 
@@ -501,6 +502,8 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
       }
     })()
   })
+
+  addSendspinRoutes(app)
 
   app.get('/health', (_, response) => {
     response.status(200).json({ status: 'ok' })

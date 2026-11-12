@@ -37,7 +37,15 @@ def airplay_state(value):
     return {key: value.get(key) is True for key in ('enabled', 'connected', 'playing')} | {'error': bool(value.get('error'))}
 
 
-NOW_SOURCES = ('airplay', 'spotify', 'youtube_music', 'yandex_music')
+
+def music_assistant_state(value):
+    # Only the bridge's own flags pass; nothing from Music Assistant reaches the panel raw.
+    if not isinstance(value, dict):
+        return None
+    return {key: value.get(key) is True for key in ('linked', 'streaming')}
+
+
+NOW_SOURCES = ('airplay', 'spotify', 'youtube_music', 'yandex_music', 'music_assistant')
 NOW_STATUSES = ('playing', 'paused', 'buffering')
 
 
@@ -592,6 +600,7 @@ class Manager:
             revision = health.get('voice_phrase_revision')
             value.update(status='online', last_seen=int(time.time()), error=None,
                          speaker_id=speaker['id'], volume_push=health.get('volume_push') is True, airplay=airplay_state(health.get('airplay')),
+                         music_assistant=music_assistant_state(health.get('music_assistant')),
                          now_playing=self._now_playing(speaker, health.get('now_playing')),
                          volume=volume_state(health.get('volume')), alice_state=health.get('alice_state') if health.get('alice_state') in ('idle', 'listening', 'thinking', 'speaking') else None,
                          voice_phrase_count=count if type(count) is int and 0 <= count <= 100000 else None,

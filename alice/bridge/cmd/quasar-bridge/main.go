@@ -2,6 +2,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
@@ -31,6 +32,7 @@ import (
 	"quasarbridge/internal/localstate"
 	"quasarbridge/internal/metrics"
 	"quasarbridge/internal/nowplaying"
+	"quasarbridge/internal/sendspin"
 	"quasarbridge/internal/soloist"
 	"quasarbridge/internal/wire"
 	"quasarbridge/internal/ytm"
@@ -323,8 +325,12 @@ func main() {
 		}
 	}
 	var airPlay *airPlayControl
+	var musicAssistant *sendspin.Player
 	playerSources := func() []nowplaying.Source {
 		var sources []nowplaying.Source
+		if musicAssistant != nil {
+			sources = append(sources, sendspinNow(musicAssistant))
+		}
 		if airPlay != nil {
 			sources = append(sources, airPlay.now)
 		}
@@ -396,7 +402,12 @@ func main() {
 				return hf.VoicePhraseCount()
 			}
 			return 0
-		}(), "music_playback_enabled": musicQueue != nil, "volume_push": true, "airplay": func() map[string]any {
+		}(), "music_playback_enabled": musicQueue != nil, "volume_push": true, "music_assistant": func() map[string]any {
+			if musicAssistant == nil {
+				return nil
+			}
+			return map[string]any{"linked": musicAssistant.Linked(), "streaming": musicAssistant.Streaming()}
+		}(), "airplay": func() map[string]any {
 			if airPlay != nil {
 				return airPlay.health()
 			}
@@ -451,8 +462,16 @@ func main() {
 		}
 		changed()
 	})
+	// Built before the watchers start so that they only ever read a settled pointer.
+	if hf != nil && hf.URL != "" {
+		// QUASAR_SENDSPIN_URL points a development bridge at a separately run service.
+		musicAssistant = &sendspin.Player{URL: cmp.Or(os.Getenv("QUASAR_SENDSPIN_URL"), hf.URL), Token: hf.Token, Speaker: hf.SpeakerID, OnChange: changed}
+	}
 	go localstate.WatchAlice(ctx, localstate.AliceSocket, func(state string) {
 		voice.Store(state)
+		if musicAssistant != nil {
+			musicAssistant.SetAliceState(state)
+		}
 		if ring != nil {
 			ring.SetVoice(state)
 		}
@@ -466,9 +485,22 @@ func main() {
 		defer control.shutdown()
 		go control.resume()
 	}
+	// Music Assistant reaches the speaker through the app, so it needs the app link and the audio helper.
+	if musicAssistant != nil {
+		if helper, err := newPCMHelper(airPlay); err != nil {
+			slog.Warn("sendspin_unavailable", "error", err)
+		} else {
+			musicAssistant.Open = helper.Open
+			engine.MusicAssistant = musicAssistant
+			go musicAssistant.Run(ctx)
+		}
+	}
 	started := time.Now()
 	snapshot := func(ctx context.Context) metrics.Snapshot {
 		players := map[string]nowplaying.Source{}
+		if musicAssistant != nil {
+			players["music_assistant"] = sendspinNow(musicAssistant)
+		}
 		if airPlay != nil {
 			players["airplay"] = airPlay.now
 		}

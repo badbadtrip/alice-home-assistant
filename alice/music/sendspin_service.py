@@ -1,0 +1,484 @@
+"""Music Assistant players for the speakers, over Sendspin.
+
+Each managed speaker becomes one Sendspin player. This process dials Music
+Assistant itself (client-initiated), so the app needs no host network. Audio
+arrives as raw PCM and is relayed to the speaker's bridge, which holds one
+long-lived request on GET /stream and plays it through the speaker's own ALSA
+helper. Home Functions proxies that path and checks the speaker token; this
+server listens on loopback only.
+
+Frames to the bridge (big-endian):
+  b'F' u32 rate u8 channels   a stream starts or changes format
+  b'A' u32 length + PCM       S16LE interleaved audio
+  b'V' u8 volume u8 muted     player volume 0-100 and mute from Music Assistant
+  b'C'                        drop buffered audio now (seek, skip)
+  b'E'                        the stream ended (pause, stop)
+  b'K'                        keepalive while idle
+"""
+from __future__ import annotations
+
+import asyncio
+import base64
+import collections
+import contextlib
+import json
+import logging
+import os
+import struct
+import sys
+from pathlib import Path
+from typing import Any
+
+from aiohttp import ClientSession, ClientTimeout, web
+from aiosendspin.client import PairingSupport, SendspinClient
+from aiosendspin.models.core import DeviceInfo
+from aiosendspin.models.player import ClientHelloPlayerSupport, SupportedAudioFormat
+from aiosendspin.models.types import AudioCodec, MediaCommand, PlayerCommand, Roles
+from aiosendspin.noise import Identity
+from aiosendspin.noise.trust_store import FileClientPairingStore
+
+log = logging.getLogger('alice.sendspin')
+
+FORMATS = [
+    SupportedAudioFormat(codec=AudioCodec.PCM, channels=2, sample_rate=48000, bit_depth=16),
+    SupportedAudioFormat(codec=AudioCodec.PCM, channels=2, sample_rate=44100, bit_depth=16),
+]
+# What Music Assistant may send ahead of real time (~1.25 s at 48 kHz). The bridge plays
+# as audio arrives, so this bounds how late a pause or skip is heard.
+BUFFER_CAPACITY = 240_000
+# Audio waiting for the bridge. Beyond this the oldest goes: a speaker that stopped
+# reading must not grow memory, and a slow drift between clocks must not grow delay.
+MAX_QUEUED = 2 * 48000 * 4
+KEEPALIVE_S = 5.0
+RECONNECT_S = (2, 5, 10, 30)
+MANUFACTURER = 'Alice for Home Assistant'
+MEDIA_TYPES = {'track': 'track', 'artist': 'artist', 'album': 'album', 'playlist': 'playlist'}
+COMMANDS = {'pause': MediaCommand.PAUSE, 'play': MediaCommand.PLAY, 'resume': MediaCommand.PLAY,
+            'stop': MediaCommand.STOP, 'next': MediaCommand.NEXT, 'previous': MediaCommand.PREVIOUS}
+
+
+def frame(kind: bytes, payload: bytes = b'') -> bytes:
+    return kind + payload
+
+
+class Outlet:
+    """The bridge's open request: an ordered, bounded queue of frames."""
+
+    def __init__(self) -> None:
+        self.frames: collections.deque[bytes] = collections.deque()
+        self.audio_bytes = 0
+        self.ready = asyncio.Event()
+        self.closed = False
+        self.dropped = 0
+
+    def put(self, data: bytes, *, audio: bool = False) -> None:
+        if self.closed:
+            return
+        self.frames.append(data)
+        if audio:
+            self.audio_bytes += len(data)
+            while self.audio_bytes > MAX_QUEUED:
+                for i, old in enumerate(self.frames):
+                    if old[:1] == b'A':
+                        del self.frames[i]
+                        self.audio_bytes -= len(old)
+                        self.dropped += len(old)
+                        break
+                else:
+                    break
+        self.ready.set()
+
+    def drop_audio(self) -> None:
+        self.frames = collections.deque(f for f in self.frames if f[:1] != b'A')
+        self.audio_bytes = 0
+
+    async def take(self, timeout: float) -> bytes | None:
+        if not self.frames:
+            self.ready.clear()
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self.ready.wait(), timeout)
+        if not self.frames:
+            return None
+        data = self.frames.popleft()
+        if data[:1] == b'A':
+            self.audio_bytes -= len(data)
+        return data
+
+
+class Player:
+    def __init__(self, service: Service, speaker: dict[str, Any]) -> None:
+        self.service = service
+        self.id = speaker['id']
+        self.name = player_name(speaker)
+        self.dir = service.data / self.id
+        self.client: SendspinClient | None = None
+        self.task: asyncio.Task | None = None
+        self.outlet: Outlet | None = None
+        self.format: tuple[int, int] | None = None
+        self.streaming = False
+        self.connected = False
+        self.pairing_code: str | None = None
+        self.metadata: dict[str, Any] = {}
+        settings = self.settings()
+        self.volume = int(settings.get('volume', 100))
+        self.muted = bool(settings.get('muted', False))
+
+    # -- persistence ---------------------------------------------------------------
+    def settings(self) -> dict[str, Any]:
+        try:
+            return json.loads((self.dir / 'settings.json').read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def save(self, **values: Any) -> None:
+        path = self.dir / 'settings.json'
+        tmp = path.with_suffix('.tmp')
+        tmp.write_text(json.dumps({**self.settings(), **values}))
+        os.replace(tmp, path)
+
+    def identity(self) -> Identity:
+        path = self.dir / 'identity.json'
+        if path.exists():
+            raw = json.loads(path.read_text())['private_key']
+            return Identity.from_private_bytes(base64.urlsafe_b64decode(raw + '=' * (-len(raw) % 4)))
+        identity = Identity.generate()
+        tmp = path.with_suffix('.tmp')
+        tmp.write_text(json.dumps({'private_key': identity.private_b64u}))
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+        return identity
+
+    # -- lifecycle -----------------------------------------------------------------
+    async def start(self) -> None:
+        self.dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        store = await FileClientPairingStore.open(self.dir / 'pairing.json')
+        client = SendspinClient(
+            identity=self.identity(), client_name=self.name,
+            roles=[Roles.PLAYER, Roles.METADATA, Roles.CONTROLLER],
+            pairing_store=store,
+            pairing_support=PairingSupport(pairing_code_display=self.show_code),
+            device_info=DeviceInfo(product_name='Яндекс Станция', manufacturer=MANUFACTURER),
+            player_support=ClientHelloPlayerSupport(supported_formats=FORMATS, buffer_capacity=BUFFER_CAPACITY),
+            state_supported_commands=[PlayerCommand.VOLUME, PlayerCommand.MUTE],
+            initial_volume=self.volume, initial_muted=self.muted,
+        )
+        client.add_stream_start_listener(self.on_start)
+        client.add_audio_chunk_listener(self.on_chunk)
+        client.add_stream_clear_listener(self.on_clear)
+        client.add_stream_end_listener(self.on_end)
+        client.add_server_command_listener(self.on_command)
+        client.add_metadata_listener(self.on_metadata)
+        client.add_disconnect_listener(self.on_disconnect)
+        self.client = client
+        self.task = asyncio.create_task(self.keep_connected())
+
+    async def stop(self) -> None:
+        if self.task:
+            self.task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await self.task
+        if self.client:
+            with contextlib.suppress(Exception):
+                await self.client.disconnect()
+        self.end_stream()
+
+    async def keep_connected(self) -> None:
+        attempt = 0
+        while True:
+            if not self.connected:
+                try:
+                    await self.client.connect(self.service.urls[attempt % len(self.service.urls)])
+                    self.connected = True
+                    attempt = 0
+                    log.info('%s: подключено к Music Assistant', self.name)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as error:  # noqa: BLE001 - the server may be absent for hours
+                    delay = RECONNECT_S[min(attempt, len(RECONNECT_S) - 1)]
+                    if attempt in (0, 3):
+                        log.warning('%s: Music Assistant недоступен (%s), повтор', self.name, type(error).__name__)
+                    attempt += 1
+                    await asyncio.sleep(delay)
+                    continue
+            await asyncio.sleep(2)
+
+    def on_disconnect(self) -> None:
+        if self.connected:
+            log.info('%s: Music Assistant отключился', self.name)
+        self.connected = False
+        self.end_stream()
+
+    async def show_code(self, code: str | None, *, grouped: str | None = None) -> None:
+        self.pairing_code = grouped or code
+        await self.service.notify_pairing(self)
+
+    # -- audio ---------------------------------------------------------------------
+    def on_start(self, message: Any) -> None:
+        player = message.payload.player
+        if player is None:
+            return
+        fmt = (player.sample_rate, player.channels)
+        if not self.streaming or fmt != self.format:
+            self.format = fmt
+            self.send(frame(b'F', struct.pack('>IB', *fmt)))
+        self.streaming = True
+
+    def on_chunk(self, _ts: int, data: bytes, _fmt: Any, _ahead: int) -> None:
+        if self.streaming and self.outlet is not None:
+            self.outlet.put(frame(b'A', struct.pack('>I', len(data)) + data), audio=True)
+
+    def on_clear(self, roles: list[str] | None) -> None:
+        if roles is None or 'player' in roles:
+            if self.outlet is not None:
+                self.outlet.drop_audio()
+            self.send(b'C')
+
+    def on_end(self, roles: list[str] | None) -> None:
+        if roles is None or 'player' in roles:
+            self.end_stream()
+
+    def end_stream(self) -> None:
+        was = self.streaming
+        self.streaming = False
+        self.format = None
+        if self.outlet is not None:
+            self.outlet.drop_audio()
+            if was:
+                self.outlet.put(b'E')
+
+    def send(self, data: bytes) -> None:
+        if self.outlet is not None:
+            self.outlet.put(data)
+
+    def on_command(self, payload: Any) -> None:
+        command = payload.player
+        if command is None:
+            return
+        if command.command == PlayerCommand.VOLUME and command.volume is not None:
+            self.volume = max(0, min(100, int(command.volume)))
+        elif command.command == PlayerCommand.MUTE and command.mute is not None:
+            self.muted = bool(command.mute)
+        else:
+            return
+        self.save(volume=self.volume, muted=self.muted)
+        self.send(frame(b'V', struct.pack('>BB', self.volume, int(self.muted))))
+        if self.client is not None and self.connected:
+            asyncio.create_task(self.report())
+
+    async def report(self) -> None:
+        with contextlib.suppress(Exception):
+            await self.client.send_player_state(available=True, volume=self.volume, muted=self.muted)
+
+    def on_metadata(self, state: Any) -> None:
+        metadata = getattr(state, 'metadata', None) if state is not None else None
+        if metadata is not None and hasattr(metadata, 'title'):
+            self.metadata = {'title': metadata.title, 'artist': metadata.artist, 'album': getattr(metadata, 'album', None)}
+
+    # -- the bridge's request ------------------------------------------------------
+    async def serve(self, request: web.Request) -> web.StreamResponse:
+        if self.outlet is not None:
+            self.outlet.closed = True
+            self.outlet.ready.set()  # the older request ends; this one takes over
+        outlet = self.outlet = Outlet()
+        outlet.put(frame(b'V', struct.pack('>BB', self.volume, int(self.muted))))
+        if self.streaming and self.format:
+            outlet.put(frame(b'F', struct.pack('>IB', *self.format)))
+        response = web.StreamResponse(headers={'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store'})
+        await response.prepare(request)
+        try:
+            while not outlet.closed:
+                data = await outlet.take(KEEPALIVE_S)
+                if outlet.closed:
+                    break
+                await asyncio.wait_for(response.write(data if data is not None else b'K'), 15)
+        except (ConnectionResetError, TimeoutError, asyncio.CancelledError):
+            pass
+        finally:
+            outlet.closed = True
+            if self.outlet is outlet:
+                self.outlet = None
+            if outlet.dropped:
+                log.warning('%s: колонка не успевала читать поток, отброшено %d байт', self.name, outlet.dropped)
+        return response
+
+    async def command(self, action: str) -> None:
+        if self.client is None or not self.connected:
+            raise web.HTTPServiceUnavailable(text='Music Assistant не подключён')
+        if action not in COMMANDS:
+            raise web.HTTPBadRequest(text='unknown action')
+        try:
+            await self.client.send_group_command(COMMANDS[action])
+        except ValueError as error:
+            raise web.HTTPConflict(text=str(error)) from error
+
+    def status(self) -> dict[str, Any]:
+        return {'name': self.name, 'connected': self.connected, 'streaming': self.streaming,
+                'listening': self.outlet is not None, 'pairing_code': self.pairing_code,
+                'volume': self.volume, 'muted': self.muted, 'now_playing': self.metadata if self.streaming else None}
+
+
+def player_name(speaker: dict[str, Any]) -> str:
+    area = str(speaker.get('area') or '').strip()
+    name = str(speaker.get('name') or '').strip()
+    return f'Алиса {area}' if area else (name or 'Алиса')
+
+
+class Service:
+    def __init__(self, speakers_path: Path, data: Path, url: str) -> None:
+        self.speakers_path = speakers_path
+        self.data = data
+        self.url = url
+        self.urls = [u.strip() for u in url.split(',') if u.strip()]
+        self.players: dict[str, Player] = {}
+        self.notified: dict[str, str | None] = {}
+
+    def read_speakers(self) -> list[dict[str, Any]]:
+        try:
+            value = json.loads(self.speakers_path.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            return []
+        return [s for s in value if isinstance(s, dict) and isinstance(s.get('id'), str)] if isinstance(value, list) else []
+
+    async def sync(self) -> None:
+        wanted = {s['id']: s for s in self.read_speakers()}
+        for speaker_id in [i for i in self.players if i not in wanted or player_name(wanted[i]) != self.players[i].name]:
+            await self.players.pop(speaker_id).stop()
+        for speaker_id, speaker in wanted.items():
+            if speaker_id not in self.players:
+                player = Player(self, speaker)
+                self.players[speaker_id] = player
+                await player.start()
+
+    async def watch(self) -> None:
+        while True:
+            with contextlib.suppress(Exception):
+                await self.sync()
+            await asyncio.sleep(15)
+
+    async def notify_pairing(self, player: Player) -> None:
+        code = player.pairing_code
+        if self.notified.get(player.id) == code:
+            return
+        self.notified[player.id] = code
+        if code:
+            log.warning('%s: Music Assistant просит PIN-код %s', player.name, code)
+        token = os.environ.get('SUPERVISOR_TOKEN')
+        if not token:
+            return
+        notification = f'alice_sendspin_{player.id}'
+        if code:
+            service, data = 'create', {'notification_id': notification, 'title': 'Алиса: подключение к Music Assistant',
+                                       'message': f'Music Assistant просит PIN-код для плеера «{player.name}». Введите: **{code}**'}
+        else:
+            service, data = 'dismiss', {'notification_id': notification}
+        with contextlib.suppress(Exception):
+            async with ClientSession(timeout=ClientTimeout(total=10)) as session:
+                await session.post(f'http://supervisor/core/api/services/persistent_notification/{service}',
+                                   json=data, headers={'Authorization': f'Bearer {token}'})
+
+    # -- HTTP ----------------------------------------------------------------------
+    def player(self, request: web.Request) -> Player:
+        player = self.players.get(request.headers.get('X-Alice-Speaker', ''))
+        if player is None:
+            raise web.HTTPNotFound(text='unknown speaker')
+        return player
+
+    async def stream(self, request: web.Request) -> web.StreamResponse:
+        return await self.player(request).serve(request)
+
+    async def control(self, request: web.Request) -> web.Response:
+        try:
+            body = await request.json()
+        except ValueError:
+            raise web.HTTPBadRequest(text='invalid json') from None
+        await self.player(request).command(str(body.get('action', '')) if isinstance(body, dict) else '')
+        return web.json_response({'ok': True})
+
+    async def play(self, request: web.Request) -> web.Response:
+        """Find and play music on this speaker's player through Home Assistant's Music Assistant."""
+        try:
+            body = await request.json()
+        except ValueError:
+            raise web.HTTPBadRequest(text='invalid json') from None
+        if not isinstance(body, dict):
+            raise web.HTTPBadRequest(text='invalid json')
+        player = self.player(request)
+        kind, query = str(body.get('kind') or ''), str(body.get('query') or '').strip()[:200]
+        if not query:
+            if kind:  # "мои лайки" has no Music Assistant equivalent
+                raise web.HTTPNotFound(text='nothing to play')
+            await player.command('play')
+            return web.json_response({'ok': True})
+        entity, state = await self.entity(player)
+        if not entity:
+            raise web.HTTPServiceUnavailable(text='Music Assistant player is not in Home Assistant')
+        if state == 'unavailable':
+            raise web.HTTPServiceUnavailable(text='Music Assistant player is unavailable')
+        data: dict[str, Any] = {'entity_id': entity, 'media_id': query, 'enqueue': 'replace'}
+        if kind in MEDIA_TYPES:
+            data['media_type'] = MEDIA_TYPES[kind]
+        status, _ = await self.home('POST', '/services/music_assistant/play_media', data)
+        if status == 401 or status == 0:
+            raise web.HTTPServiceUnavailable(text='Home Assistant did not answer')
+        if status >= 300:  # Music Assistant refuses a query it cannot resolve
+            raise web.HTTPNotFound(text='nothing found')
+        return web.json_response({'ok': True})
+
+    async def entity(self, player: Player) -> tuple[str, str]:
+        # The HA entity belongs to Music Assistant's own player id, not the Sendspin id,
+        # so it is found by the device this service describes and the player's name.
+        template = ("{%- for e in integration_entities('music_assistant') if e.startswith('media_player.') "
+                    "and device_attr(e, 'manufacturer') == '" + MANUFACTURER + "' "
+                    "and device_attr(e, 'name') == name -%}{{ e }}|{{ states(e) }};{%- endfor -%}")
+        status, text = await self.home('POST', '/template', {'template': template, 'variables': {'name': player.name}})
+        if status != 200:
+            return '', ''
+        rows = [row.split('|', 1) for row in text.split(';') if '|' in row]
+        return (rows[0][0], rows[0][1]) if len(rows) == 1 else ('', '')
+
+    async def home(self, method: str, path: str, data: Any) -> tuple[int, str]:
+        token = os.environ.get('ALICE_HA_TOKEN') or os.environ.get('SUPERVISOR_TOKEN')
+        base = os.environ.get('ALICE_HA_URL') or 'http://supervisor/core/api'
+        if not token:
+            return 0, ''
+        try:
+            async with ClientSession(timeout=ClientTimeout(total=15)) as session:
+                async with session.request(method, base + path, json=data, headers={'Authorization': f'Bearer {token}'}) as reply:
+                    return reply.status, (await reply.text())[:65536]
+        except (OSError, TimeoutError):
+            return 0, ''
+
+    async def state(self, request: web.Request) -> web.Response:
+        speaker = request.headers.get('X-Alice-Speaker')
+        if speaker:
+            return web.json_response(self.player(request).status())
+        return web.json_response({i: p.status() for i, p in self.players.items()} | {'_url': self.url})
+
+
+async def main() -> None:
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout, format='sendspin: %(message)s')
+    logging.getLogger('aiosendspin').setLevel(logging.WARNING)
+    service = Service(Path(os.environ['ALICE_SPEAKERS_PATH']), Path(os.environ['ALICE_SENDSPIN_DATA']),
+                      os.environ.get('ALICE_SENDSPIN_URL') or 'ws://172.30.32.1:8927/sendspin')
+    service.data.mkdir(mode=0o700, parents=True, exist_ok=True)
+    app = web.Application()
+    for prefix in ('', '/sendspin'):  # the second form serves a bridge directly during development
+        app.router.add_get(prefix + '/stream', service.stream)
+        app.router.add_post(prefix + '/control', service.control)
+        app.router.add_post(prefix + '/play', service.play)
+        app.router.add_get(prefix + '/state', service.state)
+    runner = web.AppRunner(app, handle_signals=False, access_log=None)
+    await runner.setup()
+    await web.TCPSite(runner, os.environ.get('ALICE_SENDSPIN_HOST', '127.0.0.1'), int(os.environ.get('ALICE_SENDSPIN_PORT', '18095'))).start()
+    log.info('Sendspin: %s', service.url)
+    try:
+        await service.watch()
+    finally:
+        for player in list(service.players.values()):
+            await player.stop()
+        await runner.cleanup()
+
+
+if __name__ == '__main__':
+    with contextlib.suppress(KeyboardInterrupt):
+        asyncio.run(main())

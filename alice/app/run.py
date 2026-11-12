@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import time
+from urllib.parse import urlsplit
 from urllib.request import Request,urlopen
 from bootstrap import configure,local_url
 from provision import provision,dashboard_path
@@ -29,6 +30,17 @@ def detected_url(info):
         return local_url(network,(info.get('network') or {}).get('18080/tcp'))
     except (OSError,ValueError,KeyError):
         return ''
+
+
+def music_assistant_urls(raw,value):
+    # Music Assistant runs on the host network: the Supervisor gateway reaches it, and the
+    # home's LAN address is the fallback. A typed address replaces both.
+    typed=(raw.get('music_assistant_url') or '').strip()
+    if typed:return typed
+    urls=['ws://172.30.32.1:8927/sendspin']
+    host=urlsplit(value.get('advertised_url') or '').hostname
+    if host:urls.append(f'ws://{host}:8927/sendspin')
+    return ','.join(urls)
 
 
 def home_timezone():
@@ -63,7 +75,7 @@ def main():
     status={'configured':bool(value['advertised_url']),'dashboard_ready':False,'dashboard_path':dashboard_path(info['slug'])}
     server=serve(status)
     threading.Thread(target=server.serve_forever,daemon=True).start()
-    children=[];stop=threading.Event()
+    children=[];music=None;stop=threading.Event()
     for sig in (signal.SIGTERM,signal.SIGINT):signal.signal(sig,lambda *_:stop.set())
     threading.Thread(target=refresh_store,args=(stop,),daemon=True).start()
     try:
@@ -89,12 +101,21 @@ def main():
         # Manager creates durable state before Home Functions starts reading it.
         children.append(subprocess.Popen([sys.executable,str(root/'manager/service.py')],env={**env,'ALICE_MANAGER_CONFIG':str(data/'manager.json')}))
         children.append(subprocess.Popen(['node',str(root/'home-functions/main.mjs')],cwd=root/'home-functions',env=env))
+        # Music Assistant players are optional: their failure must never stop the app.
+        music_env={**env,'ALICE_SENDSPIN_DATA':str(data/'state/sendspin'),'ALICE_SENDSPIN_URL':music_assistant_urls(raw,value)}
+        music=subprocess.Popen([sys.executable,str(root/'music/sendspin_service.py')],env=music_env);music_restart=0.0
         print('Алиса запущена. Откройте веб-интерфейс и Wiki. Установка мостов требует настроенного advertised_url.',flush=True)
         while not stop.wait(1):
             if any(child.poll() is not None for child in children):raise RuntimeError('Один из сервисов остановлен')
+            if music.poll() is not None:
+                if not music_restart:
+                    print('Плееры Music Assistant остановлены; перезапуск через 30 с.',flush=True);music_restart=time.monotonic()+30
+                elif time.monotonic()>=music_restart:
+                    music=subprocess.Popen([sys.executable,str(root/'music/sendspin_service.py')],env=music_env);music_restart=0.0
         return 0
     finally:
         server.shutdown();server.server_close()
+        if music is not None:children.append(music)
         for child in children:
             if child.poll() is None:child.terminate()
         for child in children:

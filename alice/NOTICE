@@ -17,6 +17,12 @@ Includes Alice Gemini Bridge integration patches and device packaging:
 Copyright 2026 vladokan42 and contributors.
 Original integration project's notices are retained; see bridge source notices.
 
+Music Assistant players use aiosendspin (Apache License 2.0):
+Copyright the Sendspin and Music Assistant contributors.
+Original project: https://github.com/Sendspin/aiosendspin
+The bridge's choice of the native ALSA library for the audio helper follows
+station-airplay (Apache License 2.0, https://github.com/skrashevich/station-airplay).
+
 Node, Python and Go dependencies retain their own licenses. Container base
 images retain their own license notices. This project is not endorsed by
 Yandex or the Home Assistant project.

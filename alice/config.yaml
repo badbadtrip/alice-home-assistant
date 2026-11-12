@@ -1,5 +1,5 @@
 name: Алиса
-version: "0.56.0"
+version: "0.57.0"
 image: ghcr.io/badbadtrip/alice-home-assistant-{arch}
 slug: alice
 description: Колонки Алисы, голосовые команды, установка мостов и встроенная Wiki
@@ -38,6 +38,7 @@ options:
   llm_base_url: ""
   llm_model: ""
   llm_api_key: ""
+  music_assistant_url: ""
 schema:
   advertised_url: str
   speaker_network: str
@@ -47,3 +48,4 @@ schema:
   llm_base_url: str
   llm_model: str
   llm_api_key: password
+  music_assistant_url: str?

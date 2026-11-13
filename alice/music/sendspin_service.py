@@ -448,6 +448,7 @@ class Service:
             raise web.HTTPServiceUnavailable(text='Music Assistant player is unavailable')
         data: dict[str, Any] = {'entity_id': entity, 'media_id': query, 'enqueue': 'replace'}
         rest: list[str] = []
+        radio = False
         if kind in MEDIA_TYPES:
             data['media_type'] = MEDIA_TYPES[kind]
         if not kind and not query:
@@ -458,7 +459,10 @@ class Service:
             if not seeds:  # nothing liked yet: the queue that was playing goes on
                 await player.command('play')
                 return web.json_response({'ok': True})
-            data = {'entity_id': entity, 'media_id': seeds, 'enqueue': 'replace', 'radio_mode': True}
+            # Radio mode makes Music Assistant gather similar music before the first note
+            # (over 8 s with Apple Music). The first liked track starts at once; the other
+            # seeds join the queue with radio mode while it already sounds.
+            data, rest, radio = {'entity_id': entity, 'media_id': seeds[0], 'enqueue': 'replace'}, seeds[1:] or seeds[:1], True
         elif kind == 'liked':
             # "Мои лайки": the tracks marked as favourite in Music Assistant, shuffled.
             liked = await self.favorites(entry) if entry else []
@@ -492,7 +496,7 @@ class Service:
         # failure is spoken, late, in Alice's own voice.
         task = asyncio.create_task(self.home('POST', '/services/music_assistant/play_media', data, timeout=PLAY_TIMEOUT_S))
         if rest:
-            self.background(self.queue_rest(task, data['entity_id'], rest))
+            self.background(self.queue_rest(task, data['entity_id'], rest, radio=radio))
         asked = clock()
         done, _ = await asyncio.wait({task}, timeout=PLAY_ANSWER_S)
         log.info('%s: Music Assistant: сущность %.0f мс, запуск %s за %.0f мс', player.name, (found_entity - started) * 1000,
@@ -507,11 +511,13 @@ class Service:
             raise web.HTTPNotFound(text='nothing found')
         return web.json_response({'ok': True})
 
-    async def queue_rest(self, first: asyncio.Task, entity: str, rest: list[str]) -> None:
+    async def queue_rest(self, first: asyncio.Task, entity: str, rest: list[str], *, radio: bool = False) -> None:
         status, _ = await first
         if status == 200:
-            await self.home('POST', '/services/music_assistant/play_media',
-                            {'entity_id': entity, 'media_id': rest, 'enqueue': 'add'}, timeout=PLAY_TIMEOUT_S)
+            data: dict[str, Any] = {'entity_id': entity, 'media_id': rest, 'enqueue': 'add'}
+            if radio:
+                data['radio_mode'] = True
+            await self.home('POST', '/services/music_assistant/play_media', data, timeout=PLAY_TIMEOUT_S)
 
     async def finish_play(self, player: Player, task: asyncio.Task) -> None:
         status, _ = await task

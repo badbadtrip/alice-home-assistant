@@ -125,6 +125,18 @@ func (f *Functions) requestTagged(ctx context.Context, method, path string, body
 	return nil
 }
 
+// callResult is the server's outcome of one function call.
+type callResult struct {
+	Name      string `json:"name"`
+	Error     string `json:"error"`
+	Response  string `json:"response"`
+	Execution *struct {
+		Name   string `json:"name"`
+		Status string `json:"status"`
+		Target string `json:"target_state"`
+	} `json:"execution"`
+}
+
 func (f *Functions) Catalog(ctx context.Context) (map[string]FunctionDefinition, error) {
 	var catalog map[string]FunctionDefinition
 	err := f.request(ctx, http.MethodGet, "/functions", nil, &catalog)
@@ -192,6 +204,8 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 		Calls      []FunctionCall `json:"calls"`
 		Answer     string         `json:"answer"`
 		Clarify    *bool          `json:"clarify"`
+		// Results come with execute=true: the server ran the calls in the same request.
+		Results []callResult `json:"results"`
 	}
 	// A reply to a question completes the original command, so "выключи свет" plus
 	// "на кухне" stays local. Older servers can lack this endpoint; the validated
@@ -200,7 +214,7 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 	if previous.Request != "" {
 		query = previous.Request + " " + text
 	}
-	if err := f.request(ctx, http.MethodPost, "/resolve", map[string]any{"text": query, "area": f.Area, "voice_only": voiceOnly}, &fast); err != nil {
+	if err := f.request(ctx, http.MethodPost, "/resolve", map[string]any{"text": query, "area": f.Area, "voice_only": voiceOnly, "execute": true}, &fast); err != nil {
 		if voiceOnly {
 			return "", err
 		}
@@ -316,17 +330,19 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 	var executions []string
 	actions := 0
 	allAccepted := true
-	for _, call := range plan.Calls {
+	done := fast.Matched && len(fast.Results) == len(plan.Calls)
+	for i, call := range plan.Calls {
 		// The server rechecks exposure and arguments on every invocation.
-		var result struct {
-			Response  string `json:"response"`
-			Execution *struct {
-				Name   string `json:"name"`
-				Status string `json:"status"`
-				Target string `json:"target_state"`
-			} `json:"execution"`
+		var result callResult
+		if done {
+			result = fast.Results[i]
+			if result.Name != call.Name {
+				result.Error = "result out of order"
+			}
+		} else {
+			err = f.request(ctx, http.MethodPost, "/functions", call, &result)
 		}
-		if err = f.request(ctx, http.MethodPost, "/functions", call, &result); err != nil {
+		if err != nil || result.Error != "" {
 			telemetry.AddCall(ctx, call.Name, "error", "")
 			executions = append(executions, "Не удалось подтвердить результат следующей команды. Автоматически повторять её не буду.")
 			return strings.Join(executions, " "), nil

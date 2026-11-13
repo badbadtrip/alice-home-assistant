@@ -74,6 +74,13 @@ function configStamp (): number {
   try { return statSync(CONFIG_PATH).mtimeMs } catch { return 0 }
 }
 
+function deviceOf (devices: Map<string, DeviceEntry>, name: string): DeviceEntry | undefined {
+  for (const entry of devices.values()) {
+    if (entry.functions.some(f => f.name === name)) return entry
+  }
+  return undefined
+}
+
 function findFunction (devices: Map<string, DeviceEntry>,
   name: string): DeviceEntry['functions'][number] | undefined {
   for (const device of devices.values()) {
@@ -404,12 +411,46 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
   // metadata-independent state
   app.post('/resolve', async (request, response) => {
     const body = z.object({
-      area: z.string().max(100).optional(), text: z.string().max(2000), voice_only: z.boolean().optional()
+      area: z.string().max(100).optional(),
+      execute: z.boolean().optional(),
+      text: z.string().max(2000),
+      voice_only: z.boolean().optional()
     }).safeParse(request.body)
     if (!body.success) { response.status(400).json({ error: 'Invalid command' }); return }
-    const result = resolveLightCommand(body.data.text, body.data.area, speakerDevices(await getDevices(), request.get('x-alice-speaker')), body.data.voice_only)
-    response.json({ ...result, clarify: result.calls.length === 0 && (result.answer?.endsWith('?') ?? false), voice_match: body.data.voice_only === true && result.matched })
+    const devices = speakerDevices(await getDevices(), request.get('x-alice-speaker'))
+    const result = resolveLightCommand(body.data.text, body.data.area, devices, body.data.voice_only)
+    const isClarification = result.calls.length === 0 && (result.answer?.endsWith('?') ?? false)
+    // With execute the speaker gets the outcome in the same answer: one request per
+    // command instead of one more per call. The checks are those of POST /functions.
+    const results = body.data.execute === true && result.matched && result.calls.length > 0
+      ? await executeCalls(result.calls, devices)
+      : undefined
+    const isVoiceMatch = body.data.voice_only === true && result.matched
+    response.json({ ...result, clarify: isClarification, results, voice_match: isVoiceMatch })
   })
+
+  async function executeCalls (calls: { arguments: Record<string, number | string>; name: string }[],
+    devices: Map<string, DeviceEntry>): Promise<Record<string, unknown>[]> {
+    const outcomes: Record<string, unknown>[] = []
+    for (const call of calls) {
+      const started = Date.now()
+      const function_ = findFunction(devices, call.name)
+      const device = deviceOf(devices, call.name)
+      if (!function_ || !device) {
+        outcomes.push({ error: 'No such function exists', name: call.name })
+        continue
+      }
+      try {
+        const outcome = await executeFunction(homeAssistant, device, function_, call.arguments)
+        logger.info(`Function '${call.name}': ${outcome.execution?.status ?? 'read'}; ${Date.now() - started}ms`)
+        outcomes.push({ name: call.name, ...outcome })
+      } catch (error: unknown) {
+        logger.warn(`Failed to call '${call.name}': ${String(error)}`)
+        outcomes.push({ error: 'Call failed', name: call.name })
+      }
+    }
+    return outcomes
+  }
 
   app.get('/state', async (_, response) => {
     response.status(200).json(collectState(homeAssistant, await getDevices()))

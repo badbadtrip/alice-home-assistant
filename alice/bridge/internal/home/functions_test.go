@@ -217,3 +217,34 @@ func TestLocalReadingDoesNotOpenClarification(t *testing.T) {
 		t.Fatal("reading left a pending clarification")
 	}
 }
+
+func TestExactCommandIsOneRequest(t *testing.T) {
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.Method+" "+r.URL.Path)
+		raw, _ := io.ReadAll(r.Body)
+		if r.URL.Path != "/resolve" || !strings.Contains(string(raw), `"execute":true`) {
+			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+			return
+		}
+		w.Write([]byte(`{"matched":true,"calls":[{"name":"set_k_state","arguments":{"state":1}}],"results":[{"name":"set_k_state","execution":{"name":"Кухня","status":"confirmed","target_state":"on"}}]}`))
+	}))
+	defer server.Close()
+	f := &Functions{URL: server.URL, Token: "t", Planner: &disabledPlanner{}}
+	answer, err := f.Handle(context.Background(), "включи свет на кухне")
+	if err != nil || answer != "Кухня: включено." || len(paths) != 1 {
+		t.Fatal(answer, err, paths)
+	}
+}
+
+func TestServerSideCallErrorIsNotSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"matched":true,"calls":[{"name":"set_k_state","arguments":{"state":1}}],"results":[{"name":"set_k_state","error":"Call failed"}]}`))
+	}))
+	defer server.Close()
+	f := &Functions{URL: server.URL, Token: "t", Planner: &disabledPlanner{}}
+	answer, err := f.Handle(context.Background(), "включи свет на кухне")
+	if err != nil || !strings.Contains(answer, "Не удалось подтвердить") {
+		t.Fatal(answer, err)
+	}
+}

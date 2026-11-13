@@ -24,6 +24,7 @@ import contextlib
 import json
 import logging
 import os
+import re
 import struct
 import sys
 from pathlib import Path
@@ -322,6 +323,19 @@ class Player:
                 'volume': self.volume, 'muted': self.muted, 'now_playing': self.metadata if self.streaming else None}
 
 
+def fold(value: Any) -> str:
+    return ' '.join(str(value or '').casefold().replace('ё', 'е').split())
+
+
+ARTIST_TAIL = re.compile(r'\s+(?:группы|исполнителя|артиста|певицы|певца|от)\s+(.+)$')
+
+
+def split_artist(query: str) -> tuple[str, str]:
+    # "выходи за меня группы anacondaz" -> the title and the artist to prefer.
+    match = ARTIST_TAIL.search(query)
+    return (query[:match.start()].strip(), match.group(1).strip()) if match else (query, '')
+
+
 def player_name(speaker: dict[str, Any]) -> str:
     area = str(speaker.get('area') or '').strip()
     name = str(speaker.get('name') or '').strip()
@@ -413,8 +427,8 @@ class Service:
             raise web.HTTPBadRequest(text='invalid json')
         player = self.player(request)
         kind, query = str(body.get('kind') or ''), str(body.get('query') or '').strip()[:200]
-        if not query:
-            if kind:  # "мои лайки" has no Music Assistant equivalent
+        if not query and kind != 'liked':
+            if kind:
                 raise web.HTTPNotFound(text='nothing to play')
             await player.command('play')
             return web.json_response({'ok': True})
@@ -430,16 +444,34 @@ class Service:
         rest: list[str] = []
         if kind in MEDIA_TYPES:
             data['media_type'] = MEDIA_TYPES[kind]
-        if kind == 'artist' and entry:
-            # Playing an artist makes Music Assistant fetch the whole discography first,
-            # which takes Apple Music half a minute. Its top tracks from search start at once.
-            tracks = await self.artist_tracks(entry, query)
-            log.info('%s: треки исполнителя найдены за %.0f мс (%d)', player.name, (clock() - found_entity) * 1000, len(tracks))
-            if tracks:
-                # Music Assistant loads every listed track before it starts, so the first
-                # one plays alone and the rest join the queue while it already sounds.
-                data = {'entity_id': entity, 'media_id': tracks[0], 'enqueue': 'replace'}
-                rest = tracks[1:]
+        if kind == 'liked':
+            # "Мои лайки": the tracks marked as favourite in Music Assistant, shuffled.
+            liked = await self.favorites(entry) if entry else []
+            log.info('%s: избранное: %d треков за %.0f мс', player.name, len(liked), (clock() - found_entity) * 1000)
+            if not liked:
+                raise web.HTTPNotFound(text='no favourite tracks')
+            data, rest = {'entity_id': entity, 'media_id': liked[0], 'enqueue': 'replace'}, liked[1:]
+        elif entry and kind in MEDIA_TYPES:
+            # Music Assistant would take the first loose match (or, for an artist, fetch the
+            # whole discography first). The app picks the item itself and starts it at once.
+            title, by = split_artist(query)
+            if kind == 'artist':
+                tracks = await self.artist_tracks(entry, title)
+                first, rest = (tracks[0], tracks[1:]) if tracks else ('', [])
+            else:
+                first, found_artist, found_name = await self.pick(entry, kind, title, by)
+                rest = []
+                if first and kind == 'track':
+                    # One song would leave silence after it: more by the same artist follows.
+                    artist = by or found_artist
+                    rest = [uri for uri in (await self.artist_tracks(entry, artist, found_name) if artist else []) if uri != first]
+            log.info('%s: поиск «%s» (%s) за %.0f мс: %s', player.name, query, kind, (clock() - found_entity) * 1000,
+                     'найдено' if first else 'ничего')
+            if not first:
+                raise web.HTTPNotFound(text='nothing found')
+            # Music Assistant loads every listed track before it starts, so the first item
+            # plays alone and the rest join the queue while it already sounds.
+            data = {'entity_id': entity, 'media_id': first, 'enqueue': 'replace'}
         # A slow provider can hold Music Assistant's search for many seconds. The speaker
         # waits a short while; after that the request goes on here, and only a real
         # failure is spoken, late, in Alice's own voice.
@@ -493,15 +525,57 @@ class Service:
         rows = [row.split('|', 2) for row in text.split(';') if row.count('|') == 2]
         return (rows[0][0], rows[0][1], rows[0][2]) if len(rows) == 1 else ('', '', '')
 
-    async def artist_tracks(self, entry: str, artist: str) -> list[str]:
+    async def search(self, entry: str, kind: str, name: str, *, library: bool = False, limit: int = 10) -> list[dict[str, Any]]:
         status, text = await self.home('POST', '/services/music_assistant/search?return_response',
-                                       {'config_entry_id': entry, 'name': artist, 'media_type': ['track'], 'limit': 25})
+                                       {'config_entry_id': entry, 'name': name, 'media_type': [kind], 'limit': limit,
+                                        'library_only': library})
         if status != 200:
             return []
         try:
-            found = json.loads(text).get('service_response', {}).get('tracks') or []
+            found = json.loads(text).get('service_response', {}).get(kind + 's') or []
         except (ValueError, AttributeError):
             return []
+        return [item for item in found if isinstance(item, dict) and isinstance(item.get('uri'), str)]
+
+    async def pick(self, entry: str, kind: str, title: str, by: str) -> tuple[str, str, str]:
+        # The owner's own playlists come before the catalogue's; for the rest the service's
+        # relevance order stands, with the exact title and the named artist first.
+        found: list[dict[str, Any]] = []
+        if kind == 'playlist':
+            found = await self.search(entry, kind, title, library=True)
+        found = found or await self.search(entry, kind, f'{title} {by}'.strip())
+        wanted, artist = fold(title), fold(by)
+        def score(index_item: tuple[int, dict[str, Any]]) -> tuple[int, int, int, int]:
+            index, item = index_item
+            name = fold(item.get('name'))
+            artists = ' '.join(fold(a.get('name')) for a in item.get('artists') or [] if isinstance(a, dict))
+            return (0 if name == wanted else 1 if wanted in name or name in wanted else 2,
+                    0 if not artist or artist in artists else 1,
+                    1 if kind != 'playlist' and item['uri'].startswith('library://') else 0, index)
+        if not found:
+            return '', '', ''
+        best = min(enumerate(found), key=score)[1]
+        if kind == 'playlist' and fold(best.get('name')) != wanted and wanted not in fold(best.get('name')):
+            return '', '', ''  # a stranger's playlist with another name is not what was asked for
+        names = [str(a.get('name')) for a in best.get('artists') or [] if isinstance(a, dict) and a.get('name')]
+        return best['uri'], names[0] if names else '', str(best.get('name') or '')
+
+    async def favorites(self, entry: str) -> list[str]:
+        status, text = await self.home('POST', '/services/music_assistant/get_library?return_response',
+                                       {'config_entry_id': entry, 'media_type': 'track', 'favorite': True,
+                                        'limit': 50, 'order_by': 'random'})
+        if status != 200:
+            return []
+        try:
+            items = json.loads(text).get('service_response', {}).get('items') or []
+        except (ValueError, AttributeError):
+            return []
+        return [item['uri'] for item in items if isinstance(item, dict) and isinstance(item.get('uri'), str)]
+
+    async def artist_tracks(self, entry: str, artist: str, skip: str = '') -> list[str]:
+        found = await self.search(entry, 'track', artist, limit=25)
+        if skip:  # the song already chosen, also under its other copies
+            found = [t for t in found if fold(t.get('name')) != fold(skip)]
         wanted = artist.casefold()
         def by_artist(track: dict[str, Any]) -> bool:
             return any(wanted in str(a.get('name', '')).casefold() for a in track.get('artists') or [] if isinstance(a, dict))

@@ -166,7 +166,11 @@ type Controller struct {
 	// While it does, the bridge stays off the ring instead of fighting it.
 	voice    atomic.Value
 	volumeAt atomic.Int64
+	journal  ringJournal
 }
+
+// Transitions returns the ring's last changes of look, oldest first.
+func (c *Controller) Transitions() []Transition { return c.journal.list() }
 
 // YieldAfterVolume is how long the firmware keeps the ring after a volume change.
 const YieldAfterVolume = 1500 * time.Millisecond
@@ -195,6 +199,14 @@ func (c *Controller) yielding(now time.Time, own bool) bool {
 		return true
 	}
 	return now.Sub(time.Unix(0, c.volumeAt.Load())) < YieldAfterVolume
+}
+
+func (c *Controller) yieldReason(now time.Time) string {
+	if now.Sub(time.Unix(0, c.volumeAt.Load())) < YieldAfterVolume {
+		return "volume"
+	}
+	state, _ := c.voice.Load().(string)
+	return state
 }
 
 func (c *Controller) aliceIdle() bool {
@@ -360,7 +372,7 @@ func (c *Controller) Serve(ctx context.Context) {
 	var gate musicGate
 	var nextCheck, loaded time.Time
 	var sourced atomic.Bool
-	playing, allowed, lit := false, false, false
+	playing, allowed, lit, card := false, false, false, false
 	black := make([]Pixel, led.size)
 	off := make([]Light, led.size)
 	var soft smoother
@@ -383,17 +395,24 @@ func (c *Controller) Serve(ctx context.Context) {
 				cfg, allowed, loaded = c.load(), unmuted(), now
 			}
 			// Alice's own speech also runs the sound card; it never counts as music.
-			card := gate.update(audioPlaying() && c.aliceIdle())
+			card = gate.update(audioPlaying() && c.aliceIdle())
 			go func() { sourced.Store(c.sourcePlaying()) }()
 			playing = card || sourced.Load()
 		}
 		voiced := own && !c.aliceIdle()
-		look, ok := pick(cfg, c.thinking() || voiced, playing)
-		if c.yielding(now, own) && !c.thinking() {
+		thinking := c.thinking()
+		look, ok := pick(cfg, thinking || voiced, playing)
+		state := lookName(cfg, thinking || voiced, playing, ok)
+		if c.yielding(now, own) && !thinking {
 			// Leave the last frame alone: the firmware is drawing over it right now.
 			lit, ok = false, false
 			soft = smoother{}
+			state = "yield:" + c.yieldReason(now)
 		}
+		if !allowed && ok {
+			state = "muted"
+		}
+		c.journal.note(now, state, card, sourced.Load())
 		switch {
 		case ok && allowed:
 			_ = led.show(soft.next(look.Render(now.Sub(started), led.size)))

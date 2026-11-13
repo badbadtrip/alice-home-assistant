@@ -546,6 +546,7 @@ button.small{min-height:32px;padding:0 12px;font-size:13px}
 .m-mark{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px var(--surface);pointer-events:none}
 .m-tip[hidden],.m-cross[hidden],.m-mark[hidden]{display:none}
 .m-table{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.m-diag{margin-top:16px}.m-table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}.m-table th{text-align:left;font-weight:500;color:var(--ink-soft);padding:4px 6px;border-bottom:1px solid var(--line)}.m-table td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}.m-table small{display:block;color:var(--ink-soft);font-size:11px}.m-table tr.m-short td{color:var(--m-orange)}.m-card{overflow-x:auto}.m-note{font-size:13px;color:var(--ink-soft)}
 .m-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:48px 20px;border:1px dashed var(--line);border-radius:var(--radius);text-align:center}
 .m-empty ha-icon{--mdc-icon-size:36px;color:var(--muted);margin-bottom:6px}
 @media(max-width:600px){.m-facts{gap:6px 14px}.m-facts li{padding:0}.m-facts li+li{border-left:0}.m-head{padding:14px 16px}.m-card{padding:14px 14px 10px}.m-plot{grid-template-rows:150px 22px}.metrics>.sec{flex-wrap:wrap}}
@@ -1421,6 +1422,8 @@ button:active:not(:disabled){transform:scale(.97)}
     async _loadMetrics(){
       try{this._metricsData=await this._api('/api/metrics');this._metricsError='';}
       catch(error){this._metricsError=error.message;}
+      const id=this._metricsSpeaker??this._speakers.find(s=>s.trusted_fingerprint)?.id;
+      if(id){try{(this._diagnostics??={})[id]=await this._api('/api/speakers/'+encodeURIComponent(id)+'/diagnostics');}catch{}}
       this._renderMetrics();
       clearTimeout(this._metricsTimer);
       if(this._section==='metrics')this._metricsTimer=setTimeout(()=>{if(this.isConnected&&this._section==='metrics'&&!document.hidden)this._loadMetrics();else if(this._section==='metrics')this._metricsTimer=setTimeout(()=>this._loadMetrics(),5000);},30000);
@@ -1454,7 +1457,23 @@ button:active:not(:disabled){transform:scale(.97)}
         {key:'bridge',title:'Память моста',hint:'Сколько занимает сам мост',color:'var(--m-magenta)',fmt:v=>this._metricBytes(v/1024),series:[['Мост',row=>kb(row.bridge_rss_kb)]]}];
       this._metricCharts={};
       const cards=charts.map(chart=>this._metricChart(chart,shown,now-range,now)).filter(Boolean).join('');
-      return pick+head+`<div class="m-grid">${cards}</div>`;
+      return pick+head+`<div class="m-grid">${cards}</div>`+this._diagnosticsCards(speaker.id);
+    }
+    /* What the bridge measured itself: where each request spent time and why the ring changed. */
+    _diagnosticsCards(id){
+      const d=this._diagnostics?.[id];if(!d)return '';
+      const ms=v=>typeof v==='number'&&v>0?(v>=1000?(v/1000).toFixed(1)+' с':v+' мс'):'—';
+      const time=at=>{const t=new Date(at);return isNaN(t)?'':t.toLocaleTimeString('ru-RU');};
+      const route={yandex:'Яндекс',home:'Дом',llm:'Нейросеть',playback:'Музыка'};
+      const median=list=>{const v=list.filter(x=>typeof x==='number'&&x>0).sort((a,b)=>a-b);return v.length?v[Math.floor(v.length/2)]:null;};
+      const rows=(d.timeline??[]).slice(-15).reverse();
+      const byRoute=Object.entries(Object.groupBy?Object.groupBy(d.timeline??[],t=>t.route||'?'):{}).map(([r,list])=>`${escape(route[r]??r)}: ${ms(median(list.map(t=>t.total_ms)))}`).join(' · ');
+      const timeline=rows.length?`<table class="m-table"><thead><tr><th>Время</th><th>Кто ответил</th><th>Распознавание</th><th>Решение</th><th>Выполнение</th><th>До голоса</th><th>Всего</th></tr></thead><tbody>${rows.map(t=>`<tr><td>${time(t.at)}</td><td>${escape(route[t.route]??t.route??'')}<small>${escape(t.source??'')}</small></td><td>${ms(t.asr_ms)}</td><td>${ms(t.decide_ms)}</td><td>${ms(t.exec_ms)}</td><td>${ms(t.voice_ms)}</td><td><b>${ms(t.total_ms)}</b></td></tr>`).join('')}</tbody></table>`:'<p class="m-note">Запросов ещё не было или мост старше версии с замерами.</p>';
+      const looks={off:'выкл',lamp:'лампа',music:'музыка',thinking:'думает',muted:'микрофон выкл','yield:volume':'громкость (прошивка)','yield:listening':'слушает (прошивка)','yield:speaking':'говорит (прошивка)','yield:thinking':'думает (прошивка)'};
+      const name=v=>escape(looks[v]??v??'—');
+      const changes=(d.ring??[]).slice(-15).reverse();
+      const ring=changes.length?`<table class="m-table"><thead><tr><th>Время</th><th>Было</th><th>Стало</th><th>Держалось</th><th>Звук / плеер</th></tr></thead><tbody>${changes.map(t=>`<tr class="${t.held_ms>0&&t.held_ms<1500?'m-short':''}"><td>${time(t.at)}</td><td>${name(t.from)}</td><td>${name(t.to)}</td><td>${ms(t.held_ms)}</td><td>${t.card?'да':'нет'} / ${t.player?'да':'нет'}</td></tr>`).join('')}</tbody></table>`:'<p class="m-note">Подсветка ещё не менялась или мост старше версии с журналом.</p>';
+      return `<div class="m-grid m-diag"><article class="m-card"><header><div><h3>Задержки запросов</h3><p>От конца фразы до голоса. Медиана: ${byRoute||'—'}</p></div></header>${timeline}</article><article class="m-card"><header><div><h3>Подсветка</h3><p>Смены вида кольца; короче 1,5 с выделены — это и есть моргание</p></div></header>${ring}</article></div>`;
     }
     _metricChart(chart,rows,from,to){
       const series=chart.series.map(([name,key,color])=>({name,color:color??chart.color,values:rows.map(row=>{const v=typeof key==='function'?key(row):row[key];return typeof v==='number'&&isFinite(v)?v:null;})}));
@@ -1812,7 +1831,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(action==='close-speaker'){this._speakerDialog=false;this._render();return;}
       if(action==='section')return this._go(button.dataset.section);
       if(action==='metrics-range'){this._metricsRange=Number(button.dataset.range);this.shadowRoot.querySelectorAll('[data-action="metrics-range"]').forEach(b=>b.setAttribute('aria-selected',String(b===button)));this._renderMetrics();return;}
-      if(action==='metrics-speaker'){this._metricsSpeaker=button.dataset.id;this._renderMetrics();return;}
+      if(action==='metrics-speaker'){this._metricsSpeaker=button.dataset.id;this._renderMetrics();this._loadMetrics();return;}
       if(action==='guide')return this._openGuide();
       if(['commands','speakers','diagnostics'].includes(action)){this._tab=action;this._render();if(action==='diagnostics')this._loadActivity();return;}
       if(action==='retry-editor'){button.disabled=true;await this._loadManager();await this._bindNativePicker();return;}

@@ -81,6 +81,7 @@ type nativeRequest struct {
 	soundDirective                  *soundDirective
 	soundSealed                     bool
 	expires                         *time.Timer
+	clock                           requestClock
 }
 type Native struct {
 	VoiceCues        *VoiceCues
@@ -170,7 +171,7 @@ func (n *Native) Client(ctx context.Context, k websocket.MessageType, data []byt
 		playerState := nativePlaybackState(req)
 		pctx = sound.WithPlaybackState(pctx, playerState)
 		slog.Info("native_player_state", "request", requestTag(id), "present", playerState.Present, "player_state", playerState.PlayerState, "offset_known", playerState.OffsetKnown, "offset_ms", playerState.OffsetMS, "has_stream", playerState.StreamID != "", "stream_tag", requestTag(playerState.StreamID))
-		p := &nativeRequest{id: id, request: proto.Clone(req).(*request.TAliceRequestProto), text: req.GetRequest().GetEvent().GetText(), ctx: pctx, cancel: cancel}
+		p := &nativeRequest{id: id, request: proto.Clone(req).(*request.TAliceRequestProto), text: req.GetRequest().GetEvent().GetText(), ctx: pctx, cancel: cancel, clock: requestClock{born: time.Now()}}
 		p.ctx = sound.WithPlayer(p.ctx, func(ctx context.Context, request sound.Request) error {
 			return n.queueSound(ctx, p, request)
 		})
@@ -438,6 +439,7 @@ func (n *Native) Server(ctx context.Context, k websocket.MessageType, data []byt
 			ref.RequestId = p.request.GetHeader().GetRequestId()
 		}
 		if e.GetTtsSpeak() != nil {
+			finishClock(p, time.Now())
 			n.streams[uint32(e.Header.GetStreamId())] = p
 			if p.streaming {
 				if e.GetTtsSpeak().GetFormat() != "audio/opus" {
@@ -466,6 +468,9 @@ func (n *Native) Server(ctx context.Context, k websocket.MessageType, data []byt
 		return n.down(ctx, k, out)
 	}
 
+	if p.cloud && (f.Kind() == "TtsSpeak" || f.Kind() == "AliceResponse") {
+		finishClock(p, time.Now())
+	}
 	if f.Kind() == "TtsSpeak" {
 		p.ttsStarted = true
 		if p.local || p.canceled {
@@ -532,6 +537,7 @@ func (n *Native) Server(ctx context.Context, k websocket.MessageType, data []byt
 		asr := e.GetAsrResult()
 		if asr.GetEndOfUtt() {
 			p.final = true
+			p.clock.asr = time.Now()
 			slog.Info("native_asr_final", "request", requestTag(p.id), "hypotheses", len(asr.GetRecognition()), "code", asr.GetResponseCode().String())
 		}
 		if asr.GetEndOfUtt() && len(asr.GetRecognition()) > 0 {
@@ -588,8 +594,12 @@ func (n *Native) maybeResolve(p *nativeRequest) {
 		var err error
 		if n.resolver != nil && strings.TrimSpace(text) != "" {
 			if routed, ok := n.resolver.(RoutedResolver); ok {
+				n.mu.Lock()
+				p.clock.decide = time.Now()
+				n.mu.Unlock()
 				decision := routed.Decide(turnCtx, text)
 				n.mu.Lock()
+				p.clock.decided, p.clock.source = time.Now(), decision.Source
 				p.listenOnStreamStart = decision.Source == "dialogue_retry" || decision.Route == "home"
 				if listening, ok := n.resolver.(interface{ ListenAfterRoute(RouteDecision) bool }); ok {
 					p.listenOnStreamStart = p.listenOnStreamStart || listening.ListenAfterRoute(decision)
@@ -635,6 +645,7 @@ func (n *Native) maybeResolve(p *nativeRequest) {
 			n.OnRoute(p.id, result.Route)
 		}
 		p.route = result.Route
+		p.clock.answered = time.Now()
 		if result.Route == "yandex" {
 			p.cloud = true
 			var err error
@@ -697,6 +708,11 @@ func (n *Native) reply(p *nativeRequest, text string) error {
 		answer.VoiceResponse.OutputSpeech.Text = new("")
 	}
 	answer.Response.Directives = n.takeSound(p)
+	if silentPlayback {
+		n.mu.Lock()
+		finishClock(p, time.Now())
+		n.mu.Unlock()
+	}
 	m := &server.TServerMessage{Message: &server.TServerMessage_Event{Event: &server.TServerMessage_TEvent{Header: &header.TEventHeader{MessageId: newID(), RefMessageId: p.id}, Event: &server.TServerMessage_TEvent_AliceResponse{AliceResponse: answer}}}}
 	b, err := (wire.Frame{Server: m, Prefix: []byte("AAPI")}).Marshal()
 	if err != nil {

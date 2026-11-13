@@ -473,7 +473,11 @@ declare module '@digital-alchemy/core' {
   }
 }
 
-void HOME_APPLICATION.bootstrap().catch((error: unknown) => {
+// The library traces every service list and socket step; the app log keeps info and up.
+// ALICE_LOG_LEVEL=trace brings the detail back for debugging.
+const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const
+const logLevel = LOG_LEVELS.find(level => level === process.env.ALICE_LOG_LEVEL) ?? 'info'
+void HOME_APPLICATION.bootstrap({ configuration: { boilerplate: { LOG_LEVEL: logLevel } } }).catch((error: unknown) => {
   logger.fatal(`Failed to bootstrap: ${String(error)}`)
   process.exit(1)
 })

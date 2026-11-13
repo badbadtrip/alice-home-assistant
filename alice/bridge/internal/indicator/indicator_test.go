@@ -136,3 +136,16 @@ func TestPlumRainbowFrames(t *testing.T) {
 		}
 	}
 }
+
+func TestJournalKeepsOnlyChanges(t *testing.T) {
+	var j ringJournal
+	start := time.Now()
+	j.note(start, "lamp", false, false)
+	j.note(start.Add(time.Second), "lamp", false, false)
+	j.note(start.Add(2*time.Second), "music", true, true)
+	j.note(start.Add(2300*time.Millisecond), "lamp", false, true)
+	got := j.list()
+	if len(got) != 3 || got[1].To != "music" || got[2].HeldMS != 300 || !got[2].Player {
+		t.Fatalf("%+v", got)
+	}
+}

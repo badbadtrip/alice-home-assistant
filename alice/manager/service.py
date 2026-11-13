@@ -634,6 +634,20 @@ class Manager:
         except OSError:
             pass
 
+    def diagnostics(self, speaker):
+        """Where the speaker's last requests spent time and how its ring changed look."""
+        def read(path):
+            try:
+                value = json.loads(self.bridge_get(speaker, path, timeout=5, ssh_fallback=False))
+            except Exception:
+                return None  # an older bridge has no such page
+            return value if isinstance(value, list) else []
+        timeline = [{key: item.get(key) for key in ('at', 'route', 'source', 'asr_ms', 'decide_ms', 'exec_ms', 'voice_ms', 'total_ms')}
+                    for item in read('/timeline') or [] if isinstance(item, dict)]
+        ring = [{key: item.get(key) for key in ('at', 'from', 'to', 'held_ms', 'card', 'player')}
+                for item in read('/ring') or [] if isinstance(item, dict)]
+        return {'timeline': timeline[-50:], 'ring': ring[-50:]}
+
     def metrics_history(self):
         known = {speaker['id'] for speaker in self.store.read('speakers.json')}
         with self.history_lock:
@@ -1586,6 +1600,8 @@ class Handler(BaseHTTPRequestHandler):
             return 200, station(manager, path[2], path[3], payload)
         if path == ['api', 'setup'] and method == 'GET':
             return 200, manager.setup()
+        if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] == 'diagnostics' and method == 'GET':
+            return 200, manager.diagnostics(manager.store.speaker(path[2]))
         if len(path) == 4 and path[:2] == ['api', 'speakers'] and ID.fullmatch(path[2]) and path[3] == 'dictionary' and method == 'GET':
             return 200, manager._hf_request('/dictionary', manager.store.speaker(path[2]))
         if path == ['api', 'dictionary', 'alias'] and method == 'POST':

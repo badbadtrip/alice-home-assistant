@@ -384,6 +384,22 @@ func main() {
 		_, _ = w.Write(data)
 	})
 	mux.HandleFunc("GET /volume", proxy.VolumeHandler)
+	// The ring's last changes of look with the reason, to find what makes it blink.
+	mux.HandleFunc("GET /ring", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var items []indicator.Transition
+		if ring != nil {
+			items = ring.Transitions()
+		}
+		data, _ := json.Marshal(items)
+		_, _ = w.Write(data)
+	})
+	// Where the last requests spent their time; no text, only the route and milliseconds.
+	mux.HandleFunc("GET /timeline", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		data, _ := json.Marshal(bridge.RecentTimelines())
+		_, _ = w.Write(data)
+	})
 	mux.HandleFunc("GET /player", func(w http.ResponseWriter, r *http.Request) {
 		if err := engine.PlayerControl(r.Context(), r.URL.Query().Get("action")); err != nil {
 			http.Error(w, "player unavailable", http.StatusConflict)

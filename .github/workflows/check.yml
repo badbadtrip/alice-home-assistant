@@ -22,6 +22,9 @@ jobs:
         with:
           go-version-file: alice/bridge/go.mod
           cache-dependency-path: alice/bridge/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+        working-directory: alice/bridge
       - run: go test ./...
         working-directory: alice/bridge
   server:

@@ -95,8 +95,8 @@ var (
 	namedSearch = regexp.MustCompile(searchVerb + `(?: мою| мой)? (песню|трек|композицию|группу|исполнителя|артиста|альбом|плейлист) (.+)$`)
 	// "включи веселый плейлист": a short name said before the word.
 	titledSearch = regexp.MustCompile(searchVerb + `(?: мой| мою)? ((?:[^ ]+ )?[^ ]+) (альбом|плейлист)$`)
-	likedSearch = regexp.MustCompile(searchVerb + ` (?:мои лайки|избранное|любимую музыку|мою любимую музыку|любимые (?:песни|треки)|понравившиеся(?: песни| треки)?)$`)
-	searchKinds = map[string]string{
+	likedSearch  = regexp.MustCompile(searchVerb + ` (?:мои лайки|избранное|любимую музыку|мою любимую музыку|любимые (?:песни|треки)|понравившиеся(?: песни| треки)?)$`)
+	searchKinds  = map[string]string{
 		"песню": "track", "трек": "track", "композицию": "track",
 		"группу": "artist", "исполнителя": "artist", "артиста": "artist",
 		"альбом": "album", "плейлист": "playlist",

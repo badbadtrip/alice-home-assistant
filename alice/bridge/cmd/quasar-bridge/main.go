@@ -101,6 +101,9 @@ func main() {
 		return
 	}
 	var clientCount, serverCount atomic.Int64
+	// Every frame used to be written to the log; on the speaker's flash that is constant
+	// writing. Only the counters stay; QUASAR_DEBUG_FRAMES=1 brings the frame log back.
+	debugFrames := os.Getenv("QUASAR_DEBUG_FRAMES") == "1"
 	proxy := &bridge.Proxy{Upstream: cfg.Upstream, Observer: func(direction string, kind websocket.MessageType, data []byte) {
 		d := wire.ClientToServer
 		var count int64
@@ -109,6 +112,9 @@ func main() {
 			count = serverCount.Add(1)
 		} else {
 			count = clientCount.Add(1)
+		}
+		if !debugFrames {
+			return
 		}
 		frame := wire.Decode(data, d)
 		name := frame.Kind()

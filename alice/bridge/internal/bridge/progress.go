@@ -27,7 +27,12 @@ func (n *Native) progressAfter(p *nativeRequest, minimum time.Duration) func() {
 	n.wg.Go(func() {
 		defer close(done)
 		delay := n.ProgressAfter
-		if n.VoiceCues != nil { delay = minimum }; if delay < minimum { delay = minimum }
+		if n.VoiceCues != nil {
+			delay = minimum
+		}
+		if delay < minimum {
+			delay = minimum
+		}
 		timer := time.NewTimer(delay)
 		defer timer.Stop()
 		select {

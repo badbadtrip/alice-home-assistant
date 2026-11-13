@@ -83,7 +83,11 @@ func (c *Client) Complete(ctx context.Context, messages []Message, structured bo
 	if len(m.ToolCalls) > 0 {
 		return "", errors.New("unexpected tool call in plain completion")
 	}
-	if !structured { if err := ValidateAnswer(m.Content); err != nil { return "", err } }
+	if !structured {
+		if err := ValidateAnswer(m.Content); err != nil {
+			return "", err
+		}
+	}
 	content := strings.TrimSpace(m.Content)
 	if structured {
 		// Some providers wrap JSON in a Markdown fence despite response_format.

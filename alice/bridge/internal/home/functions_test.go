@@ -29,7 +29,10 @@ func (p *clarificationPlanner) Complete(_ context.Context, m []llm.Message, _ bo
 }
 func TestFunctionsClarificationContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/resolve" { w.Write([]byte(`{"matched":false}`)); return }
+		if r.URL.Path == "/resolve" {
+			w.Write([]byte(`{"matched":false}`))
+			return
+		}
 		if r.Method != http.MethodGet {
 			t.Error("read-only clarification invoked an action")
 		}
@@ -71,7 +74,10 @@ func (p sensorOnlyPlanner) Complete(_ context.Context, messages []llm.Message, _
 }
 func TestFunctionsWithOnlyReadOnlySensors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/resolve" { w.Write([]byte(`{"matched":false}`)); return }
+		if r.URL.Path == "/resolve" {
+			w.Write([]byte(`{"matched":false}`))
+			return
+		}
 		if r.Method != http.MethodGet {
 			t.Error("sensor reading attempted a service call")
 		}

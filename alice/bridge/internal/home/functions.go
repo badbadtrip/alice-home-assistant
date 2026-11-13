@@ -10,24 +10,24 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"sync/atomic"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"quasarbridge/internal/dialogue"
 	"quasarbridge/internal/llm"
 	"quasarbridge/internal/sound"
- "quasarbridge/internal/telemetry"
+	"quasarbridge/internal/telemetry"
 )
 
 // Functions connects the existing home route to the home-functions HTTP API.
 // Its bearer token is separate from the Home Assistant administrator token.
 type Functions struct {
- activity *telemetry.Writer
+	activity  *telemetry.Writer
 	voice     voicePhraseCache
 	Area      string
- SpeakerID string
+	SpeakerID string
 	URL       string
 	Token     string
 	Planner   Planner
@@ -100,7 +100,7 @@ func (f *Functions) requestTagged(ctx context.Context, method, path string, body
 	if tag != nil && *tag != "" {
 		req.Header.Set("If-None-Match", *tag)
 	}
- req.Header.Set("X-Alice-Speaker", f.SpeakerID)
+	req.Header.Set("X-Alice-Speaker", f.SpeakerID)
 	client := f.HTTP
 	if client == nil {
 		client = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -179,17 +179,19 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 	if time.Since(previous.At) >= 90*time.Second {
 		previous = homeClarification{}
 	}
-	if voiceOnly { previous = homeClarification{} }
+	if voiceOnly {
+		previous = homeClarification{}
+	}
 	// The catalog is only needed to check a model's plan. An exact command is built by
 	// the server from its own catalog, and the server checks exposure on every call.
 	var catalog map[string]FunctionDefinition
 	var err error
 	var fast struct {
-		VoiceMatch bool `json:"voice_match"`
-		Matched bool           `json:"matched"`
-		Calls   []FunctionCall `json:"calls"`
-		Answer  string         `json:"answer"`
-		Clarify *bool          `json:"clarify"`
+		VoiceMatch bool           `json:"voice_match"`
+		Matched    bool           `json:"matched"`
+		Calls      []FunctionCall `json:"calls"`
+		Answer     string         `json:"answer"`
+		Clarify    *bool          `json:"clarify"`
 	}
 	// A reply to a question completes the original command, so "выключи свет" plus
 	// "на кухне" stays local. Older servers can lack this endpoint; the validated
@@ -199,10 +201,15 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 		query = previous.Request + " " + text
 	}
 	if err := f.request(ctx, http.MethodPost, "/resolve", map[string]any{"text": query, "area": f.Area, "voice_only": voiceOnly}, &fast); err != nil {
-		if voiceOnly { return "", err }
+		if voiceOnly {
+			return "", err
+		}
 		fast.Matched = false
 	}
-	if voiceOnly && (!fast.Matched || !fast.VoiceMatch) { telemetry.Status(ctx,"unavailable");return "Эта голосовая команда отключена или изменена в Home Assistant.", nil }
+	if voiceOnly && (!fast.Matched || !fast.VoiceMatch) {
+		telemetry.Status(ctx, "unavailable")
+		return "Эта голосовая команда отключена или изменена в Home Assistant.", nil
+	}
 	var plan FunctionPlan
 	if fast.Matched {
 		plan.Calls, plan.Answer = fast.Calls, fast.Answer
@@ -220,7 +227,7 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 			return "", err
 		}
 		if len(catalog) == 0 && len(state) == 0 {
-   telemetry.Status(ctx,"unavailable")
+			telemetry.Status(ctx, "unavailable")
 			return "В Home Assistant пока нет устройств с настроенной меткой.", nil
 		}
 		data, err := json.Marshal(map[string]any{"functions": catalog, "state": state, "request": text, "speaker_area": f.Area, "previous_request": previous.Request, "clarification_question": previous.Question})
@@ -268,7 +275,11 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 		}
 	}
 	if len(plan.Calls) == 0 {
-  if plan.Clarify || strings.HasSuffix(strings.TrimSpace(plan.Answer),"?") {telemetry.Status(ctx,"clarification")} else {telemetry.Status(ctx,"answered")}
+		if plan.Clarify || strings.HasSuffix(strings.TrimSpace(plan.Answer), "?") {
+			telemetry.Status(ctx, "clarification")
+		} else {
+			telemetry.Status(ctx, "answered")
+		}
 		if strings.TrimSpace(plan.Answer) == "" {
 			return "", errors.New("empty home answer")
 		}
@@ -316,12 +327,12 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 			} `json:"execution"`
 		}
 		if err = f.request(ctx, http.MethodPost, "/functions", call, &result); err != nil {
-   telemetry.AddCall(ctx,call.Name,"error","")
+			telemetry.AddCall(ctx, call.Name, "error", "")
 			executions = append(executions, "Не удалось подтвердить результат следующей команды. Автоматически повторять её не буду.")
 			return strings.Join(executions, " "), nil
 		}
 		if result.Response != "" || (result.Execution == nil && catalog[call.Name].HasResponse) {
-   telemetry.AddCall(ctx,call.Name,"answered","")
+			telemetry.AddCall(ctx, call.Name, "answered", "")
 			if result.Response == "" {
 				return "", errors.New("home function returned no result")
 			}
@@ -330,7 +341,7 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 			actions++
 			if result.Execution != nil {
 				e := result.Execution
-    telemetry.AddCall(ctx,call.Name,e.Status,e.Name)
+				telemetry.AddCall(ctx, call.Name, e.Status, e.Name)
 				if e.Status != "already" && e.Status != "confirmed" && e.Status != "accepted" {
 					allAccepted = false
 				}
@@ -349,7 +360,7 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 					executions = append(executions, e.Name+": команда отправлена, результат пока не подтверждён.")
 				}
 			} else {
-    telemetry.AddCall(ctx,call.Name,"accepted","")
+				telemetry.AddCall(ctx, call.Name, "accepted", "")
 				allAccepted = false
 				executions = append(executions, "Команда отправлена в Home Assistant.")
 			}

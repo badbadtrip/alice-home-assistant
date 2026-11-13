@@ -127,5 +127,7 @@ func makeSoundDirective(request sound.Request) (*directives.TDirective, error) {
 }
 
 func (n *Native) hasQueuedSuccess(p *nativeRequest) bool {
- n.mu.Lock(); defer n.mu.Unlock(); return p.soundDirective != nil && p.soundRequest != nil && (p.soundRequest.Sound == "success" || p.soundRequest.Sound == "notification")
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return p.soundDirective != nil && p.soundRequest != nil && (p.soundRequest.Sound == "success" || p.soundRequest.Sound == "notification")
 }

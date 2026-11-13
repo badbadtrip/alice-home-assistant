@@ -93,6 +93,8 @@ func Start(text string) bool { return start.MatchString(normalize(text)) }
 var (
 	searchVerb  = `^(?:включи|поставь|запусти|сыграй|играй|найди)(?: мне)?`
 	namedSearch = regexp.MustCompile(searchVerb + `(?: мою| мой)? (песню|трек|композицию|группу|исполнителя|артиста|альбом|плейлист) (.+)$`)
+	// "включи веселый плейлист": a short name said before the word.
+	titledSearch = regexp.MustCompile(searchVerb + `(?: мой| мою)? ((?:[^ ]+ )?[^ ]+) (альбом|плейлист)$`)
 	likedSearch = regexp.MustCompile(searchVerb + ` (?:мои лайки|избранное|любимую музыку|мою любимую музыку|любимые (?:песни|треки)|понравившиеся(?: песни| треки)?)$`)
 	searchKinds = map[string]string{
 		"песню": "track", "трек": "track", "композицию": "track",
@@ -110,6 +112,9 @@ func Search(text string) (kind, query string, ok bool) {
 	}
 	if match := namedSearch.FindStringSubmatch(text); match != nil {
 		return searchKinds[match[1]], match[2], true
+	}
+	if match := titledSearch.FindStringSubmatch(text); match != nil {
+		return searchKinds[match[2]], match[1], true
 	}
 	return "", "", false
 }

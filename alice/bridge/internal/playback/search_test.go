@@ -9,6 +9,9 @@ func TestSearch(t *testing.T) {
 		{"включи альбом Meteora", "album", "meteora"},
 		{"включи плейлист для бега", "playlist", "для бега"},
 		{"включи мои лайки", "liked", ""},
+		{"Алиса, включи весёлый плейлист", "playlist", "веселый"},
+		{"поставь мой летний плейлист", "playlist", "летний"},
+		{"включи новый альбом", "album", "новый"},
 	}
 	for _, c := range cases {
 		kind, query, ok := Search(c.text)

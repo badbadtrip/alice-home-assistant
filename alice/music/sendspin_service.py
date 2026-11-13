@@ -327,6 +327,11 @@ def fold(value: Any) -> str:
     return ' '.join(str(value or '').casefold().replace('ё', 'е').split())
 
 
+def stem(value: Any) -> str:
+    # "веселый" asks for "Весёлая": Russian endings differ, the stem does not.
+    return ' '.join(word.rstrip('аеиоуыэюяйь') or word for word in fold(value).split())
+
+
 ARTIST_TAIL = re.compile(r'\s+(?:группы|исполнителя|артиста|певицы|певца|от)\s+(.+)$')
 
 
@@ -544,18 +549,20 @@ class Service:
         if kind == 'playlist':
             found = await self.search(entry, kind, title, library=True)
         found = found or await self.search(entry, kind, f'{title} {by}'.strip())
-        wanted, artist = fold(title), fold(by)
+        wanted, artist, close = fold(title), fold(by), stem(title)
         def score(index_item: tuple[int, dict[str, Any]]) -> tuple[int, int, int, int]:
             index, item = index_item
             name = fold(item.get('name'))
             artists = ' '.join(fold(a.get('name')) for a in item.get('artists') or [] if isinstance(a, dict))
-            return (0 if name == wanted else 1 if wanted in name or name in wanted else 2,
+            near = stem(name)
+            return (0 if name == wanted else 1 if wanted in name or name in wanted or near == close else
+                    2 if close in near or near in close else 3,
                     0 if not artist or artist in artists else 1,
                     1 if kind != 'playlist' and item['uri'].startswith('library://') else 0, index)
         if not found:
             return '', '', ''
         best = min(enumerate(found), key=score)[1]
-        if kind == 'playlist' and fold(best.get('name')) != wanted and wanted not in fold(best.get('name')):
+        if kind == 'playlist' and close not in stem(best.get('name')):
             return '', '', ''  # a stranger's playlist with another name is not what was asked for
         names = [str(a.get('name')) for a in best.get('artists') or [] if isinstance(a, dict) and a.get('name')]
         return best['uri'], names[0] if names else '', str(best.get('name') or '')

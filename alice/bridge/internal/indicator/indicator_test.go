@@ -198,3 +198,20 @@ func TestBrokenConfigKeepsThePreviousLook(t *testing.T) {
 		t.Fatalf("a broken read must keep the previous look, got %+v", got)
 	}
 }
+
+func TestCardIsNotMusicRightAfterAliceSpoke(t *testing.T) {
+	c := &Controller{}
+	c.SetVoice("speaking")
+	c.SetVoice("idle")
+	now := time.Now()
+	if c.quietFor(now, QuietBeforeCardMusic) {
+		t.Fatal("the reply's sound may still be playing")
+	}
+	if !c.quietFor(now.Add(QuietBeforeCardMusic), QuietBeforeCardMusic) {
+		t.Fatal("after a quiet while the card may be music again")
+	}
+	c.SetVoice("listening")
+	if c.quietFor(now.Add(time.Hour), QuietBeforeCardMusic) {
+		t.Fatal("never while Alice is busy")
+	}
+}

@@ -222,6 +222,14 @@ func (c *Controller) yieldReason(now time.Time) string {
 	return state
 }
 
+// QuietBeforeCardMusic: the sound card counts as music only this long after Alice spoke.
+const QuietBeforeCardMusic = 3 * time.Second
+
+// quietFor tells whether Alice has been idle for at least d.
+func (c *Controller) quietFor(now time.Time, d time.Duration) bool {
+	return c.aliceIdle() && now.Sub(time.Unix(0, c.voiceAt.Load())) >= d
+}
+
 func (c *Controller) aliceIdle() bool {
 	state, _ := c.voice.Load().(string)
 	return state == "" || state == "idle"
@@ -358,21 +366,25 @@ func unmuted() bool {
 	return false
 }
 
-// musicGate ignores short sounds: spoken answers must not start the music look.
+// musicGate ignores short sounds: spoken answers and chimes must not start the music look.
 type musicGate struct{ on, off int }
 
-// Checked every 300 ms: 1.2 s of sound while Alice is quiet is music, and it stays
-// music through a second of silence between tracks.
+// cardMusicChecks: the sound card is only a guess for the stock player, which the bridge
+// does not run. Measured on Midi, a reply and its chime kept the card busy 1.1-1.5 s after
+// Alice went idle, so it takes 3 s of sound (10 checks of 300 ms) to count as music.
+const cardMusicChecks = 10
+
+// Checked every 300 ms; music stays music through a second of silence between tracks.
 func (g *musicGate) update(running bool) bool {
 	if running {
-		g.on, g.off = min(g.on+1, 4), 0
+		g.on, g.off = min(g.on+1, cardMusicChecks), 0
 	} else {
 		g.off++
 		if g.off >= 4 {
 			g.on = 0
 		}
 	}
-	return g.on >= 4
+	return g.on >= cardMusicChecks
 }
 
 // Serve draws the ring until ctx ends and leaves it dark.
@@ -418,8 +430,9 @@ func (c *Controller) Serve(ctx context.Context) {
 			if now.Sub(loaded) > time.Second {
 				cfg, allowed, loaded = c.load(cfg), unmuted(), now
 			}
-			// Alice's own speech also runs the sound card; it never counts as music.
-			card = gate.update(audioPlaying() && c.aliceIdle())
+			// Alice's own speech also runs the sound card, also for a moment after her
+			// state turns idle; it never counts as music.
+			card = gate.update(audioPlaying() && c.quietFor(now, QuietBeforeCardMusic))
 			go func() { sourced.Store(c.sourcePlaying()) }()
 			playing = card || sourced.Load()
 		}

@@ -68,14 +68,14 @@ func TestLookPriority(t *testing.T) {
 
 func TestShortSoundsDoNotCountAsMusic(t *testing.T) {
 	var gate musicGate
-	// Checked every 300 ms: three checks are under a second, too short for music.
-	for range 3 {
+	// Checked every 300 ms: a reply with its chime (up to 1.5 s, measured on Midi) is not music.
+	for range cardMusicChecks - 1 {
 		if gate.update(true) {
 			t.Fatal("started too early")
 		}
 	}
 	if !gate.update(true) {
-		t.Fatal("1.2 s of sound is music")
+		t.Fatal("3 s of sound is music")
 	}
 	gate.update(false)
 	if !gate.update(true) {

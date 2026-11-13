@@ -40,7 +40,7 @@ Promise<{ execution?: ExecutionResult; response?: string | undefined; }> {
     if (isTargetState()) return result('confirmed')
     if (Date.now() >= deadline) return result('accepted')
     const remaining = deadline - Date.now()
-    await delay(Math.min(100, Math.max(1, remaining)))
+    await delay(Math.min(25, Math.max(1, remaining)))
   } while (Date.now() <= deadline)
   return result('accepted')
 }

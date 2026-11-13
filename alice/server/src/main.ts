@@ -7,6 +7,7 @@ import {
 import dotenv from 'dotenv'
 import express from 'express'
 import { createHash, timingSafeEqual } from 'node:crypto'
+import { statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import z from 'zod'
 
@@ -36,10 +37,12 @@ const CONFIG_PATH = process.env.CONFIG_PATH ?? 'config.yaml'
 const PORT = Number.parseInt(process.env.PORT || '8080')
 
 /**
- * Device list cache TTL: registry updates arrive over websocket instantly, so
- * this only protects against pathological request rates.
+ * The device list is rebuilt when Home Assistant reports a registry change or the
+ * exposure config file changes. The long limit is only a safety net for a lost event.
  */
-const DEVICE_CACHE_MS = 1000
+const DEVICE_CACHE_MS = 10 * 60_000
+const REGISTRY_EVENTS = ['entity_registry_updated', 'device_registry_updated', 'area_registry_updated',
+  'label_registry_updated', 'floor_registry_updated']
 
 function collectFunctions (devices: Map<string, DeviceEntry>): Functions {
   const result: Functions = {}
@@ -67,6 +70,10 @@ function collectState (homeAssistant: HomeAssistantApi,
   return result
 }
 
+function configStamp (): number {
+  try { return statSync(CONFIG_PATH).mtimeMs } catch { return 0 }
+}
+
 function findFunction (devices: Map<string, DeviceEntry>,
   name: string): DeviceEntry['functions'][number] | undefined {
   for (const device of devices.values()) {
@@ -82,19 +89,25 @@ function findFunction (devices: Map<string, DeviceEntry>,
  * home-functions exposes Home Assistant devices (selected by their HA labels) to the
  * processor, using the same function/state HTTP contract as function-state-server.
  */
-function MainService ({ hass, lifecycle }: TServiceParams) {
+function MainService ({ context, hass, lifecycle }: TServiceParams) {
   const homeAssistant: HomeAssistantApi = createHomeAssistantApi(hass, logger)
 
   /**
    * Rebuilt on demand from the live websocket-synced registry, so newly
    * labeled devices appear without a restart.
    */
-  let devicesCache: undefined | { devices: Map<string, DeviceEntry>; updatedAt: number, }
+  let devicesCache: undefined | { configStamp: number; devices: Map<string, DeviceEntry>; updatedAt: number, }
   let devicesPromise: Promise<Map<string, DeviceEntry>> | undefined
+  // A label, name, alias or area change in HA: the next request builds a fresh list.
+  for (const event of REGISTRY_EVENTS) {
+    hass.socket.onEvent({ context, event, exec: () => { devicesCache = undefined; homeAssistant.invalidate?.() } })
+  }
 
   async function getDevices (shouldRefresh = false): Promise<Map<string, DeviceEntry>> {
     const now = Date.now()
-    if (!shouldRefresh && devicesCache && now - devicesCache.updatedAt < DEVICE_CACHE_MS) {
+    const stamp = configStamp()
+    const isFresh = devicesCache?.configStamp === stamp && now - devicesCache.updatedAt < DEVICE_CACHE_MS
+    if (!shouldRefresh && devicesCache && isFresh) {
       return devicesCache.devices
     }
     if (devicesPromise) {
@@ -109,7 +122,7 @@ function MainService ({ hass, lifecycle }: TServiceParams) {
             `(${device.functions.length} functions)`)
         }
       }
-      devicesCache = { devices, updatedAt: Date.now() }
+      devicesCache = { configStamp: stamp, devices, updatedAt: Date.now() }
       return devices
     })()
     try {
@@ -429,7 +442,8 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     const started = Date.now()
     void (async () => {
       try {
-        const devices = speakerDevices(await getDevices(true), request.get('x-alice-speaker'))
+        // The cached list follows HA's registry events, so exposure is current here.
+        const devices = speakerDevices(await getDevices(), request.get('x-alice-speaker'))
         const function_ = findFunction(devices, body.name)
         let device: DeviceEntry | undefined
         for (const entry of devices.values()) {

@@ -2,6 +2,8 @@ package indicator
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -147,5 +149,52 @@ func TestJournalKeepsOnlyChanges(t *testing.T) {
 	got := j.list()
 	if len(got) != 3 || got[1].To != "music" || got[2].HeldMS != 300 || !got[2].Player {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestQuickModelCallsDoNotLightTheRing(t *testing.T) {
+	c := &Controller{}
+	done := c.Begin()
+	if c.thinking() {
+		t.Fatal("a call that just began must not light the ring yet")
+	}
+	c.mu.Lock()
+	c.thinkingSince = time.Now().Add(-ThinkDelay)
+	c.mu.Unlock()
+	if !c.thinking() {
+		t.Fatal("a call running past the delay lights the ring")
+	}
+	done()
+	if c.thinking() {
+		t.Fatal("finished calls leave the ring")
+	}
+}
+
+func TestShortFirmwareStatesDoNotTakeTheRing(t *testing.T) {
+	c := &Controller{}
+	c.SetVoice("idle")
+	c.SetVoice("listening")
+	now := time.Now()
+	if c.yielding(now, false) {
+		t.Fatal("a fresh listening state may be a false blip")
+	}
+	if !c.yielding(now.Add(YieldAfterVoice), false) {
+		t.Fatal("a lasting state belongs to the firmware")
+	}
+	if c.yielding(now.Add(YieldAfterVoice), true) {
+		t.Fatal("with an own look the bridge draws voice itself")
+	}
+}
+
+func TestBrokenConfigKeepsThePreviousLook(t *testing.T) {
+	dir := t.TempDir()
+	c := &Controller{Path: filepath.Join(dir, "indicator.json")}
+	previous := Config{Enabled: true, Color: "#112233"}
+	if got := c.load(previous); got.Enabled {
+		t.Fatal("no file means no look")
+	}
+	_ = os.WriteFile(c.Path, []byte("{broken"), 0o600)
+	if got := c.load(previous); got.Color != "#112233" {
+		t.Fatalf("a broken read must keep the previous look, got %+v", got)
 	}
 }

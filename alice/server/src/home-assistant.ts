@@ -23,6 +23,10 @@ export interface HomeAssistantApi {
   getEntityState (entityId: string): EntityState | undefined;
   getRegistry (): Promise<RegistryEntry[]>;
   hasService (domain: string, service: string): boolean;
+  /**
+  Forget cached names, aliases and areas after HA reports a registry change.
+  */
+  invalidate? (): void;
   loadServiceIndex (): Promise<void>;
   removeEntityAlias (entityId: string, alias: string): Promise<'missing' | 'removed'>;
 }
@@ -220,6 +224,7 @@ export function createHomeAssistantApi (hass: HassLike, logger: Logger<unknown>)
     getEntityState,
     getRegistry,
     hasService,
+    invalidate () { aliasCache = undefined; locationCache = undefined },
     loadServiceIndex,
     removeEntityAlias
   }

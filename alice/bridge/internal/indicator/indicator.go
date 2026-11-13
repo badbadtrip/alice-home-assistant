@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json/v2"
+	"errors"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -155,16 +157,19 @@ func (c *Controller) Request(ctx context.Context) func() {
 }
 
 type Controller struct {
-	Path     string
-	mu       sync.Mutex
-	active   int
-	sources  []func() bool
-	reported atomic.Bool
-	once     sync.Once
-	wake     chan struct{}
+	Path   string
+	mu     sync.Mutex
+	active int
+	// thinkingSince is when the first of the running model calls began.
+	thinkingSince time.Time
+	sources       []func() bool
+	reported      atomic.Bool
+	once          sync.Once
+	wake          chan struct{}
 	// The firmware draws listening, speaking and the volume level on the same ring.
 	// While it does, the bridge stays off the ring instead of fighting it.
 	voice    atomic.Value
+	voiceAt  atomic.Int64
 	volumeAt atomic.Int64
 	journal  ringJournal
 }
@@ -184,9 +189,16 @@ func (c *Controller) poke() {
 
 // SetVoice receives Alice's state: idle, listening, thinking or speaking.
 func (c *Controller) SetVoice(state string) {
+	if previous, _ := c.voice.Load().(string); previous != state {
+		c.voiceAt.Store(time.Now().UnixNano())
+	}
 	c.voice.Store(state)
 	c.poke()
 }
+
+// YieldAfterVoice: the event socket reports false "listening" of half a second; the
+// ring is handed to the firmware only for a state that lasts longer than a blink.
+const YieldAfterVoice = 250 * time.Millisecond
 
 // VolumeChanged hands the ring to the firmware's volume display for a moment.
 func (c *Controller) VolumeChanged() {
@@ -195,7 +207,8 @@ func (c *Controller) VolumeChanged() {
 }
 
 func (c *Controller) yielding(now time.Time, own bool) bool {
-	if state, _ := c.voice.Load().(string); !own && state != "" && state != "idle" {
+	if state, _ := c.voice.Load().(string); !own && state != "" && state != "idle" &&
+		now.Sub(time.Unix(0, c.voiceAt.Load())) >= YieldAfterVoice {
 		return true
 	}
 	return now.Sub(time.Unix(0, c.volumeAt.Load())) < YieldAfterVolume
@@ -254,6 +267,9 @@ func New(configPath string) *Controller {
 func (c *Controller) Begin() func() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.active == 0 {
+		c.thinkingSince = time.Now()
+	}
 	c.active++
 	// A dark ring sleeps between checks; thinking must light it at once.
 	select {
@@ -270,17 +286,25 @@ func (c *Controller) Begin() func() {
 	}
 }
 
+// ThinkDelay keeps quick model calls (a short plan, a check) from flashing the ring.
+const ThinkDelay = 300 * time.Millisecond
+
 func (c *Controller) thinking() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.active > 0
+	return c.active > 0 && time.Since(c.thinkingSince) >= ThinkDelay
 }
 
-func (c *Controller) load() Config {
+// load reads the owner's look. No file means no look; a file that cannot be read or
+// parsed keeps the previous look, so a write in progress never turns the ring off.
+func (c *Controller) load(previous Config) Config {
 	var cfg Config
 	raw, err := os.ReadFile(c.Path)
-	if err != nil || json.Unmarshal(raw, &cfg) != nil {
+	if errors.Is(err, fs.ErrNotExist) {
 		return Config{}
+	}
+	if err != nil || json.Unmarshal(raw, &cfg) != nil {
+		return previous
 	}
 	return cfg
 }
@@ -361,7 +385,7 @@ func (c *Controller) Serve(ctx context.Context) {
 	// With an own voice look the firmware's voice animations are hidden and the bridge
 	// draws listening, thinking and speaking itself. This runs before the firmware starts.
 	own := StockReplaced()
-	if first := c.load(); !own && first.Enabled && first.valid() {
+	if first := c.load(Config{}); !own && first.Enabled && first.valid() {
 		own = ReplaceStock("") == nil
 	}
 	// Frames run at 60 per second only while something shows; a dark ring wakes once a second.
@@ -392,7 +416,7 @@ func (c *Controller) Serve(ctx context.Context) {
 		if now.After(nextCheck) {
 			nextCheck = now.Add(300 * time.Millisecond)
 			if now.Sub(loaded) > time.Second {
-				cfg, allowed, loaded = c.load(), unmuted(), now
+				cfg, allowed, loaded = c.load(cfg), unmuted(), now
 			}
 			// Alice's own speech also runs the sound card; it never counts as music.
 			card = gate.update(audioPlaying() && c.aliceIdle())
@@ -405,8 +429,8 @@ func (c *Controller) Serve(ctx context.Context) {
 		state := lookName(cfg, thinking || voiced, playing, ok)
 		if c.yielding(now, own) && !thinking {
 			// Leave the last frame alone: the firmware is drawing over it right now.
+			// The smoother keeps its last frame: coming back fades from it, not from black.
 			lit, ok = false, false
-			soft = smoother{}
 			state = "yield:" + c.yieldReason(now)
 		}
 		if !allowed && ok {

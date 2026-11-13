@@ -180,10 +180,10 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 		previous = homeClarification{}
 	}
 	if voiceOnly { previous = homeClarification{} }
-	catalog, err := f.Catalog(ctx)
-	if err != nil {
-		return "", err
-	}
+	// The catalog is only needed to check a model's plan. An exact command is built by
+	// the server from its own catalog, and the server checks exposure on every call.
+	var catalog map[string]FunctionDefinition
+	var err error
 	var fast struct {
 		VoiceMatch bool `json:"voice_match"`
 		Matched bool           `json:"matched"`
@@ -212,6 +212,9 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 		}
 		slog.Info("home_plan", "source", "exact", "calls", len(plan.Calls))
 	} else {
+		if catalog, err = f.Catalog(ctx); err != nil {
+			return "", err
+		}
 		var state map[string]any
 		if err = f.request(ctx, http.MethodGet, "/state", nil, &state); err != nil {
 			return "", err
@@ -258,8 +261,10 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 			return "", errors.New("duplicate home function call")
 		}
 		seen[call.Name] = true
-		if err = validateFunctionCall(call, catalog); err != nil {
-			return "", err
+		if catalog != nil {
+			if err = validateFunctionCall(call, catalog); err != nil {
+				return "", err
+			}
 		}
 	}
 	if len(plan.Calls) == 0 {
@@ -301,14 +306,7 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 	actions := 0
 	allAccepted := true
 	for _, call := range plan.Calls {
-		// Recheck exposure before every invocation, including after earlier calls.
-		fresh, err := f.Catalog(ctx)
-		if err != nil {
-			return "", err
-		}
-		if err = validateFunctionCall(call, fresh); err != nil {
-			return "", err
-		}
+		// The server rechecks exposure and arguments on every invocation.
 		var result struct {
 			Response  string `json:"response"`
 			Execution *struct {
@@ -322,7 +320,7 @@ func (f *Functions) handle(ctx context.Context, text string, voiceOnly bool) (st
 			executions = append(executions, "Не удалось подтвердить результат следующей команды. Автоматически повторять её не буду.")
 			return strings.Join(executions, " "), nil
 		}
-		if catalog[call.Name].HasResponse {
+		if result.Response != "" || (result.Execution == nil && catalog[call.Name].HasResponse) {
    telemetry.AddCall(ctx,call.Name,"answered","")
 			if result.Response == "" {
 				return "", errors.New("home function returned no result")

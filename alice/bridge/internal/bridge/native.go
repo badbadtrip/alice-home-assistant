@@ -406,6 +406,27 @@ func (n *Native) Server(ctx context.Context, k websocket.MessageType, data []byt
 	if e == nil {
 		return n.down(ctx, k, data)
 	}
+	if v := e.GetSpotterValidation(); v != nil {
+		// Several speakers heard the same phrase; the cloud keeps one and tells the others
+		// before their final recognition. A losing speaker must not run the command too.
+		lost := v.GetCanceledCauseOfMultiactivation()
+		n.mu.Lock()
+		p, _ := n.findLocked(e.GetHeader())
+		if p == nil {
+			p = n.microphones[uint32(e.GetHeader().GetStreamId())]
+		}
+		if p != nil && lost && !p.started {
+			p.canceled = true
+			p.cancel()
+		}
+		tag := ""
+		if p != nil {
+			tag = requestTag(p.id)
+		}
+		n.mu.Unlock()
+		slog.Info("native_spotter_validation", "request", tag, "result", v.GetResult().String(), "other_speaker_answers", lost)
+		return n.down(ctx, k, data)
+	}
 
 	n.mu.Lock()
 	if f.Kind() == "TtsSpeak" {

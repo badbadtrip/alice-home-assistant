@@ -57,6 +57,7 @@ MEDIA_TYPES = {'track': 'track', 'artist': 'artist', 'album': 'album', 'playlist
 # How long the speaker waits for Music Assistant before the search goes on in the background.
 PLAY_ANSWER_S = 8
 PLAY_TIMEOUT_S = 60
+MIX_SEEDS = 5
 COMMANDS = {'pause': MediaCommand.PAUSE, 'play': MediaCommand.PLAY, 'resume': MediaCommand.PLAY,
             'stop': MediaCommand.STOP, 'next': MediaCommand.NEXT, 'previous': MediaCommand.PREVIOUS}
 
@@ -432,11 +433,8 @@ class Service:
             raise web.HTTPBadRequest(text='invalid json')
         player = self.player(request)
         kind, query = str(body.get('kind') or ''), str(body.get('query') or '').strip()[:200]
-        if not query and kind != 'liked':
-            if kind:
-                raise web.HTTPNotFound(text='nothing to play')
-            await player.command('play')
-            return web.json_response({'ok': True})
+        if not query and kind not in ('liked', ''):
+            raise web.HTTPNotFound(text='nothing to play')
         clock = asyncio.get_running_loop().time
         started = clock()
         entity, state, entry = await self.entity(player)
@@ -449,7 +447,16 @@ class Service:
         rest: list[str] = []
         if kind in MEDIA_TYPES:
             data['media_type'] = MEDIA_TYPES[kind]
-        if kind == 'liked':
+        if not kind and not query:
+            # "Включи музыку": a mix made for the owner. Liked tracks seed Music Assistant's
+            # radio, which goes on with similar music from the streaming service.
+            seeds = (await self.favorites(entry))[:MIX_SEEDS] if entry else []
+            log.info('%s: подборка: %d треков-образцов за %.0f мс', player.name, len(seeds), (clock() - found_entity) * 1000)
+            if not seeds:  # nothing liked yet: the queue that was playing goes on
+                await player.command('play')
+                return web.json_response({'ok': True})
+            data = {'entity_id': entity, 'media_id': seeds, 'enqueue': 'replace', 'radio_mode': True}
+        elif kind == 'liked':
             # "Мои лайки": the tracks marked as favourite in Music Assistant, shuffled.
             liked = await self.favorites(entry) if entry else []
             log.info('%s: избранное: %d треков за %.0f мс', player.name, len(liked), (clock() - found_entity) * 1000)

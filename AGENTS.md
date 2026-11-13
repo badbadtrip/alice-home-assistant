@@ -13,8 +13,9 @@ References: https://contributors.home-assistant.io/design/components/controls/ ;
 
 Home Assistant sees an update only when `version` in `alice/config.yaml` changes on `main`.
 
-- Every shipped change raises that version and adds an entry to `CHANGELOG.md` and `alice/CHANGELOG.md`.
+- Every shipped change raises that version and adds an entry to `alice/CHANGELOG.md`. The changelog and the wiki live only in `alice/` (`alice/CHANGELOG.md`, `alice/wiki/`); there are no root copies.
 - `alice/` is the only source of app, server and bridge code; nothing is imported from sibling projects.
-- Run `python tools/sync_release.py` to copy docs and refresh `alice/source-manifest.json`; `python tools/check_release.py` must pass.
+- Run `python tools/sync_release.py` to copy the notices, build `alice/DOCS.md` and refresh `alice/source-manifest.json`; `python tools/check_release.py` must pass.
+- The improvement plan is in `docs/plan/` (one file per part, status table at the end of each).
 - Push a `claude/` branch first. The `Promote` workflow fast-forwards `main` by itself once `Check` and `Image` are green for that commit, so push only what is ready to ship: an update on `main` installs itself on the live HA, and HA downloads the image `Image` published for that version instead of building it.
 - Bridges update themselves after an app update unless switched off in the panel: right after the app update, one speaker at a time, even during playback, with automatic rollback. A failure stops that version everywhere. Health cannot prove the microphone, so an update finishes only when the next voice request reaches the bridge.

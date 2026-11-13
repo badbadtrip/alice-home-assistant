@@ -43,19 +43,7 @@ func main() {
 	checkMCP := flag.Bool("check-mcp", false, "connect to configured MCP servers and list tools without executing them")
 	route := flag.String("route", "", "explain a route without executing home actions or generating an answer")
 	validate := flag.Bool("check-config", false, "validate configuration without contacting backends")
-	speakerAction := flag.String("speaker-endpoint", "", "apply or rollback the on-device loopback endpoint (requires writable firmware)")
-	speakerConfig := flag.String("speaker-config", "/system/vendor/quasar/quasar.cfg", "firmware configuration path")
-	speakerBackup := flag.String("speaker-backup", "/data/opt/quasar-bridge/endpoint-backup.json", "persistent endpoint backup")
-	speakerURL := flag.String("speaker-url", "ws://127.0.0.1:8443/uni.ws", "on-device bridge URL")
 	flag.Parse()
-	if *speakerAction != "" {
-		if err := setSpeakerEndpoint(*speakerConfig, *speakerBackup, *speakerURL, *speakerAction); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		fmt.Println("Speaker endpoint updated; restart the voice service to apply")
-		return
-	}
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	slog.SetDefault(logger)
 	cfg, err := readConfig(*path)
@@ -170,11 +158,6 @@ func main() {
 		planner = noLLMPlanner{}
 	}
 	engine := &bridge.Engine{LLM: planner, Dialogue: dialogue.New(cfg.DialogueContext), SystemPrompt: cfg.SystemPrompt}
-	var hc *home.Controller
-	if endpoint := os.Getenv("QUASAR_HOME_MCP_URL"); endpoint != "" {
-		hc = &home.Controller{Tools: &home.MCP{URL: endpoint}, Planner: planner}
-		engine.Home = hc
-	}
 	var hf *home.Functions
 	if endpoint := os.Getenv("QUASAR_HOME_FUNCTIONS_URL"); endpoint != "" {
 		hf = &home.Functions{SpeakerID: os.Getenv("QUASAR_HOME_SPEAKER_ID"), Area: os.Getenv("QUASAR_HOME_AREA"), URL: endpoint, Token: os.Getenv("QUASAR_HOME_FUNCTIONS_TOKEN"), Planner: planner}
@@ -235,16 +218,7 @@ func main() {
 				fmt.Printf("LLM: %s; Home functions: %d functions\n", llmStatus, len(catalog))
 				return
 			}
-			if hc == nil {
-				fmt.Printf("LLM: %s; Home Assistant: disabled\n", llmStatus)
-				return
-			}
-			entities, err := hc.Entities(ctx)
-			if err != nil {
-				slog.Error("Home Assistant check failed", "error", err)
-				os.Exit(1)
-			}
-			fmt.Printf("LLM: %s; Home Assistant: %d entities\n", llmStatus, len(entities))
+			fmt.Printf("LLM: %s; Home Assistant: disabled\n", llmStatus)
 			return
 		}
 		r, err := engine.Resolve(ctx, *query)
@@ -271,24 +245,6 @@ func main() {
 		}
 	}
 	if cfg.Mode == "hybrid" {
-		if hc != nil && cfg.HomeWarmArea != "" {
-			warmCtx, warmCancel := context.WithCancel(context.Background())
-			defer warmCancel()
-			go func() {
-				for {
-					ctx, cancel := context.WithTimeout(warmCtx, 90*time.Second)
-					err := hc.Warm(ctx, cfg.HomeWarmArea)
-					cancel()
-					slog.Info("home_warm", "ready", err == nil)
-					select {
-					case <-warmCtx.Done():
-						return
-					case <-time.After(time.Minute):
-					}
-				}
-			}()
-		}
-
 		proxy.NewSession = func(ctx context.Context, up, down bridge.Sender) bridge.Session {
 			n := bridge.NewNative(ctx, up, down, engine)
 			n.VoiceCues = cues

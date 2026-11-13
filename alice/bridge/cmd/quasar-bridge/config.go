@@ -47,7 +47,7 @@ type config struct {
 	LLMMaxOutputTokens int                  `json:"llm_max_output_tokens"`
 	LLMHostedTools     []string             `json:"llm_hosted_tools"`
 	LLMChatParameters  map[string]any       `json:"llm_chat_parameters"`
-	HomeWarmArea       string               `json:"home_warm_area"`
+	HomeWarmArea       string               `json:"home_warm_area"` // ignored: the MCP home backend it warmed was removed
 	ListenAfterReply   bool                 `json:"listen_after_reply"`
 	Routing            bridge.RoutingConfig `json:"routing"`
 }

@@ -86,9 +86,9 @@ class AppTests(unittest.TestCase):
             self.assertEqual(tools['mcp_servers'][0]['allowed_tools'],['home_catalog','home_state','home_history'])
 
     def test_wiki_links_and_safe_renderer(self):
-        for page in (ROOT/'wiki').glob('*.md'):
+        for page in (ROOT/'alice/wiki').glob('*.md'):
             for name in re.findall(r'\]\(([A-Za-z0-9_-]+)\.md\)',page.read_text(encoding='utf-8')):
-                self.assertTrue((ROOT/'wiki'/(name+'.md')).exists(),str(page)+': '+name)
+                self.assertTrue((ROOT/'alice/wiki'/(name+'.md')).exists(),str(page)+': '+name)
         rendered=markdown('# Wiki\n<script>alert(1)</script>\n[Мост](Bridge.md)\n```sh\nrm <unsafe>\n```')
         self.assertNotIn('<script>',rendered)
         self.assertIn('wiki/Bridge',rendered)

@@ -35,11 +35,11 @@ ARM64-колонка с заранее настроенным root SSH и дос
 
 ## Руководство
 
-- [Установка и параметры](wiki/Installation.md)
-- [Совместимость](wiki/Compatibility.md)
-- [Подключение колонки и установка моста](wiki/Bridge.md)
-- [Команды и устройства](wiki/Commands.md)
-- [Обновление и восстановление](wiki/Recovery.md)
+- [Установка и параметры](alice/wiki/Installation.md)
+- [Совместимость](alice/wiki/Compatibility.md)
+- [Подключение колонки и установка моста](alice/wiki/Bridge.md)
+- [Команды и устройства](alice/wiki/Commands.md)
+- [Обновление и восстановление](alice/wiki/Recovery.md)
 - [Что проверено](BUILD-REPORT.md)
 
 ## Повторная установка рядом с локальной версией

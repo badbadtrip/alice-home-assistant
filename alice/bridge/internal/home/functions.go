@@ -125,6 +125,11 @@ func (f *Functions) requestTagged(ctx context.Context, method, path string, body
 	return nil
 }
 
+// Planner is the model that plans home actions the exact grammar did not understand.
+type Planner interface {
+	Complete(context.Context, []llm.Message, bool) (string, error)
+}
+
 // callResult is the server's outcome of one function call.
 type callResult struct {
 	Name      string `json:"name"`

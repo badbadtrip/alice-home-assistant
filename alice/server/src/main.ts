@@ -307,6 +307,9 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
   // Speakers report their player as it changes; the manager reads it for the panel.
   // Newer bridges also send their health and system figures, so the app needs no polling.
   const nowPlaying = new Map<string, { at: number; health?: unknown; system?: unknown; value: unknown }>()
+  // The manager waits here instead of asking every second: a speaker's report wakes it.
+  const reportWaiters = new Set<() => void>()
+  const reports = (): Record<string, unknown> => Object.fromEntries(nowPlaying)
   const PlayerField = z.union([z.string().max(2048), z.number()])
   const Bag = z.record(z.string(), z.unknown()).optional()
   const NowPlayingSchema = z.object({
@@ -318,10 +321,28 @@ function startHttpServer (homeAssistant: HomeAssistantApi,
     if (isTooBig || !speaker || speaker.length > 64 || !parsed.success) { response.status(400).json({ error: 'Invalid player state' }); return }
     const { health, now_playing: value, system } = parsed.data
     nowPlaying.set(speaker, { at: Date.now(), health, system, value })
+    for (const wake of reportWaiters) wake()
     response.json({ ok: true })
   })
   app.get('/now-playing', (_, response) => {
-    response.json(Object.fromEntries([...nowPlaying].map(([speaker, entry]) => [speaker, entry])))
+    response.json(reports())
+  })
+  // Answers as soon as any speaker reported after `since` (ms), or after 10 s anyway.
+  app.get('/now-playing-wait', (request, response) => {
+    const since = Number(request.query.since) || 0
+    const isNewer = (): boolean => {
+      for (const entry of nowPlaying.values()) if (entry.at > since) return true
+      return false
+    }
+    if (isNewer()) { response.json(reports()); return }
+    const done = (): void => {
+      clearTimeout(timer)
+      reportWaiters.delete(done)
+      if (!response.headersSent) response.json(reports())
+    }
+    const timer = setTimeout(done, 10_000)
+    reportWaiters.add(done)
+    response.on('close', () => { clearTimeout(timer); reportWaiters.delete(done) })
   })
   app.get('/voice-phrases', async (request, response) => {
     const commands = []

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import threading
+import time
 import types
 import sys
 import unittest
@@ -685,6 +686,17 @@ class NowPlayingTests(unittest.TestCase):
             value = service.Manager._fresh_now_playing(manager, result, now)[0]['connection']['now_playing']
         service.Manager.MA_ENTITIES.clear()
         self.assertEqual((value['title'], value['status'], value['entity']), ('Next', 'paused', 'media_player.a'))
+
+    def test_each_speaker_report_is_taken_once(self):
+        taken = []
+        manager = types.SimpleNamespace(report_lock=threading.Lock(), pushed_seen={}, _monitor_speaker=lambda speaker, entry: taken.append(entry['at']))
+        entry = {'at': time.time() * 1000, 'health': {}}
+        speaker = {'id': 's1'}
+        service.Manager._take_report(manager, speaker, entry)
+        service.Manager._take_report(manager, speaker, entry)
+        service.Manager._take_report(manager, speaker, {'at': 1, 'health': {}})  # too old
+        service.Manager._take_report(manager, None, entry)
+        self.assertEqual(len(taken), 1)
 
     def test_bridge_sound_wins_and_stock_fills_gap(self):
         speaker = {'media_entity': 'media_player.midi'}

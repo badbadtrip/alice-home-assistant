@@ -309,6 +309,7 @@ class Manager:
         self.state_cond = threading.Condition()
         self.state_revision = 0
         self.pushed_seen = {}
+        self.report_lock = threading.Lock()
         self.polled_at = {}
         self.history_lock = threading.Lock()
         self.history = self._load_history()
@@ -331,6 +332,35 @@ class Manager:
         self.monitor_stop.clear()
         self.monitor_thread = threading.Thread(target=self._monitor_loop, name='alice-speaker-health', daemon=True)
         self.monitor_thread.start()
+        threading.Thread(target=self._report_loop, name='alice-speaker-reports', daemon=True).start()
+
+    def _report_loop(self):
+        """A speaker's own report reaches the panel at once: HF holds the request until one arrives."""
+        since = 0
+        while not self.monitor_stop.is_set():
+            try:
+                reported = self._hf_request('/now-playing-wait?since=%d' % since, timeout=15)
+            except Exception:
+                self.monitor_stop.wait(2)  # an older HF without the wait, or HF restarting
+                continue
+            if not isinstance(reported, dict):
+                self.monitor_stop.wait(2)
+                continue
+            records = {speaker['id']: speaker for speaker in self.store.read('speakers.json') if speaker.get('trusted_fingerprint')}
+            for speaker_id, entry in reported.items():
+                if not isinstance(entry, dict) or type(entry.get('at')) not in (int, float):
+                    continue
+                since = max(since, int(entry['at']))
+                self._take_report(records.get(speaker_id), entry)
+
+    def _take_report(self, speaker, entry):
+        if not speaker or not isinstance(entry.get('health'), dict) or time.time() * 1000 - entry['at'] >= 40000:
+            return
+        with self.report_lock:
+            if self.pushed_seen.get(speaker['id']) == entry['at']:
+                return
+            self.pushed_seen[speaker['id']] = entry['at']
+        self._monitor_speaker(speaker, entry)
 
     def stop_monitor(self):
         self.monitor_stop.set()
@@ -508,10 +538,9 @@ class Manager:
                 continue
             entry = reported.get(speaker['id'])
             if isinstance(entry, dict) and isinstance(entry.get('health'), dict) and type(entry.get('at')) in (int, float) and now * 1000 - entry['at'] < 40000:
-                # The bridge reported itself; nothing to connect to.
-                if self.pushed_seen.get(speaker['id']) != entry['at']:
-                    self.pushed_seen[speaker['id']] = entry['at']
-                    self._monitor_speaker(speaker, entry)
+                # The bridge reported itself; nothing to connect to. Usually the report
+                # thread has taken it already; this catches one it missed.
+                self._take_report(speaker, entry)
                 continue
             if now - self.polled_at.get(speaker['id'], 0) < 5:
                 continue
@@ -738,8 +767,8 @@ class Manager:
         self._hf_token_cache = (stamp, token)
         return token
 
-    def _hf_request(self, path, speaker=None, payload=None):
-        if path not in ('/now-playing', '/phrases', '/voice-phrases', '/preview', '/events', '/inventory', '/dictionary', '/dictionary/alias', '/music', '/sendspin/state'):
+    def _hf_request(self, path, speaker=None, payload=None, timeout=5):
+        if not re.fullmatch(r'/now-playing-wait\?since=\d{1,16}', path) and path not in ('/now-playing', '/phrases', '/voice-phrases', '/preview', '/events', '/inventory', '/dictionary', '/dictionary/alias', '/music', '/sendspin/state'):
             raise Error('Неизвестный внутренний маршрут.', 500)
         parsed = urlsplit(self.config.get('home_functions_url', ''))
         if parsed.scheme not in ('http', 'https') or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ('', '/'):
@@ -754,7 +783,7 @@ class Manager:
         if body is not None:
             headers['Content-Type'] = 'application/json'
         cls = http.client.HTTPSConnection if parsed.scheme == 'https' else http.client.HTTPConnection
-        connection = cls(parsed.hostname, parsed.port or (443 if parsed.scheme == 'https' else 80), timeout=5)
+        connection = cls(parsed.hostname, parsed.port or (443 if parsed.scheme == 'https' else 80), timeout=timeout)
         try:
             connection.request('POST' if payload is not None else 'GET', path, body=body, headers=headers)
             response = connection.getresponse()

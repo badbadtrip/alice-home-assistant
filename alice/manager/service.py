@@ -408,8 +408,12 @@ class Manager:
                 continue
             current = connection.get('now_playing')
             value = now_playing_state(entry.get('value')) if entry.get('value') else None
+            if value and value['source'] == 'music_assistant' and not value['title'] \
+                    and isinstance(current, dict) and current.get('source') == 'music_assistant' and current.get('title'):
+                # The bridge knows only that Music Assistant sounds; the track came from HA.
+                value = {**current, 'status': value['status']}
             # Stock Yandex music is seen by HA, not by the bridge.
-            connection['now_playing'] = value or (current if isinstance(current, dict) and current.get('source') == 'yandex_music' else None)
+            connection['now_playing'] =value or (current if isinstance(current, dict) and current.get('source') == 'yandex_music' else None)
         return result
 
     def bridge_get(self, speaker, path, timeout=8, ssh_fallback=True):

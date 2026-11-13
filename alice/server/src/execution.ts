@@ -12,8 +12,12 @@ export interface ExecutionResult {
   target_state?: string | undefined;
 }
 
+// Measured 2026-11-13: devices that work confirm in 120-260 ms. A device that does not
+// answer in 1.2 s is reported as sent, not confirmed, without making the speaker wait 2 s.
+const CONFIRM_TIMEOUT_MS = 1200
+
 export async function executeFunction (api: HomeAssistantApi, device: DeviceEntry,
-  function_: DeviceFunction, values: Record<string, number | string>, timeoutMs = 2000):
+  function_: DeviceFunction, values: Record<string, number | string>, timeoutMs = CONFIRM_TIMEOUT_MS):
 Promise<{ execution?: ExecutionResult; response?: string | undefined; }> {
   validateArguments(function_.arguments, values)
   const result = (status: ExecutionResult['status']): { execution: ExecutionResult } => ({

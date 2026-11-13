@@ -4,7 +4,6 @@ package main
 import (
 	"cmp"
 	"context"
-	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
 	"flag"
@@ -14,13 +13,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
-
-	"github.com/coder/websocket"
 
 	"quasarbridge/internal/assistant"
 	"quasarbridge/internal/bridge"
@@ -33,7 +29,6 @@ import (
 	"quasarbridge/internal/metrics"
 	"quasarbridge/internal/nowplaying"
 	"quasarbridge/internal/sendspin"
-	"quasarbridge/internal/wire"
 )
 
 func main() {
@@ -92,53 +87,7 @@ func main() {
 	// Every frame used to be written to the log; on the speaker's flash that is constant
 	// writing. Only the counters stay; QUASAR_DEBUG_FRAMES=1 brings the frame log back.
 	debugFrames := os.Getenv("QUASAR_DEBUG_FRAMES") == "1"
-	proxy := &bridge.Proxy{Upstream: cfg.Upstream, Observer: func(direction string, kind websocket.MessageType, data []byte) {
-		d := wire.ClientToServer
-		var count int64
-		if direction == "server" {
-			d = wire.ServerToClient
-			count = serverCount.Add(1)
-		} else {
-			count = clientCount.Add(1)
-		}
-		if !debugFrames {
-			return
-		}
-		frame := wire.Decode(data, d)
-		name := frame.Kind()
-		if (name != "opaque" && name != "AsrResult") || count <= 8 || count%100 == 0 {
-			attrs := []any{"direction", direction, "transport_type", int(kind), "event", name, "bytes", len(data), "count", count}
-			if len(frame.Prefix) == 4 {
-				attrs = append(attrs, "prefix_tag", string(frame.Prefix))
-			}
-			if frame.Client != nil {
-				e := frame.Client.GetEvent()
-				if req := e.GetTextInput(); req != nil {
-					attrs = append(attrs, "wait_client_approval", req.GetRequest().GetUniproxyOptions().GetWaitClientApproval())
-				}
-				if req := e.GetVoiceInput(); req != nil {
-					attrs = append(attrs, "wait_client_approval", req.GetRequest().GetUniproxyOptions().GetWaitClientApproval())
-				}
-			}
-			if name == "opaque" && count <= 8 {
-				attrs = append(attrs, "framing", wire.Probe(data, d))
-			}
-			if name == "opaque" && kind == websocket.MessageText {
-				// Keys only: never emit request values, audio or authentication.
-				var obj map[string]jsontext.Value
-				if json.Unmarshal(data, &obj) == nil {
-					var keys []string
-					for key := range obj {
-						if len(key) < 40 && !strings.ContainsAny(key, "\n\r") {
-							keys = append(keys, key)
-						}
-					}
-					attrs = append(attrs, "json_keys", keys)
-				}
-			}
-			slog.Info("frame", attrs...)
-		}
-	}}
+	proxy := &bridge.Proxy{Upstream: cfg.Upstream, Observer: frameObserver(&clientCount, &serverCount, debugFrames)}
 	logs := new(journal.Writer)
 	lc := &llm.Client{
 		BaseURL: cfg.LLMBaseURL, Model: cfg.LLMModel, APIKey: os.Getenv("QUASAR_LLM_API_KEY"),
@@ -190,44 +139,7 @@ func main() {
 		os.Exit(1)
 	}
 	if *query != "" || *check || *route != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
-		defer cancel()
-		if hf != nil && (*route != "" || *query != "") {
-			_ = hf.RefreshVoiceCache(ctx)
-		}
-		if *route != "" {
-			data, _ := json.Marshal(engine.Decide(ctx, *route))
-			fmt.Println(string(data))
-			return
-		}
-		if *check {
-			llmStatus := "disabled"
-			if !llmDisabled {
-				if _, err := lc.Complete(ctx, []llm.Message{{Role: "user", Content: "Ответь одним словом: связь"}}, false); err != nil {
-					slog.Error("LLM check failed")
-					os.Exit(1)
-				}
-				llmStatus = "ok"
-			}
-			if hf != nil {
-				catalog, err := hf.Catalog(ctx)
-				if err != nil {
-					slog.Error("Home functions check failed", "error", err)
-					os.Exit(1)
-				}
-				fmt.Printf("LLM: %s; Home functions: %d functions\n", llmStatus, len(catalog))
-				return
-			}
-			fmt.Printf("LLM: %s; Home Assistant: disabled\n", llmStatus)
-			return
-		}
-		r, err := engine.Resolve(ctx, *query)
-		if err != nil {
-			slog.Error("query failed", "route", r.Route, "error", err)
-			os.Exit(1)
-		}
-		data, _ := json.Marshal(r)
-		fmt.Println(string(data))
+		runOneShot(lc, hf, engine, llmDisabled, *query, *route, *check)
 		return
 	}
 	if err := logs.Configure(cfg.ConversationLog); err != nil {

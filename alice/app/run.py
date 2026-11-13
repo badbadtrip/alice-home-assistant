@@ -101,7 +101,8 @@ def main():
         children.append(subprocess.Popen([sys.executable,str(root/'manager/service.py')],env={**env,'ALICE_MANAGER_CONFIG':str(data/'manager.json')}))
         children.append(subprocess.Popen(['node',str(root/'home-functions/main.mjs')],cwd=root/'home-functions',env=env))
         # Music Assistant players are optional: their failure must never stop the app.
-        music_env={**env,'ALICE_SENDSPIN_DATA':str(data/'state/sendspin'),'ALICE_SENDSPIN_URL':music_assistant_urls(raw,value)}
+        music_env={**env,'ALICE_SENDSPIN_DATA':str(data/'state/sendspin'),'ALICE_SENDSPIN_URL':music_assistant_urls(raw,value),
+                 'ALICE_MA_TOKEN':(raw.get('music_assistant_token') or '').strip()}
         music=subprocess.Popen([sys.executable,str(root/'music/sendspin_service.py')],env=music_env);music_restart=0.0
         print('Алиса запущена. Откройте веб-интерфейс и Wiki. Установка мостов требует настроенного advertised_url.',flush=True)
         while not stop.wait(1):

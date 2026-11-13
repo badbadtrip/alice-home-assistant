@@ -672,15 +672,19 @@ class NowPlayingTests(unittest.TestCase):
         self.assertTrue(value['cover'].startswith('/api/media_player_proxy/media_player.alisa_komnata?token=tok&cache='))
         service.Manager.MA_ENTITIES.clear()
 
-    def test_pushed_music_assistant_keeps_the_track_from_ha(self):
+    def test_pushed_music_assistant_reads_the_current_track_from_ha(self):
         track = {'source': 'music_assistant', 'status': 'playing', 'title': 'T', 'artist': 'A', 'album': None,
                  'cover': None, 'position_ms': None, 'duration_ms': None}
         result = [{'id': 's1', 'connection': {'status': 'online', 'now_playing': dict(track)}}]
         now = 1000.0
         pushed = {'s1': {'at': now * 1000, 'value': {'source': 'music_assistant', 'status': 'paused'}}}
-        manager = types.SimpleNamespace(_hf_request=lambda path: pushed)
-        value = service.Manager._fresh_now_playing(manager, result, now)[0]['connection']['now_playing']
-        self.assertEqual((value['title'], value['status']), ('T', 'paused'))
+        manager = types.SimpleNamespace(_hf_request=lambda path: pushed, _ma_track=service.Manager._ma_track)
+        state = {'entity_id': 'media_player.a', 'state': 'playing', 'attributes': {'media_title': 'Next', 'media_artist': 'A'}}
+        service.Manager.MA_ENTITIES.clear()
+        with patch('updater._ha_text', return_value='media_player.a'), patch('updater._ha', return_value=state):
+            value = service.Manager._fresh_now_playing(manager, result, now)[0]['connection']['now_playing']
+        service.Manager.MA_ENTITIES.clear()
+        self.assertEqual((value['title'], value['status'], value['entity']), ('Next', 'paused', 'media_player.a'))
 
     def test_bridge_sound_wins_and_stock_fills_gap(self):
         speaker = {'media_entity': 'media_player.midi'}

@@ -28,6 +28,7 @@ import re
 import struct
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import Any
 
 from aiohttp import ClientSession, ClientTimeout, web
@@ -58,6 +59,8 @@ MEDIA_TYPES = {'track': 'track', 'artist': 'artist', 'album': 'album', 'playlist
 PLAY_ANSWER_S = 8
 PLAY_TIMEOUT_S = 60
 MIX_SEEDS = 5
+TOP_TRACKS = 25
+MA_API_PORT = 8095
 COMMANDS = {'pause': MediaCommand.PAUSE, 'play': MediaCommand.PLAY, 'resume': MediaCommand.PLAY,
             'stop': MediaCommand.STOP, 'next': MediaCommand.NEXT, 'previous': MediaCommand.PREVIOUS}
 
@@ -468,7 +471,7 @@ class Service:
             # whole discography first). The app picks the item itself and starts it at once.
             title, by = split_artist(query)
             if kind == 'artist':
-                tracks = await self.artist_tracks(entry, title)
+                tracks = await self.by_artist(entry, title)
                 first, rest = (tracks[0], tracks[1:]) if tracks else ('', [])
             else:
                 first, found_artist, found_name = await self.pick(entry, kind, title, by)
@@ -476,7 +479,7 @@ class Service:
                 if first and kind == 'track':
                     # One song would leave silence after it: more by the same artist follows.
                     artist = by or found_artist
-                    rest = [uri for uri in (await self.artist_tracks(entry, artist, found_name) if artist else []) if uri != first]
+                    rest = [uri for uri in (await self.by_artist(entry, artist, found_name) if artist else []) if uri != first]
             log.info('%s: поиск «%s» (%s) за %.0f мс: %s', player.name, query, kind, (clock() - found_entity) * 1000,
                      'найдено' if first else 'ничего')
             if not first:
@@ -585,6 +588,52 @@ class Service:
         except (ValueError, AttributeError):
             return []
         return [item['uri'] for item in items if isinstance(item, dict) and isinstance(item.get('uri'), str)]
+
+    async def by_artist(self, entry: str, artist: str, skip: str = '') -> list[str]:
+        # The service's own "top tracks" of the artist when Music Assistant's API is open
+        # to the app; otherwise the tracks a search finds under the artist's name.
+        return await self.top_tracks(entry, artist, skip) or await self.artist_tracks(entry, artist, skip)
+
+    async def top_tracks(self, entry: str, artist: str, skip: str = '') -> list[str]:
+        if not os.environ.get('ALICE_MA_TOKEN'):
+            return []
+        wanted = fold(artist)
+        found = [a for a in await self.search(entry, 'artist', artist, limit=5) if fold(a.get('name')) == wanted]
+        # A streaming service's artist has the service's chart; a library one may not.
+        found.sort(key=lambda a: a['uri'].startswith('library://'))
+        for item in found[:2]:
+            match = re.fullmatch(r'([a-z0-9_-]+)://artist/(.+)', item['uri'])
+            if not match:
+                continue
+            tracks = await self.ma_api('music/artists/top_tracks',
+                                       {'item_id': match.group(2), 'provider_instance_id_or_domain': match.group(1)})
+            uris = [t['uri'] for t in tracks if isinstance(t, dict) and isinstance(t.get('uri'), str)
+                    and (not skip or fold(t.get('name')) != fold(skip))] if isinstance(tracks, list) else []
+            if uris:
+                return uris[:TOP_TRACKS]
+        return []
+
+    async def ma_api(self, command: str, args: dict[str, Any]) -> Any:
+        token = os.environ.get('ALICE_MA_TOKEN')
+        if not token:
+            return None
+        for base in self.api_urls():
+            try:
+                async with ClientSession(timeout=ClientTimeout(total=10)) as session:
+                    async with session.post(base, json={'command': command, 'args': args},
+                                            headers={'Authorization': f'Bearer {token}'}) as reply:
+                        if reply.status == 200:
+                            return await reply.json(content_type=None)
+                        log.warning('Music Assistant API %s: %s %s', command, reply.status, (await reply.text())[:200])
+                        return None
+            except (OSError, TimeoutError, ValueError):
+                continue
+        return None
+
+    def api_urls(self) -> list[str]:
+        # Music Assistant's API sits next to its Sendspin server, on its web port.
+        hosts = [urlsplit(url.strip()).hostname for url in self.url.split(',')]
+        return [f'http://{host}:{MA_API_PORT}/api' for host in hosts if host]
 
     async def artist_tracks(self, entry: str, artist: str, skip: str = '') -> list[str]:
         found = await self.search(entry, 'track', artist, limit=25)

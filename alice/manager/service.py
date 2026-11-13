@@ -408,10 +408,9 @@ class Manager:
                 continue
             current = connection.get('now_playing')
             value = now_playing_state(entry.get('value')) if entry.get('value') else None
-            if value and value['source'] == 'music_assistant' and not value['title'] \
-                    and isinstance(current, dict) and current.get('source') == 'music_assistant' and current.get('title'):
-                # The bridge knows only that Music Assistant sounds; the track came from HA.
-                value = {**current, 'status': value['status']}
+            # The bridge knows only that Music Assistant sounds; the track is read from HA,
+            # and the panel follows that HA player live for the songs after it.
+            value = self._ma_track(item, value)
             # Stock Yandex music is seen by HA, not by the bridge.
             connection['now_playing'] =value or (current if isinstance(current, dict) and current.get('source') == 'yandex_music' else None)
         return result
@@ -569,19 +568,24 @@ class Manager:
         return entity
 
     @classmethod
+    def _ma_track(cls, speaker, current):
+        if not current or current['source'] != 'music_assistant' or current['title']:
+            return current
+        import updater
+        try:
+            entity = cls._ma_entity(speaker)
+            track = media_now_playing(updater._ha('states/' + entity), 'music_assistant') if entity else None
+        except Exception:
+            track = None
+        if not track:
+            return current
+        track['status'] = current['status']
+        track['entity'] = entity  # the panel reads the next songs from this HA player itself
+        return track
+
+    @classmethod
     def _now_playing(cls, speaker, reported):
-        current = now_playing_state(reported)
-        if current and current['source'] == 'music_assistant' and not current['title']:
-            # The bridge only knows that Music Assistant sounds; the track is in HA.
-            import updater
-            try:
-                entity = cls._ma_entity(speaker)
-                track = media_now_playing(updater._ha('states/' + entity), 'music_assistant') if entity else None
-            except Exception:
-                track = None
-            if track:
-                track['status'] = current['status']
-                current = track
+        current = cls._ma_track(speaker, now_playing_state(reported))
         entity = speaker.get('media_entity')
         if not entity or (current and current['status'] == 'playing'):
             return current

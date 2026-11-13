@@ -93,16 +93,26 @@ def now_playing_state(value):
 
 def yandex_now_playing(state):
     """Stock Yandex Music is visible only through the speaker's HA media_player."""
+    return media_now_playing(state, 'yandex_music')
+
+
+def media_now_playing(state, source):
+    """The track an HA media_player shows; its cover goes through HA's own image proxy."""
     if not isinstance(state, dict) or state.get('state') not in ('playing', 'paused'):
         return None
     attributes = state.get('attributes') or {}
+    cover, token, entity = attributes.get('entity_picture'), attributes.get('access_token'), state.get('entity_id')
+    if isinstance(cover, str) and not cover.startswith('/api/media_player_proxy/') and isinstance(token, str) \
+            and isinstance(entity, str) and re.fullmatch(r'media_player\.[a-z0-9_]+', entity):
+        # Music Assistant gives its own LAN address, which a panel opened over HTTPS cannot load.
+        cover = f'/api/media_player_proxy/{entity}?token={token}&cache={hashlib.sha1(cover.encode()).hexdigest()[:16]}'
 
     def milliseconds(key):
         item = attributes.get(key)
         return int(item * 1000) if type(item) in (int, float) else None
-    return now_playing_state({'source': 'yandex_music', 'status': state['state'], 'title': attributes.get('media_title'),
+    return now_playing_state({'source': source, 'status': state['state'], 'title': attributes.get('media_title'),
                               'artist': attributes.get('media_artist'), 'album': attributes.get('media_album_name'),
-                              'cover': attributes.get('entity_picture'), 'position_ms': milliseconds('media_position'),
+                              'cover': cover, 'position_ms': milliseconds('media_position'),
                               'duration_ms': milliseconds('media_duration')})
 
 
@@ -532,9 +542,42 @@ class Manager:
                             'pairing_code': code if isinstance(code, str) and len(code) <= 16 else None})
         return {'available': True, 'players': players}
 
-    @staticmethod
-    def _now_playing(speaker, reported):
+    # The Music Assistant player of each speaker in HA: speaker id -> (entity, when looked up).
+    MA_ENTITIES = {}
+    MA_ENTITY_TTL = 300
+
+    @classmethod
+    def _ma_entity(cls, speaker):
+        """Music Assistant names its HA player after the Sendspin player of this speaker."""
+        cached = cls.MA_ENTITIES.get(speaker.get('id'))
+        if cached and time.monotonic() - cached[1] < cls.MA_ENTITY_TTL:
+            return cached[0]
+        area, name = str(speaker.get('area') or '').strip(), str(speaker.get('name') or '').strip()
+        player = f'Алиса {area}' if area else (name or 'Алиса')
+        template = ("{%- for e in integration_entities('music_assistant') if e.startswith('media_player.') "
+                    "and device_attr(e, 'manufacturer') == 'Alice for Home Assistant' "
+                    "and device_attr(e, 'name') == name -%}{{ e }};{%- endfor -%}")
+        import updater
+        text = updater._ha_text('template', {'template': template, 'variables': {'name': player}}) or ''
+        found = [row for row in text.split(';') if re.fullmatch(r'media_player\.[a-z0-9_]+', row)]
+        entity = found[0] if len(found) == 1 else None
+        cls.MA_ENTITIES[speaker.get('id')] = (entity, time.monotonic())
+        return entity
+
+    @classmethod
+    def _now_playing(cls, speaker, reported):
         current = now_playing_state(reported)
+        if current and current['source'] == 'music_assistant' and not current['title']:
+            # The bridge only knows that Music Assistant sounds; the track is in HA.
+            import updater
+            try:
+                entity = cls._ma_entity(speaker)
+                track = media_now_playing(updater._ha('states/' + entity), 'music_assistant') if entity else None
+            except Exception:
+                track = None
+            if track:
+                track['status'] = current['status']
+                current = track
         entity = speaker.get('media_entity')
         if not entity or (current and current['status'] == 'playing'):
             return current

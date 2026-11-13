@@ -52,6 +52,16 @@ def _ha(path, payload=None):
         return json.load(response)
 
 
+def _ha_text(path, payload):
+    """Like _ha for the endpoints that answer plain text, such as templates."""
+    token = os.environ.get('SUPERVISOR_TOKEN')
+    if not token:
+        return None
+    request = Request('http://supervisor/core/api/' + path, data=json.dumps(payload).encode(), headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+    with urlopen(request, timeout=10) as response:
+        return response.read(65536).decode('utf-8', 'replace')
+
+
 def notify(message):
     try:
         _ha('services/persistent_notification/create', {'title': 'Мост Алисы', 'message': message, 'notification_id': 'alice_bridge_update'})

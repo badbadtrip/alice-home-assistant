@@ -657,10 +657,26 @@ class NowPlayingTests(unittest.TestCase):
         self.assertEqual(value['cover'], '/api/media_player_proxy/m?token=1')
         self.assertIsNone(service.yandex_now_playing({'state': 'idle', 'attributes': {'media_title': 'T'}}))
 
+    def test_music_assistant_track_comes_from_its_ha_player(self):
+        service.Manager.MA_ENTITIES.clear()
+        state = {'entity_id': 'media_player.alisa_komnata', 'state': 'playing', 'attributes': {
+            'media_title': 'Sad In Carolina', 'media_artist': 'Dexter', 'access_token': 'tok',
+            'entity_picture': 'http://192.168.1.104:8095/imageproxy/x?size=512', 'media_position': 3, 'media_duration': 190}}
+        speaker = {'id': 's1', 'area': 'Комната'}
+        with patch('updater._ha_text', return_value='media_player.alisa_komnata;') as template, patch('updater._ha', return_value=state):
+            value = service.Manager._now_playing(speaker, {'source': 'music_assistant', 'status': 'playing'})
+            service.Manager._now_playing(speaker, {'source': 'music_assistant', 'status': 'playing'})
+        self.assertEqual(template.call_count, 1)
+        self.assertEqual(template.call_args[0][1]['variables'], {'name': 'Алиса Комната'})
+        self.assertEqual((value['source'], value['title'], value['artist'], value['duration_ms']), ('music_assistant', 'Sad In Carolina', 'Dexter', 190000))
+        self.assertTrue(value['cover'].startswith('/api/media_player_proxy/media_player.alisa_komnata?token=tok&cache='))
+        service.Manager.MA_ENTITIES.clear()
+
     def test_bridge_sound_wins_and_stock_fills_gap(self):
         speaker = {'media_entity': 'media_player.midi'}
         bridge = {'source': 'music_assistant', 'status': 'playing'}
-        with patch('updater._ha', side_effect=AssertionError):
+        with patch('updater._ha', side_effect=AssertionError), patch('updater._ha_text', return_value=''):
+            service.Manager.MA_ENTITIES.clear()
             self.assertEqual(service.Manager._now_playing(speaker, bridge)['source'], 'music_assistant')
         stock = {'state': 'playing', 'attributes': {'media_title': 'T'}}
         with patch('updater._ha', return_value=stock):

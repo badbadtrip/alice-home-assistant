@@ -151,6 +151,7 @@ func (p *Player) session(parent context.Context) error {
 		}
 	}()
 	s := &stream{player: p, ctx: ctx}
+	defer s.closing.Wait()
 	defer s.stop()
 	err = s.read(bufio.NewReaderSize(resp.Body, 64<<10), func() {
 		select {
@@ -209,6 +210,8 @@ type stream struct {
 	gain           float64
 	openFailed     time.Time
 	mu             sync.Mutex
+	// closing counts helpers stopped in the background after a skip.
+	closing sync.WaitGroup
 }
 
 func (s *stream) read(r *bufio.Reader, alive func()) error {
@@ -241,9 +244,12 @@ func (s *stream) read(r *bufio.Reader, alive func()) error {
 			s.player.volume.Store(int32(min(header[0], 100)))
 			s.player.muted.Store(header[1] != 0)
 		case 'C':
-			s.stop()
+			// A skip: the old helper is silenced in the background and the next track
+			// opens a new one at once. Waiting for the old one to exit held the next
+			// track back; ALSA's dmix takes both for that moment.
+			s.release()
 		case 'E':
-			s.stop()
+			s.release()
 			s.player.setStreaming(false)
 		case 'A':
 			if _, err := io.ReadFull(r, header[:4]); err != nil {
@@ -302,6 +308,22 @@ func (s *stream) target() float64 {
 		g *= duckGain
 	}
 	return g
+}
+
+// release detaches the output and closes it without waiting.
+func (s *stream) release() {
+	s.mu.Lock()
+	out := s.out
+	s.out = nil
+	s.mu.Unlock()
+	if out == nil {
+		return
+	}
+	s.closing.Go(func() {
+		if err := out.Close(); err != nil {
+			slog.Warn("sendspin_output_close_failed", "error", err)
+		}
+	})
 }
 
 func (s *stream) stop() {

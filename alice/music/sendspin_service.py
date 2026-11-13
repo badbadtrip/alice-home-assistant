@@ -27,6 +27,7 @@ import os
 import re
 import struct
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 from typing import Any
@@ -129,6 +130,9 @@ class Player:
         self.connected = False
         self.pairing_code: str | None = None
         self.metadata: dict[str, Any] = {}
+        # A skip asked by the speaker: (action, when) until the next track sounds.
+        self.switching: tuple[str, float] | None = None
+        self.cleared = 0.0
         settings = self.settings()
         self.volume = int(settings.get('volume', 100))
         self.muted = bool(settings.get('muted', False))
@@ -227,6 +231,8 @@ class Player:
         player = message.payload.player
         if player is None:
             return
+        if self.switching is not None and not self.cleared:
+            self.cleared = time.monotonic()
         fmt = (player.sample_rate, player.channels)
         if not self.streaming or fmt != self.format:
             self.format = fmt
@@ -234,10 +240,18 @@ class Player:
         self.streaming = True
 
     def on_chunk(self, _ts: int, data: bytes, _fmt: Any, _ahead: int) -> None:
+        if self.switching is not None and self.cleared:
+            # The first sound of the next track: how long a skip really took.
+            action, began = self.switching
+            log.info('%s: переключение (%s): сброс через %.0f мс, первый звук через %.0f мс', self.name, action,
+                     (self.cleared - began) * 1000, (time.monotonic() - began) * 1000)
+            self.switching, self.cleared = None, 0.0
         if self.streaming and self.outlet is not None:
             self.outlet.put(frame(b'A', struct.pack('>I', len(data)) + data), audio=True)
 
     def on_clear(self, roles: list[str] | None) -> None:
+        if self.switching is not None and not self.cleared:
+            self.cleared = time.monotonic()
         if roles is None or 'player' in roles:
             if self.outlet is not None:
                 self.outlet.drop_audio()
@@ -316,6 +330,8 @@ class Player:
             raise web.HTTPServiceUnavailable(text='Music Assistant не подключён')
         if action not in COMMANDS:
             raise web.HTTPBadRequest(text='unknown action')
+        if action in ('next', 'previous'):
+            self.switching, self.cleared = (action, time.monotonic()), 0.0
         try:
             await self.client.send_group_command(COMMANDS[action])
         except ValueError as error:

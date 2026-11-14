@@ -21,6 +21,7 @@ func (r *volumeRig) unified() *unifiedVolume {
 			r.mu.Lock()
 			defer r.mu.Unlock()
 			r.sets = append(r.sets, level)
+			r.level = float64(level)
 			return nil
 		},
 		level: func() (float64, bool) { r.mu.Lock(); defer r.mu.Unlock(); return r.level, true },
@@ -40,12 +41,13 @@ func (r *volumeRig) snapshot() ([]int, []float64) {
 	return append([]int(nil), r.sets...), append([]float64(nil), r.reports...)
 }
 
-func waitFor(t *testing.T, ok func() bool) {
+func (r *volumeRig) setLevel(level float64) { r.mu.Lock(); r.level = level; r.mu.Unlock() }
+
+func fastVolume(t *testing.T) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && !ok() {
-		time.Sleep(5 * time.Millisecond)
-	}
+	apply, quiet, rest := phoneApply, phoneQuiet, speakerRest
+	phoneApply, phoneQuiet, speakerRest = 20*time.Millisecond, 150*time.Millisecond, 40*time.Millisecond
+	t.Cleanup(func() { phoneApply, phoneQuiet, speakerRest = apply, quiet, rest })
 }
 
 func TestVolumeScales(t *testing.T) {
@@ -67,49 +69,65 @@ func TestVolumeScales(t *testing.T) {
 	}
 }
 
-func TestPhoneSliderSetsSpeakerButNeverMutesAlice(t *testing.T) {
-	rig := &volumeRig{level: 5}
+// A drag as logged on Midi: a value every ~40 ms down to the bottom and silence.
+func TestDragSendsOnlyTheLatestLevelAndNeverMutesAlice(t *testing.T) {
+	fastVolume(t)
+	rig := &volumeRig{level: 7}
 	u := rig.unified()
-	if !u.fromSender(-6) {
-		t.Fatal("the speaker must take the slider")
+	for _, db := range []float64{-9.75, -11.6, -13.5, -15.4, -17.3, -19.1, -21, -22.9, -24.8, -28.5, -144} {
+		u.fromSender(db)
+		time.Sleep(2 * time.Millisecond)
 	}
-	waitFor(t, func() bool { s, _ := rig.snapshot(); return len(s) == 1 })
-	u.fromSender(-144) // phone at zero: AirPlay mutes itself, Alice keeps her level
-	u.fromSender(-15)  // already the speaker's level: nothing to send
-	time.Sleep(30 * time.Millisecond)
-	if sets, _ := rig.snapshot(); len(sets) != 1 || sets[0] != 8 {
-		t.Fatalf("levels sent %v", sets)
+	time.Sleep(80 * time.Millisecond)
+	sets, reports := rig.snapshot()
+	if len(sets) == 0 || len(sets) > 3 || sets[len(sets)-1] != 1 {
+		t.Fatalf("levels sent to Alice %v", sets)
+	}
+	if len(reports) != 0 {
+		t.Fatalf("sent back to the phone during its own drag: %v", reports)
 	}
 }
 
-func TestSpeakerVolumeMovesPhoneWithoutEcho(t *testing.T) {
+func TestMixerCatchingUpIsNotSentBack(t *testing.T) {
+	fastVolume(t)
+	rig := &volumeRig{level: 9}
+	u := rig.unified()
+	u.fromSender(-24.4) // the phone asks for 2 …
+	for _, level := range []float64{8, 6, 4, 2} {
+		u.changed(level) // … and the mixer passes 8, 6, 4 on the way
+	}
+	time.Sleep(phoneQuiet + 100*time.Millisecond)
+	if _, reports := rig.snapshot(); len(reports) != 0 {
+		t.Fatalf("the slider was pulled back: %v", reports)
+	}
+}
+
+func TestSpeakerChangeMovesTheQuietPhone(t *testing.T) {
+	fastVolume(t)
 	rig := &volumeRig{level: 5}
 	u := rig.unified()
-	u.fromSender(-6) // the phone asked for 8 …
-	rig.mu.Lock()
-	rig.level = 8
-	rig.mu.Unlock()
-	u.changed(8) // … and the mixer reports it: not sent back
-	time.Sleep(volumeSettle + 100*time.Millisecond)
-	if _, reports := rig.snapshot(); len(reports) != 0 {
-		t.Fatalf("echoed the phone's own change: %v", reports)
-	}
-	rig.mu.Lock()
-	rig.level = 3
-	rig.mu.Unlock()
-	u.changed(4) // buttons: a quick run settles to the last value
-	u.changed(3)
+	u.speaker() // the phone connected at 5
+	rig.setLevel(6)
+	u.changed(5.5) // "громче": a quick run settles to the last value
+	u.changed(6)
 	waitFor(t, func() bool { _, r := rig.snapshot(); return len(r) > 0 })
-	if _, reports := rig.snapshot(); len(reports) != 1 || reports[0] != levelToDB(3) {
+	time.Sleep(60 * time.Millisecond)
+	if _, reports := rig.snapshot(); len(reports) != 1 || reports[0] != levelToDB(6) {
 		t.Fatalf("reports %v", reports)
+	}
+	u.changed(6) // the phone already shows 6
+	time.Sleep(60 * time.Millisecond)
+	if _, reports := rig.snapshot(); len(reports) != 1 {
+		t.Fatalf("sent again: %v", reports)
 	}
 }
 
 func TestSpeakerVolumeWaitsForAlice(t *testing.T) {
+	fastVolume(t)
 	rig := &volumeRig{level: 6, busy: true}
 	u := rig.unified()
 	u.changed(6)
-	time.Sleep(volumeSettle + 100*time.Millisecond)
+	time.Sleep(speakerRest + 50*time.Millisecond)
 	if _, reports := rig.snapshot(); len(reports) != 0 {
 		t.Fatalf("sent while Alice was speaking: %v", reports)
 	}
@@ -123,5 +141,13 @@ func TestSpeakerVolumeWaitsForAlice(t *testing.T) {
 	u.aliceIdle() // nothing held: nothing sent
 	if _, reports := rig.snapshot(); len(reports) != 1 {
 		t.Fatalf("sent twice: %v", reports)
+	}
+}
+
+func waitFor(t *testing.T, ok func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && !ok() {
+		time.Sleep(5 * time.Millisecond)
 	}
 }

@@ -13,6 +13,10 @@ replaces the upstream module with this copy. Upstream: https://github.com/grandc
 3. **Lost multicast membership.** Every 30 s the server joins the mDNS group again; the
    join succeeds only if membership was lost (Wi-Fi reconnect), and then the service is
    announced at once.
+4. **Diagnostics** (`alice_stats.go`). Once a minute the log gets `mdns_stats`: packets
+   heard, questions about this service by kind, multicast/unicast answers, answers
+   suppressed as known, and sender addresses. Shows whether a sender's queries still
+   arrive while the receiver is missing from its list.
 
 Together 1 and 2 made speakers vanish from the iPhone AirPlay list some time after the
 receiver started, until it was restarted (measured 2026-11-14). A changed IP address is

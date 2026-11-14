@@ -154,6 +154,7 @@ type Server struct {
 	shutdownEnd    sync.WaitGroup
 	isShutdown     bool
 	ttl            uint32
+	stats          queryStats // Alice patch
 }
 
 // Constructs server structure
@@ -202,6 +203,7 @@ func (s *Server) maintain(every time.Duration) {
 	defer s.shutdownEnd.Done()
 	ticker := time.NewTicker(every)
 	defer ticker.Stop()
+	tick := 0
 	for {
 		select {
 		case <-s.shouldShutdown:
@@ -223,6 +225,13 @@ func (s *Server) maintain(every time.Duration) {
 		}
 		if rejoined {
 			s.announce()
+		}
+		if tick++; rejoined || tick%2 == 0 { // Alice patch: diagnostics every minute
+			name := ""
+			if s.service != nil {
+				name = s.service.Instance + "." + s.service.Service
+			}
+			s.stats.flush(name, rejoined)
 		}
 	}
 }
@@ -355,6 +364,7 @@ func (s *Server) parsePacket(packet []byte, ifIndex int, from net.Addr) error {
 
 // handleQuery is used to handle an incoming query
 func (s *Server) handleQuery(query *dns.Msg, ifIndex int, from net.Addr) error {
+	s.stats.packet() // Alice patch: diagnostics
 	// Ignore questions with authoritative section for now
 	if len(query.Ns) > 0 {
 		return nil
@@ -371,9 +381,13 @@ func (s *Server) handleQuery(query *dns.Msg, ifIndex int, from net.Addr) error {
 		resp.Question = nil // RFC6762 section 6 "responses MUST NOT contain any questions"
 		resp.Answer = []dns.RR{}
 		resp.Extra = []dns.RR{}
+		kind := s.questionKind(q) // Alice patch: diagnostics
 		if err = s.handleQuestion(q, &resp, query, ifIndex); err != nil {
 			// log.Printf("[ERR] zeroconf: failed to handle question %v: %v", q, err)
 			continue
+		}
+		if kind != "" {
+			s.stats.question(kind, from, len(resp.Answer) > 0, isUnicastQuestion(q))
 		}
 		// Check if there is an answer
 		if len(resp.Answer) == 0 {

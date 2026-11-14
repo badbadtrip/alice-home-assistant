@@ -23,6 +23,7 @@
 | 6 | Менеджер, состояние, панель | [06-manager-panel.md](06-manager-panel.md) | цепочка состояния, опросы, монолит UI |
 | 7 | Мост: структура и конфиг | [07-bridge-structure.md](07-bridge-structure.md) | `main.go`, мёртвые режимы, конфиг |
 | 8 | Сборка, релиз, журналы | [08-release-ops.md](08-release-ops.md) | дубли файлов, уровень логов, CI |
+| 9 | AirPlay: мост и панель | [09-airplay.md](09-airplay.md) | управление, приглушение, трек, наследие shairport, UI |
 
 ## Порядок работ
 

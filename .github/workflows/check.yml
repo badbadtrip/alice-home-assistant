@@ -25,7 +25,8 @@ jobs:
       - name: gofmt
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
         working-directory: alice/bridge
-      - run: go test ./...
+      # The patched mDNS library in third_party is a replaced module, outside ./...
+      - run: go test ./... github.com/grandcat/zeroconf
         working-directory: alice/bridge
   server:
     runs-on: ubuntu-latest

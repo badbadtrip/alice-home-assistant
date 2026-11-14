@@ -1,6 +1,8 @@
 FROM golang:1.27 AS bridge
 WORKDIR /src
 COPY bridge/go.mod bridge/go.sum ./
+# go.mod replaces the mDNS library with the patched copy in third_party.
+COPY bridge/third_party/ ./third_party/
 RUN go mod download
 COPY bridge/ ./
 RUN --mount=type=cache,target=/root/.cache/go-build GOEXPERIMENT=jsonv2 true \

@@ -18,7 +18,7 @@ rm -rf "$root/alice/server/node_modules"
 
 step "Bridge"
 (cd "$root/alice/bridge" && unformatted=$(gofmt -l .) && { [ -z "$unformatted" ] || { echo "gofmt: $unformatted"; exit 1; }; } &&
-  go vet ./... && go test ./...)
+  go vet ./... && go test ./... github.com/grandcat/zeroconf)
 
 step "Release manifest"
 (cd "$root" && "$python" tools/sync_release.py && "$python" tools/check_release.py)

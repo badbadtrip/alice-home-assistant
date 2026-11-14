@@ -7,7 +7,7 @@ require (
 	github.com/freequasar/quasar-go-genproto v0.0.0-20261025092142-2f85025877ff
 	github.com/google/jsonschema-go v0.4.3
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/skrashevich/station-airplay v0.2.2
+	github.com/skrashevich/station-airplay v0.2.3
 	golang.org/x/net v0.61.0
 	google.golang.org/protobuf v1.36.12
 )
@@ -43,3 +43,6 @@ tool (
 	github.com/skrashevich/station-airplay/cmd/station-pcm
 	github.com/skrashevich/station-airplay/cmd/station-pcm-package
 )
+
+// Fixed mDNS responder for the AirPlay receiver; see third_party/zeroconf/ALICE-PATCH.md.
+replace github.com/grandcat/zeroconf => ./third_party/zeroconf

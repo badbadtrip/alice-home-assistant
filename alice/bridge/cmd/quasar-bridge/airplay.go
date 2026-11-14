@@ -5,6 +5,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -71,6 +72,48 @@ func (c *airPlayControl) resume() {
 		case <-time.After(c.retry):
 		}
 	}
+}
+
+// followAddress restarts the receiver when the speaker's address changes: the
+// receiver, its clock and its announcement are bound to the address it started
+// with, and phones would keep a dead entry.
+func (c *airPlayControl) followAddress(every time.Duration, current func() string) {
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.app.Done():
+			return
+		case <-ticker.C:
+		}
+		state := c.receiver.Status()
+		if !c.enabled() || state.State != airplay.StateRunning || state.Connected {
+			continue
+		}
+		host, _, err := net.SplitHostPort(state.Address)
+		now := current()
+		if err != nil || now == "" || host == now {
+			continue
+		}
+		slog.Info("airplay_address_changed", "from", host, "to", now)
+		ctx, cancel := context.WithTimeout(c.app, 15*time.Second)
+		if err := c.receiver.Stop(ctx); err != nil {
+			slog.Warn("airplay_restart_failed", "error", err)
+		} else if err := c.receiver.Start(c.app); err != nil {
+			slog.Warn("airplay_restart_failed", "error", err)
+		}
+		cancel()
+	}
+}
+
+// routeIP is the address the multicast route leaves from, as the receiver picks it.
+func routeIP() string {
+	conn, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: net.IPv4(224, 0, 0, 251), Port: 5353})
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+	return conn.LocalAddr().(*net.UDPAddr).IP.String()
 }
 
 func (c *airPlayControl) start() error {

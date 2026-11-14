@@ -343,6 +343,7 @@ func main() {
 		mux.Handle("GET /airplay", control)
 		defer control.shutdown()
 		go control.resume()
+		go control.followAddress(30*time.Second, routeIP)
 	}
 	// Music Assistant reaches the speaker through the app, so it needs the app link and the audio helper.
 	if musicAssistant != nil {

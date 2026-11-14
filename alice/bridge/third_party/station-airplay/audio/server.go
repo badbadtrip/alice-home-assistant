@@ -35,6 +35,10 @@ type Server struct {
 	timingClockID, anchorClockID uint64
 	anchorTime                   time.Time // network clock, converted afresh as PTP converges
 	discarded                    []sequenceRange
+	// Alice patch: what happened to input since the last flush or anchor, logged
+	// once at the first frame that is kept, to explain silence after resume.
+	skippedFlushed, skippedEarly int
+	reportedGen                  uint64
 	buffer                       *Buffer
 	wake                         chan struct{}
 	inputDone, done              chan struct{}
@@ -141,6 +145,7 @@ func (s *Server) enqueue(f *PCMFrame) error {
 		changed := s.buffer.Changed()
 		s.mu.Lock()
 		if s.haveAnchor && int32(f.Timestamp-s.anchorRTP) < 0 {
+			s.skippedEarly++
 			s.mu.Unlock()
 			return nil
 		}
@@ -152,6 +157,7 @@ func (s *Server) enqueue(f *PCMFrame) error {
 			}
 		}
 		if skip {
+			s.skippedFlushed++
 			s.mu.Unlock()
 			return nil
 		}
@@ -164,6 +170,12 @@ func (s *Server) enqueue(f *PCMFrame) error {
 		}
 		s.discarded = ranges
 		ok := s.buffer.TryPush(f)
+		if ok && s.reportedGen != s.generation {
+			s.reportedGen = s.generation
+			s.player.Logf("audio kept first seq=%d ts=%d anchor=%d ahead_ms=%d skipped_flushed=%d skipped_early=%d queued=%d",
+				f.SequenceNumber, f.Timestamp, s.anchorRTP, int64(int32(f.Timestamp-s.anchorRTP))*1000/int64(s.rate), s.skippedFlushed, s.skippedEarly, s.buffer.Len())
+			s.skippedFlushed, s.skippedEarly = 0, 0
+		}
 		s.mu.Unlock()
 		if ok {
 			return nil
@@ -178,6 +190,11 @@ func (s *Server) enqueue(f *PCMFrame) error {
 func (s *Server) SetRateAnchorTime(rtp uint32, network time.Time) {
 	s.mu.Lock()
 	before := s.buffer.Len()
+	if f := s.buffer.Peek(); f != nil {
+		s.player.Logf("audio anchor buffer frames=%d first_seq=%d first_ts=%d ahead_ms=%d", before, f.SequenceNumber, f.Timestamp, int64(int32(f.Timestamp-rtp))*1000/int64(s.rate))
+	} else {
+		s.player.Logf("audio anchor buffer frames=0")
+	}
 	s.buffer.TrimBefore(rtp)
 	reset := !s.playing || s.buffer.Len() != before
 	var old *codec.Output

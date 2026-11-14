@@ -75,10 +75,18 @@ func (r *Rstp) OnFlushBuffered(req *rtsp.Request) (*rtsp.Response, error) {
 	var v struct {
 		From  uint64 `plist:"flushFromSeq"`
 		Until uint64 `plist:"flushUntilSeq"`
+		// Alice patch: logged only, to see what the sender asks for on pause.
+		FromTS  *uint64 `plist:"flushFromTS"`
+		UntilTS uint64  `plist:"flushUntilTS"`
 	}
 	if _, err := plist.Unmarshal(req.Body, &v); err != nil || v.From > 0xffffff || v.Until > 0xffffff {
 		return &rtsp.Response{StatusCode: rtsp.StatusBadRequest}, nil
 	}
+	fromTS := int64(-1)
+	if v.FromTS != nil {
+		fromTS = int64(*v.FromTS)
+	}
+	r.logger.Printf("audio flush from_seq=%d until_seq=%d from_ts=%d until_ts=%d", v.From, v.Until, fromTS, v.UntilTS)
 	if s := r.streams[req.Path]; s != nil {
 		s.Flush(v.From, v.Until)
 	}

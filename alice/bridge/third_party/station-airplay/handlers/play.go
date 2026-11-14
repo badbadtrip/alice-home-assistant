@@ -89,6 +89,13 @@ func (r *Rstp) OnFlushBuffered(req *rtsp.Request) (*rtsp.Response, error) {
 	r.logger.Printf("audio flush from_seq=%d until_seq=%d from_ts=%d until_ts=%d", v.From, v.Until, fromTS, v.UntilTS)
 	if s := r.streams[req.Path]; s != nil {
 		s.Flush(v.From, v.Until)
+		// Alice patch: without flushFromSeq the flush is immediate (shairport-sync:
+		// reset_ptp_anchor_info). The sender starts a new RTP timeline and
+		// prebuffers into it before the next anchor; judged against the old
+		// anchor those frames would be thrown away as late.
+		if v.FromTS == nil && v.From == 0 {
+			s.ForgetAnchor()
+		}
 	}
 	return &rtsp.Response{StatusCode: rtsp.StatusOK}, nil
 }

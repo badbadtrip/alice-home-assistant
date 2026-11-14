@@ -18,6 +18,18 @@ scripts are left out. Every change is marked
    dropped as flushed or as earlier than the anchor. On 2026-11-14 a resume after a voice
    pause waited 8.6 s for audio (and once 2 h 33 min on a stale anchor); these lines show
    which frames were thrown away. Logging only, no behaviour change.
+3. **Resume after pause without a hole** (`handlers/play.go`, `audio/server.go`). Measured
+   with item 2: on pause the iPhone sends an immediate `FLUSHBUFFERED` (no `flushFromSeq`),
+   starts a new RTP timeline at a random point and prebuffers into it; the resume anchor
+   comes in the new timeline. The receiver judged the prebuffered frames against the old
+   anchor, and when the new timeline started "below" it (int32 compare, about half the
+   time) dropped them all as late: the sender does not resend them, so music came back
+   ~8.6 s late. Now an immediate flush forgets the anchor, as shairport-sync does
+   (`reset_ptp_anchor_info`). A new anchor keeps only frames 0–5 s after it, and if the
+   first frame then arriving lies outside that window (anchor and audio in different
+   timelines, which made the receiver "wait" 10 h 44 min), playback follows the audio
+   with a 300 ms lead instead of waiting. Tests: `audio/alice_patch_test.go`, run with
+   `go test github.com/skrashevich/station-airplay/audio` from `alice/bridge`.
 
-Tests for the patch live in the bridge (`cmd/quasar-bridge`), which builds the real
-receiver. To be offered upstream; drop this copy once a release has the same call.
+Tests for item 1 live in the bridge (`cmd/quasar-bridge`); item 3 has its own in
+`audio/alice_patch_test.go`. To be offered upstream; drop this copy once a release has the same call.

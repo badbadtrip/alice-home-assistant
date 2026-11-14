@@ -39,10 +39,13 @@ type Server struct {
 	// once at the first frame that is kept, to explain silence after resume.
 	skippedFlushed, skippedEarly int
 	reportedGen                  uint64
-	buffer                       *Buffer
-	wake                         chan struct{}
-	inputDone, done              chan struct{}
-	once                         sync.Once
+	// awaitFirst: after an anchor that left no frame in its window, the first
+	// frame tells whether the sender's anchor and audio share a timeline.
+	awaitFirst      bool
+	buffer          *Buffer
+	wake            chan struct{}
+	inputDone, done chan struct{}
+	once            sync.Once
 }
 
 func NewServer(p *Player) *Server {
@@ -144,6 +147,16 @@ func (s *Server) enqueue(f *PCMFrame) error {
 		}
 		changed := s.buffer.Changed()
 		s.mu.Lock()
+		if s.awaitFirst && s.playing && s.haveAnchor {
+			s.awaitFirst = false
+			if f.Timestamp-s.anchorRTP >= uint32(anchorWindow*s.rate) {
+				// Audio from another timeline than the anchor: waiting for it
+				// would mean hours of silence (int32 wrap). Play it now.
+				s.player.Logf("audio re-anchored from=%d to=%d", s.anchorRTP, f.Timestamp-uint32(s.rate*anchorLeadMS/1000))
+				s.anchorRTP = f.Timestamp - uint32(s.rate*anchorLeadMS/1000)
+				s.generation++
+			}
+		}
 		if s.haveAnchor && int32(f.Timestamp-s.anchorRTP) < 0 {
 			s.skippedEarly++
 			s.mu.Unlock()
@@ -195,7 +208,9 @@ func (s *Server) SetRateAnchorTime(rtp uint32, network time.Time) {
 	} else {
 		s.player.Logf("audio anchor buffer frames=0")
 	}
-	s.buffer.TrimBefore(rtp)
+	window := uint32(anchorWindow * s.rate)
+	s.buffer.filter(func(f *PCMFrame) bool { return f.Timestamp-rtp < window })
+	s.awaitFirst = s.buffer.Len() == 0
 	reset := !s.playing || s.buffer.Len() != before
 	var old *codec.Output
 	if reset {
@@ -214,6 +229,24 @@ func (s *Server) SetRateAnchorTime(rtp uint32, network time.Time) {
 	}
 	s.signal()
 }
+
+// Alice patch: anchorWindow bounds how far after a rate anchor its first frame
+// may be (the sender keeps ~0.3 s; the buffer holds ~3 s). anchorLeadMS is the
+// lead given to audio re-anchored after a timeline mismatch.
+const (
+	anchorWindow = 5
+	anchorLeadMS = 300
+)
+
+// ForgetAnchor is an Alice patch: after an immediate flush the old anchor no
+// longer describes the audio that follows.
+func (s *Server) ForgetAnchor() {
+	s.mu.Lock()
+	s.haveAnchor = false
+	s.awaitFirst = false
+	s.mu.Unlock()
+}
+
 func (s *Server) SetTimingPeers(peers []net.IP, id uint64) {
 	s.mu.Lock()
 	s.timingClockID = id

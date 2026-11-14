@@ -352,7 +352,7 @@ func main() {
 			changed()
 		}
 	}
-	go localstate.WatchAlice(ctx, localstate.AliceSocket, func(state string) {
+	go localstate.WatchAliceEvents(ctx, localstate.AliceSocket, func(state string) {
 		voice.Store(state)
 		if musicAssistant != nil {
 			musicAssistant.SetAliceState(state)
@@ -367,6 +367,13 @@ func main() {
 			speakerVolume.aliceIdle()
 		}
 		changed()
+	}, func(phrase, action string) {
+		// 10.2: quick phrases without «Алиса» drive AirPlay while it is connected.
+		connected := airPlay != nil && airPlay.Connected()
+		slog.Info("alice_quick_command", "phrase", phrase, "action", action, "airplay", connected)
+		if connected {
+			_ = airPlay.Control(ctx, action)
+		}
 	})
 	if control, err := newAirPlayControl(ctx, os.Getenv("QUASAR_DATA_DIR"), os.Getenv("QUASAR_HOME_AREA"), airplay.VolumeHooks{Sender: speakerVolume.fromSender, Speaker: speakerVolume.speaker}); err != nil {
 		slog.Warn("airplay_unavailable", "error", err)

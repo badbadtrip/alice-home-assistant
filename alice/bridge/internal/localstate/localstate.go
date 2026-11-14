@@ -107,12 +107,18 @@ const AliceSocket = "127.0.0.1:9875"
 // WatchAlice reports Alice's state on every change. The socket also carries account
 // tokens and recognised speech: only the state number is ever kept.
 func WatchAlice(ctx context.Context, address string, report func(string)) {
+	WatchAliceEvents(ctx, address, report, nil)
+}
+
+// WatchAliceEvents is WatchAlice that also reports quick commands heard without
+// the wake word (CommandSpotterCapability). Only whitelisted phrases leave here.
+func WatchAliceEvents(ctx context.Context, address string, report func(string), spotted func(phrase, action string)) {
 	for ctx.Err() == nil {
 		var dialer net.Dialer
 		conn, err := dialer.DialContext(ctx, "tcp", address)
 		if err == nil {
 			go func() { <-ctx.Done(); conn.Close() }()
-			readAlice(bufio.NewReader(conn), report)
+			readAlice(bufio.NewReader(conn), report, spotted)
 			conn.Close()
 			report("idle")
 		}
@@ -123,7 +129,7 @@ func WatchAlice(ctx context.Context, address string, report func(string)) {
 	}
 }
 
-func readAlice(r io.Reader, report func(string)) {
+func readAlice(r io.Reader, report func(string), spotted func(phrase, action string)) {
 	last := ""
 	header := make([]byte, 4)
 	for {
@@ -141,6 +147,10 @@ func readAlice(r io.Reader, report func(string)) {
 		if state, ok := aliceState(frame); ok && state != last {
 			last = state
 			report(state)
+		} else if spotted != nil {
+			if phrase, action, ok := QuickCommand(frame); ok {
+				spotted(phrase, action)
+			}
 		}
 	}
 }

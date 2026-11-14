@@ -34,7 +34,7 @@ func TestReadAliceKeepsOnlyStateChanges(t *testing.T) {
 		stream.Write(message)
 	}
 	var seen []string
-	readAlice(&stream, func(state string) { seen = append(seen, state) })
+	readAlice(&stream, func(state string) { seen = append(seen, state) }, nil)
 	if want := []string{"listening", "thinking", "idle"}; len(seen) != 3 || seen[0] != want[0] || seen[1] != want[1] || seen[2] != want[2] {
 		t.Fatalf("got %v", seen)
 	}

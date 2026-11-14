@@ -56,7 +56,9 @@ func (u *unifiedVolume) fromSender(db float64) bool {
 		return true // the receiver mutes itself; Alice keeps her level
 	}
 	want := dbToLevel(db)
-	if now, ok := u.level(); ok && int(math.Round(now)) == want {
+	now, ok := u.level()
+	slog.Info("airplay_volume_from_phone", "db", math.Round(db*10)/10, "level", want, "speaker", now, "known", ok)
+	if ok && int(math.Round(now)) == want {
 		return true
 	}
 	u.mu.Lock()
@@ -67,6 +69,8 @@ func (u *unifiedVolume) fromSender(db float64) bool {
 		defer cancel()
 		if err := u.set(ctx, want); err != nil {
 			slog.Warn("airplay_volume_failed", "level", want, "error", err)
+		} else {
+			slog.Info("airplay_volume_set", "level", want)
 		}
 	}()
 	return true
@@ -121,5 +125,6 @@ func (u *unifiedVolume) flush() {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	// No sender or one without the event channel: nothing to move.
-	_ = u.report(ctx, levelToDB(level))
+	err := u.report(ctx, levelToDB(level))
+	slog.Info("airplay_volume_to_phone", "level", level, "error", err)
 }

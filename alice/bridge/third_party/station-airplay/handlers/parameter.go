@@ -22,6 +22,20 @@ func (r *Rstp) OnGetParameterWeb(req *rtsp.Request) (*rtsp.Response, error) {
 	return &rtsp.Response{StatusCode: rtsp.StatusOK, Header: rtsp.Header{"Content-Type": {"text/parameters"}}, Body: []byte(fmt.Sprintf("volume: %.6f\r\n", volume))}, nil
 }
 func (r *Rstp) OnSetParameterWeb(req *rtsp.Request) (*rtsp.Response, error) {
+	// Alice patch: what the sender actually sets (type, size, first text line),
+	// to find where the phone's volume slider goes. Binary bodies are not shown.
+	first, ct := "", ""
+	if v := req.Header["Content-Type"]; len(v) > 0 {
+		ct = v[0]
+	}
+	if strings.HasPrefix(ct, "text/") {
+		first, _, _ = strings.Cut(string(req.Body), "\n")
+		first = strings.TrimSpace(first)
+		if len(first) > 60 {
+			first = first[:60]
+		}
+	}
+	r.logger.Printf("audio set_parameter type=%q bytes=%d first=%q hooked=%v", ct, len(req.Body), first, r.player.SenderVolume != nil)
 	scanner := bufio.NewScanner(bytes.NewReader(req.Body))
 	for scanner.Scan() {
 		line := scanner.Text()

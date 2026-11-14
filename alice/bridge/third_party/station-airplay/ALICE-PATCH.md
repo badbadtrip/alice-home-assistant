@@ -38,6 +38,10 @@ scripts are left out. Every change is marked
    host's volume so a connecting phone starts from it; `Receiver.ReportVolume` moves the
    sender's slider (`NotifyVolume`) without touching the gain. Without hooks nothing
    changes.
+5. **Diagnostics for the volume slider** (`handlers/parameter.go`): every `SET_PARAMETER`
+   logs its content type, size and first text line, and whether the volume hooks are
+   set. On 2026-11-14 the slider made AirPlay quieter while Alice's level stayed at 5.
+   Logging only.
 
 Tests for item 1 live in the bridge (`cmd/quasar-bridge`); item 3 in
 `audio/alice_patch_test.go`, item 4 in `handlers/alice_patch_test.go`. To be offered upstream; drop this copy once a release has the same call.

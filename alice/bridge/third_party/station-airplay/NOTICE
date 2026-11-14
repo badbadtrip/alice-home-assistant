@@ -1,0 +1,22 @@
+Station AirPlay is derived from ibiscum/goplay2 (Apache-2.0), commit 91a0a06b56a5b7ddbb573fe007f36d913d39cb02, by Alban Seurat and contributors.
+AAC decoder dependency: skrashevich/go-aac, based on AAC.js by Devon Govett and Audiocogs, LGPL-3.0. Source and pinned dependency details are distributed with this project.
+The owned station-pcm audio helper uses ebitengine/purego (Apache-2.0) to call the firmware's ALSA library without Cgo. Purego's license is included under docs/licenses/purego-Apache-2.0.txt and its exact source is retained in the corresponding-source archive. The receiver itself does not link purego or the firmware audio libraries.
+
+AirPlay 2 event command fields and event-key direction were independently
+implemented from protocol behavior cross-checked with the MIT-licensed
+Shairport Sync source (remote/remote.c, ap2_event_receiver.c and
+pair_ap/pair_homekit.c): https://github.com/mikebrady/shairport-sync
+
+ALAC decoder dependency: github.com/mycophonic/saprobe-alac, Apache-2.0.
+Its license is included in docs/licenses/saprobe-alac-Apache-2.0.txt.
+The dependency's attribution notice follows:
+
+saprobe-alac
+Copyright Mycophonic.
+
+This product includes software derived from the Apple Lossless Audio Codec
+reference implementation (https://github.com/macosforge/alac),
+Copyright (c) 2011 Apple Inc. All rights reserved, licensed under the
+Apache License, Version 2.0. The ported files carry Apple's notice in
+their headers: decoder.go and, under internal/alac, bitbuffer.go,
+golomb.go, matrix.go and predictor.go.

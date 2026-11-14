@@ -350,6 +350,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
+github.com/skrashevich/station-airplay v0.2.3 (modified copy in third_party/station-airplay, see ALICE-PATCH.md)
+
+Apache License 2.0. The full license is third_party/station-airplay/LICENSE; its NOTICE
+and the dependency licenses it names are kept in third_party/station-airplay/NOTICE and
+third_party/station-airplay/docs/licenses/.
+
+
 github.com/yosida95/uritemplate/v3 v3.0.2
 
 Copyright (C) 2016, Kohei YOSHIDA <https://yosida95.com/>. All rights reserved.

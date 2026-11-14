@@ -32,17 +32,26 @@ type pcmHelper struct {
 	env     []string
 }
 
-func newPCMHelper(control *airPlayControl) (*pcmHelper, error) {
-	if control == nil {
-		return nil, errors.New("audio helper is unavailable")
-	}
-	checker, ok := control.receiver.(interface {
+// newPCMHelper takes the helper from the AirPlay receiver when there is one.
+// Without it (AirPlay failed to set up) a receiver that never starts serves
+// only to unpack the helper, so music does not depend on AirPlay.
+func newPCMHelper(control *airPlayControl, state string) (*pcmHelper, error) {
+	type checker = interface {
 		Check(context.Context) (airplay.CheckResult, error)
-	})
-	if !ok {
-		return nil, errors.New("audio helper is unavailable")
 	}
-	return &pcmHelper{receiver: checker}, nil
+	if control != nil {
+		if c, ok := control.receiver.(checker); ok {
+			return &pcmHelper{receiver: c}, nil
+		}
+	}
+	if state == "" {
+		state = "/data/opt/quasar-bridge"
+	}
+	receiver, err := airplay.New(airplay.Config{Name: "Alice", DataDir: filepath.Join(state, "airplay")})
+	if err != nil {
+		return nil, fmt.Errorf("audio helper is unavailable: %w", err)
+	}
+	return &pcmHelper{receiver: receiver}, nil
 }
 
 func (h *pcmHelper) resolve(ctx context.Context) (string, []string, error) {

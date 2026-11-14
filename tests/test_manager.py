@@ -99,21 +99,18 @@ class ManagerTests(unittest.TestCase):
         updater.set_enabled(self.manager, False)
         job, _ = self.rollout(); job.assert_not_called()
 
-    def airplay_cycle(self, lost):
-        self.manager.airplay_next_check = self.manager.airplay_next_try = 0.0
-        with patch.object(self.manager, '_airplay_lost', return_value=lost), patch.object(self.manager, 'ssh') as ssh:
-            self.manager.airplay_cycle()
-        return ssh.call_count
-
-    def test_airplay_reannounce_waits_retries_and_gives_up(self):
-        self.manager.store.metadata(self.speaker['id'], trusted_fingerprint='SHA256:test')
-        self.assertEqual(self.airplay_cycle(True), 0)
-        self.assertEqual([self.airplay_cycle(True) for _ in range(4)], [1, 1, 1, 0])
-        self.assertEqual(self.airplay_cycle(False), 0)
-        self.assertEqual(self.manager.airplay_tries, 0)
-
-    def test_airplay_reannounce_skips_untrusted_speaker(self):
-        self.assertEqual([self.airplay_cycle(True) for _ in range(2)], [0, 0])
+    def test_airplay_state_keeps_error_text_without_paths_or_addresses(self):
+        from service import airplay_state
+        state = airplay_state({'enabled': True, 'error': 'listen tcp 192.168.1.59:7000: bind: address in use\n/data/opt/x', 'volume_db': -12.34})
+        self.assertTrue(state['error'])
+        self.assertNotIn('192.168', state['error_text'])
+        self.assertNotIn('/data', state['error_text'])
+        self.assertNotIn('\n', state['error_text'])
+        self.assertEqual(state['volume_db'], -12.3)
+        self.assertIsNone(airplay_state({'volume_db': 5})['volume_db'])
+        self.assertIsNone(airplay_state({'volume_db': True})['volume_db'])
+        self.assertLessEqual(len(airplay_state({'error': 'x' * 500})['error_text']), 120)
+        self.assertIsNone(airplay_state(None))
 
     def test_lan_address_rejects_public_loopback_hostname_and_shell(self):
         for value in ('127.0.0.1', '0.0.0.0', '8.8.8.8', 'alice-lite2', '192.168.1.1;reboot', '169.254.1.1', '::1'):

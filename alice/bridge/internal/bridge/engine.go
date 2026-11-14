@@ -36,10 +36,12 @@ type Engine struct {
 	Home         HomeHandler
 	// MusicAssistant plays Music Assistant on this speaker; nil without the app link.
 	MusicAssistant MusicAssistantPlayer
-	Silencer       interface{ Silence(context.Context) error }
-	Dialogue       *dialogue.Store
-	dialogueOnce   sync.Once
-	routing        atomic.Pointer[RoutingPolicy]
+	// AirPlay is the receiver built into the bridge; nil when it could not be set up.
+	AirPlay      AirPlayPlayer
+	Silencer     interface{ Silence(context.Context) error }
+	Dialogue     *dialogue.Store
+	dialogueOnce sync.Once
+	routing      atomic.Pointer[RoutingPolicy]
 }
 
 func (e *Engine) dialogue() *dialogue.Store {
@@ -116,6 +118,12 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 			result.Answer = Reply("relay_sent", "Передала.")
 			if err := e.Home.(SpeakerRelay).Relay(ctx, room, message); err != nil {
 				result.Answer = Reply("relay_failed", "Не получилось передать: колонка не отвечает.")
+			}
+			return result, nil
+		}
+		if decision.Source == "airplay_control" {
+			if err := e.AirPlay.Control(ctx, airPlayActions[playback.Command(text)]); err != nil {
+				result.Answer = Reply("airplay_refused", "Телефон не принял команду. Управляйте музыкой на нём.")
 			}
 			return result, nil
 		}
@@ -282,6 +290,7 @@ func (e *Engine) PlayerControl(ctx context.Context, action string) error {
 		if e.maStreaming() {
 			_ = e.MusicAssistant.Control(ctx, "pause")
 		}
+		e.pauseAirPlay(ctx)
 		if e.Silencer == nil {
 			return nil
 		}
@@ -289,7 +298,13 @@ func (e *Engine) PlayerControl(ctx context.Context, action string) error {
 	default:
 		return errors.New("unknown player action")
 	}
-	if e.maStreaming() {
+	switch e.controlTarget(action) {
+	case "airplay":
+		if err := e.AirPlay.Control(ctx, airPlayActions[action]); err != nil {
+			return errors.Join(ErrAirPlayRefused, err)
+		}
+		return nil
+	case "music_assistant":
 		return e.MusicAssistant.Control(ctx, maActions[action])
 	}
 	return errors.New("nothing is playing")
@@ -344,11 +359,20 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 			return RouteDecision{Route: "playback", Source: "relay"}
 		}
 	}
-	if action := playback.Command(text); action != "" && maActions[action] != "" && e.maStreaming() {
-		return RouteDecision{Route: "playback", Source: "ma_control"}
+	if action := playback.Command(text); action != "" {
+		switch e.controlTarget(action) {
+		case "airplay":
+			return RouteDecision{Route: "playback", Source: "airplay_control"}
+		case "music_assistant":
+			return RouteDecision{Route: "playback", Source: "ma_control"}
+		}
 	}
 	if e.wantsMusicAssistant(text) {
 		return RouteDecision{Route: "playback", Source: "ma_play"}
+	}
+	if playback.MusicAsk(text) {
+		// Any music Alice starts takes the speaker from the phone.
+		e.pauseAirPlay(ctx)
 	}
 	if e.musicSource() != "music_assistant" && e.maStreaming() && playback.MusicAsk(text) {
 		// Stock music takes over, so Music Assistant must not keep playing under it.

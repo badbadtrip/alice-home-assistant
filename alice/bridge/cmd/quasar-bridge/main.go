@@ -331,6 +331,9 @@ func main() {
 		if musicAssistant != nil {
 			musicAssistant.SetAliceState(state)
 		}
+		if airPlay != nil {
+			airPlay.SetAliceState(state)
+		}
 		if ring != nil {
 			ring.SetVoice(state)
 		}
@@ -340,6 +343,7 @@ func main() {
 		slog.Warn("airplay_unavailable", "error", err)
 	} else {
 		airPlay = control
+		engine.AirPlay = control
 		mux.Handle("GET /airplay", control)
 		defer control.shutdown()
 		go control.resume()
@@ -347,11 +351,26 @@ func main() {
 	}
 	// Music Assistant reaches the speaker through the app, so it needs the app link and the audio helper.
 	if musicAssistant != nil {
-		if helper, err := newPCMHelper(airPlay); err != nil {
+		if helper, err := newPCMHelper(airPlay, os.Getenv("QUASAR_DATA_DIR")); err != nil {
 			slog.Warn("sendspin_unavailable", "error", err)
 		} else {
 			musicAssistant.Open = helper.Open
 			engine.MusicAssistant = musicAssistant
+			if airPlay != nil {
+				go func() {
+					var one oneSound
+					ticker := time.NewTicker(time.Second)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case <-ticker.C:
+							one.check(ctx, airPlay, musicAssistant)
+						}
+					}
+				}()
+			}
 			go musicAssistant.Run(ctx)
 		}
 	}

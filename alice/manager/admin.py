@@ -127,19 +127,13 @@ def station(manager, speaker_id, operation, payload):
             action = payload.get('action')
             if action not in ('on', 'off'):
                 raise Error('Выберите: включить или выключить AirPlay.')
-            url = 'http://127.0.0.1:18861/airplay?action='
-            # Both receivers need UDP 319/320. The disabled file also stops the old
-            # service from returning at boot.
-            if action == 'on':
-                script = ('if [ -x /data/airplay/ctl.sh ]; then touch /data/airplay/disabled; /data/airplay/ctl.sh stop; sleep 1; fi; '
-                          'wget -T 12 -q -O - "' + url + 'start"')
-            else:
-                script = ('wget -T 12 -q -O - "' + url + 'stop" && '
-                          'if [ -x /data/airplay/bin/shairport-sync ]; then rm -f /data/airplay/disabled; /data/airplay/ctl.sh start; fi; true')
-            output = manager.ssh(speaker, script, timeout=25)
+            # Over HTTP like the volume; SSH only for a bridge that predates the LAN port.
+            # Starting checks the audio helper first, which may take a few seconds.
+            output = manager.bridge_get(speaker, '/airplay?action=' + ('start' if action == 'on' else 'stop'), timeout=25, http_timeout=15)
             manager.store.metadata(speaker_id, airplay_off=action == 'off')
             state = json.loads(output.decode().strip().splitlines()[0])
-            return {'enabled': state.get('enabled') is True, 'connected': state.get('connected') is True, 'playing': state.get('playing') is True, 'error': bool(state.get('error'))}
+            from service import airplay_state
+            return airplay_state(state)
         if operation == 'player':
             action = payload.get('action')
             if action not in ('pause', 'resume', 'next', 'previous', 'silence'):

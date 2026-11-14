@@ -34,7 +34,13 @@ ID = re.compile(r'^[a-z0-9][a-z0-9_-]{0,63}$')
 def airplay_state(value):
     if not isinstance(value, dict):
         return None
-    return {key: value.get(key) is True for key in ('enabled', 'connected', 'playing')} | {'error': bool(value.get('error'))}
+    state = {key: value.get(key) is True for key in ('enabled', 'connected', 'playing')}
+    # The receiver's own words, short and on one line; paths and addresses stay out.
+    error = value.get('error') if isinstance(value.get('error'), str) else ''
+    error = re.sub(r'(?:/[\w.-]+)+|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b', '…', ' '.join(error.split()))[:120]
+    volume = value.get('volume_db')
+    state['volume_db'] = round(volume, 1) if isinstance(volume, (int, float)) and not isinstance(volume, bool) and -144 <= volume <= 0 else None
+    return state | {'error': bool(error), 'error_text': error}
 
 
 
@@ -116,11 +122,6 @@ def media_now_playing(state, source):
                               'duration_ms': milliseconds('media_duration')})
 
 
-AIRPLAY_ENTITY = re.compile(r'^media_player\.[a-z0-9_]*_airplay$')
-# Exit 3: no receiver on this speaker. Exit 4: it is playing, never interrupt that.
-AIRPLAY_REANNOUNCE = ('[ -x /data/airplay/ctl.sh ] || exit 3; '
-                      "netstat -tn 2>/dev/null | grep -q ':5000 .*ESTABLISHED' && exit 4; "
-                      '/data/airplay/ctl.sh restart')
 
 
 AI_RUNTIME = ('QUASAR_LLM_BASE_URL=', 'QUASAR_LLM_MODEL=', 'QUASAR_LLM_API_KEY=', 'QUASAR_LLM_DISABLED=')
@@ -316,10 +317,6 @@ class Manager:
         self.history_saved = time.monotonic()
         self.monitor_stop = threading.Event()
         self.monitor_thread = None
-        self.airplay_next_check = 0.0
-        self.airplay_next_try = 0.0
-        self.airplay_lost_checks = 0
-        self.airplay_tries = 0
         self._setup_cache = None
         self.known_hosts = self.store.directory / 'known_hosts'
         if not self.known_hosts.exists():
@@ -374,10 +371,6 @@ class Manager:
                 self.monitor_cycle()
             except Exception:
                 # A registry read error must not kill the monitor or leak data.
-                pass
-            try:
-                self.airplay_cycle()
-            except Exception:
                 pass
             try:
                 import updater
@@ -445,7 +438,7 @@ class Manager:
             connection['now_playing'] =value or (current if isinstance(current, dict) and current.get('source') == 'yandex_music' else None)
         return result
 
-    def bridge_get(self, speaker, path, timeout=8, ssh_fallback=True):
+    def bridge_get(self, speaker, path, timeout=8, ssh_fallback=True, http_timeout=None):
         """Routine calls go over HTTP. SSH is the fallback for a bridge that predates it."""
         if not re.fullmatch(r'/[a-z-]+(\?[A-Za-z0-9_=&.-]*)?', path):
             raise Error('Некорректный адрес моста.', 500)
@@ -458,7 +451,7 @@ class Manager:
             raise Error('Колонка не отвечает по сети.', 502)
         try:
             request = Request('http://' + lan_ip(speaker['host']) + ':18862' + path, headers={'Authorization': 'Bearer ' + self._hf_token()})
-            with urlopen(request, timeout=min(timeout, 6)) as response:
+            with urlopen(request, timeout=min(timeout, 6) if http_timeout is None else http_timeout) as response:
                 return response.read(256 * 1024)
         except HTTPError as error:
             if error.code not in (401, 404):
@@ -467,11 +460,11 @@ class Manager:
             if not ssh_fallback:
                 raise Error('Колонка не отвечает по сети.', 502) from None
             try:
-                return self.ssh(speaker, 'wget -T 4 -q -O - "http://127.0.0.1:18861' + path + '"', timeout=timeout)
+                return self.ssh(speaker, 'wget -T %d -q -O - "http://127.0.0.1:18861%s"' % (max(4, (http_timeout or 0) - 2), path), timeout=timeout)
             except Exception:
                 down[speaker['host']] = time.monotonic() + 20
                 raise
-        return self.ssh(speaker, 'wget -T 4 -q -O - "http://127.0.0.1:18861' + path + '"', timeout=timeout)
+        return self.ssh(speaker, 'wget -T %d -q -O - "http://127.0.0.1:18861%s"' % (max(4, (http_timeout or 0) - 2), path), timeout=timeout)
 
     def _metrics(self, speaker):
         # Plain HTTP on the home network: a wrong token or an old bridge just gives none.
@@ -481,42 +474,6 @@ class Manager:
                 return metrics_state(json.loads(response.read(64 * 1024)), speaker['id'])
         except Exception:
             return None
-
-    def _airplay_lost(self):
-        token = os.environ.get('SUPERVISOR_TOKEN')
-        if not token:
-            return False
-        request = Request('http://supervisor/core/api/states', headers={'Authorization': 'Bearer ' + token})
-        with urlopen(request, timeout=10) as response:
-            states = json.load(response)
-        return any(AIRPLAY_ENTITY.fullmatch(item['entity_id']) and item['state'] == 'unavailable' for item in states)
-
-    # A speaker announces AirPlay only when the service starts and does not answer
-    # later queries, so a restarted Music Assistant loses it until it announces again.
-    def airplay_cycle(self):
-        now = time.monotonic()
-        if now < self.airplay_next_check:
-            return
-        self.airplay_next_check = now + 60
-        if not self._airplay_lost():
-            self.airplay_lost_checks = self.airplay_tries = 0
-            return
-        self.airplay_lost_checks += 1
-        # Two checks give Music Assistant time to finish starting; three tries
-        # keep a speaker without a working receiver from restarting forever.
-        if self.airplay_lost_checks < 2 or self.airplay_tries >= 3 or now < self.airplay_next_try:
-            return
-        self.airplay_tries += 1
-        self.airplay_next_try = now + 300
-        for speaker in self.store.read('speakers.json'):
-            if not speaker.get('trusted_fingerprint') or not self.operation_lock.acquire(blocking=False):
-                continue
-            try:
-                self.ssh(speaker, AIRPLAY_REANNOUNCE, timeout=25)
-            except Exception:
-                pass  # An offline speaker or one without a receiver is not an error here.
-            finally:
-                self.operation_lock.release()
 
     def monitor_cycle(self):
         records = self.store.read('speakers.json')

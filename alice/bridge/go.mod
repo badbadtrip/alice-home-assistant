@@ -46,3 +46,6 @@ tool (
 
 // Fixed mDNS responder for the AirPlay receiver; see third_party/zeroconf/ALICE-PATCH.md.
 replace github.com/grandcat/zeroconf => ./third_party/zeroconf
+
+// AirPlay receiver with a local duck under Alice's voice; see third_party/station-airplay/ALICE-PATCH.md.
+replace github.com/skrashevich/station-airplay => ./third_party/station-airplay

@@ -9,7 +9,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	airplay "github.com/skrashevich/station-airplay"
 
@@ -21,6 +24,8 @@ const airPlayStartAttempts = 5
 type airPlayReceiver interface {
 	Start(context.Context) error
 	Stop(context.Context) error
+	Control(context.Context, string) error
+	SetDuck(float64) error
 	Status() airplay.Status
 }
 
@@ -32,22 +37,65 @@ type airPlayControl struct {
 	app      context.Context
 	marker   string
 	retry    time.Duration
+	// duckTurn is bumped on every change of Alice's state; a ramp stops when
+	// it is no longer the latest one.
+	duckTurn atomic.Uint64
+	ducked   atomic.Bool
+}
+
+// airPlayDuck matches the Sendspin player: music at 15 % under Alice's voice.
+const airPlayDuck = 0.15
+
+// SetAliceState lowers AirPlay while Alice listens, thinks or speaks and brings
+// it back afterwards, in a few steps over ~120 ms so that it does not click.
+func (c *airPlayControl) SetAliceState(state string) {
+	down := state != "" && state != "idle"
+	if c.ducked.Swap(down) == down {
+		return
+	}
+	turn := c.duckTurn.Add(1)
+	from, to := 1.0, airPlayDuck
+	if !down {
+		from, to = airPlayDuck, 1.0
+	}
+	go func() {
+		const steps = 6
+		for i := 1; i <= steps; i++ {
+			if c.duckTurn.Load() != turn {
+				return
+			}
+			factor := from + (to-from)*float64(i)/steps
+			if i == steps {
+				factor = to
+			}
+			_ = c.receiver.SetDuck(factor)
+			if i < steps {
+				time.Sleep(20 * time.Millisecond)
+			}
+		}
+	}()
 }
 
 func newAirPlayControl(app context.Context, state, area string) (*airPlayControl, error) {
 	if state == "" {
 		state = "/data/opt/quasar-bridge"
 	}
-	name := "Алиса"
-	if area != "" {
-		name += " " + area
-	}
-	dir := filepath.Join(state, "airplay")
-	receiver, err := airplay.New(airplay.Config{Name: name, DataDir: dir})
+	receiver, err := airplay.New(airplay.Config{Name: airPlayName(area), DataDir: filepath.Join(state, "airplay")})
 	if err != nil {
 		return nil, err
 	}
 	return &airPlayControl{receiver: receiver, app: app, marker: filepath.Join(state, "airplay.enabled"), retry: 20 * time.Second}, nil
+}
+
+// airPlayName is "Алиса <room>" cut at a letter to the 63 bytes mDNS allows:
+// Cyrillic takes two bytes a letter, so a long room name would stop AirPlay.
+func airPlayName(area string) string {
+	name := strings.TrimSpace("Алиса " + strings.Join(strings.Fields(area), " "))
+	for len(name) > 63 {
+		_, size := utf8.DecodeLastRuneInString(name)
+		name = strings.TrimSpace(name[:len(name)-size])
+	}
+	return name
 }
 
 func (c *airPlayControl) enabled() bool {
@@ -142,7 +190,49 @@ func (c *airPlayControl) shutdown() {
 
 func (c *airPlayControl) health() map[string]any {
 	state := c.receiver.Status()
-	return map[string]any{"enabled": c.enabled(), "state": string(state.State), "name": state.Name, "connected": state.Connected, "playing": state.Playing, "error": state.Error}
+	return map[string]any{"enabled": c.enabled(), "state": string(state.State), "name": state.Name, "address": state.Address, "connected": state.Connected, "playing": state.Playing, "volume_db": state.VolumeDB, "error": state.Error}
+}
+
+// Connected, Playing and Control make the receiver a player for the engine:
+// voice and panel commands reach the phone over its AirPlay event channel.
+func (c *airPlayControl) Connected() bool { return c.receiver.Status().Connected }
+func (c *airPlayControl) Playing() bool   { return c.receiver.Status().Playing }
+func (c *airPlayControl) Control(ctx context.Context, action string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	err := c.receiver.Control(ctx, action)
+	if err != nil {
+		slog.Warn("airplay_media_failed", "action", action, "error", err)
+	}
+	return err
+}
+
+// oneSound keeps a single player on the speaker: whoever starts last plays,
+// the other pauses. It runs on every look at the players (about once a second).
+type oneSound struct {
+	airPlay, music bool
+}
+
+func (o *oneSound) check(ctx context.Context, airPlay interface {
+	Playing() bool
+	Control(context.Context, string) error
+}, music interface {
+	Streaming() bool
+	Control(context.Context, string) error
+}) {
+	if airPlay == nil || music == nil {
+		return
+	}
+	a, m := airPlay.Playing(), music.Streaming()
+	switch {
+	case a && m && !o.airPlay:
+		slog.Info("player_preempted", "playing", "airplay", "paused", "music_assistant")
+		_ = music.Control(ctx, "pause")
+	case a && m && !o.music:
+		slog.Info("player_preempted", "playing", "music_assistant", "paused", "airplay")
+		_ = airPlay.Control(ctx, "pause")
+	}
+	o.airPlay, o.music = a, m
 }
 
 // now gives only the source and status: the receiver reads no track data from the

@@ -40,11 +40,14 @@ class AdminTests(unittest.TestCase):
   self.assertEqual(m.bridge_get.call_args.args[1],'/volume?level=7')
   for level in (-1,11,True,'5;reboot',None,5.0):
    with self.subTest(level=level),self.assertRaises(Error):station(m,'test','volume',{'level':level})
- def test_airplay_switch_keeps_old_service_off_and_rejects_other_actions(self):
-  m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'},metadata=Mock()),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(return_value=b'{"enabled":true,"connected":false,"playing":false,"error":""}\n'))
-  self.assertTrue(station(m,'test','airplay',{'action':'on'})['enabled'])
-  script=m.ssh.call_args.args[1];self.assertLess(script.index('ctl.sh stop'),script.index('action=start'));self.assertIn('touch /data/airplay/disabled',script)
-  station(m,'test','airplay',{'action':'off'});script=m.ssh.call_args.args[1];self.assertLess(script.index('action=stop'),script.index('ctl.sh start'));self.assertIn('[ -x /data/airplay/bin/shairport-sync ]',script)
+ def test_airplay_switch_uses_bridge_http_and_rejects_other_actions(self):
+  m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'},metadata=Mock()),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(),bridge_get=Mock(return_value=b'{"enabled":true,"connected":false,"playing":false,"volume_db":-9.5,"error":""}\n'))
+  state=station(m,'test','airplay',{'action':'on'})
+  self.assertTrue(state['enabled']);self.assertEqual(state['volume_db'],-9.5);self.assertEqual(state['error_text'],'')
+  self.assertEqual(m.bridge_get.call_args.args[1],'/airplay?action=start')
+  station(m,'test','airplay',{'action':'off'})
+  self.assertEqual(m.bridge_get.call_args.args[1],'/airplay?action=stop')
+  m.ssh.assert_not_called()
   m.store.metadata.assert_called_with('test',airplay_off=True)
   with self.assertRaises(Error):station(m,'test','airplay',{'action':'reboot'})
  def test_indicator_validates_and_uses_atomic_persistent_write(self):

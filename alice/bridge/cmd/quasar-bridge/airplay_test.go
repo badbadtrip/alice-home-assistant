@@ -7,17 +7,23 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	airplay "github.com/skrashevich/station-airplay"
+	"github.com/skrashevich/station-airplay/audio"
 )
 
 type fakeReceiver struct {
 	starts, stops int
 	failures      int
 	// status replaces the default snapshot when set.
-	status *airplay.Status
+	status   *airplay.Status
+	controls []string
+	mu       sync.Mutex
+	ducks    []float64
 }
 
 func (f *fakeReceiver) Start(context.Context) error {
@@ -29,6 +35,21 @@ func (f *fakeReceiver) Start(context.Context) error {
 	return nil
 }
 func (f *fakeReceiver) Stop(context.Context) error { f.stops++; return nil }
+func (f *fakeReceiver) SetDuck(factor float64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ducks = append(f.ducks, factor)
+	return nil
+}
+func (f *fakeReceiver) duckLog() []float64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]float64(nil), f.ducks...)
+}
+func (f *fakeReceiver) Control(_ context.Context, action string) error {
+	f.controls = append(f.controls, action)
+	return nil
+}
 func (f *fakeReceiver) Status() airplay.Status {
 	if f.status != nil {
 		return *f.status
@@ -115,5 +136,109 @@ func TestAirPlayKeepsSessionOnNewAddress(t *testing.T) {
 	c.followAddress(time.Millisecond, func() string { return "192.168.1.77" })
 	if f.stops != 0 {
 		t.Fatal("restarted while a sender owns playback")
+	}
+}
+
+func TestAirPlayNameFitsMDNS(t *testing.T) {
+	if got := airPlayName(""); got != "Алиса" {
+		t.Fatalf("%q", got)
+	}
+	if got := airPlayName("  Кухня  "); got != "Алиса Кухня" {
+		t.Fatalf("%q", got)
+	}
+	long := airPlayName("Детская комната на втором этаже у лестницы")
+	if len(long) > 63 || !utf8.ValidString(long) || !strings.HasPrefix(long, "Алиса Детская") {
+		t.Fatalf("%q (%d bytes)", long, len(long))
+	}
+	if _, err := airplay.New(airplay.Config{Name: long, DataDir: t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMusicHelperWithoutAirPlay(t *testing.T) {
+	if _, err := newPCMHelper(nil, t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+type fakeMusic struct {
+	streaming bool
+	controls  []string
+}
+
+func (f *fakeMusic) Streaming() bool { return f.streaming }
+func (f *fakeMusic) Control(_ context.Context, action string) error {
+	f.controls = append(f.controls, action)
+	return nil
+}
+
+func TestOneSoundPausesWhoeverPlayedFirst(t *testing.T) {
+	f := &fakeReceiver{status: &airplay.Status{State: airplay.StateRunning}}
+	c := testAirPlay(t, f)
+	music := &fakeMusic{}
+	var one oneSound
+	ctx := context.Background()
+	f.status.Playing = true
+	one.check(ctx, c, music)
+	music.streaming = true // music started over the phone
+	one.check(ctx, c, music)
+	if len(f.controls) != 1 || f.controls[0] != "pause" || len(music.controls) != 0 {
+		t.Fatalf("phone %v music %v", f.controls, music.controls)
+	}
+	f.status.Playing = false
+	one.check(ctx, c, music)
+	f.status.Playing = true // the phone started over the music
+	one.check(ctx, c, music)
+	if len(music.controls) != 1 || music.controls[0] != "pause" {
+		t.Fatalf("music %v", music.controls)
+	}
+	one.check(ctx, c, music) // both still reported: nothing new
+	if len(music.controls) != 1 || len(f.controls) != 1 {
+		t.Fatalf("repeated: phone %v music %v", f.controls, music.controls)
+	}
+}
+
+func TestAirPlayDucksUnderAliceAndComesBack(t *testing.T) {
+	f := &fakeReceiver{}
+	c := testAirPlay(t, f)
+	waitDuck := func(want float64) {
+		t.Helper()
+		deadline := time.Now().Add(time.Second)
+		for time.Now().Before(deadline) {
+			if d := f.duckLog(); len(d) > 0 && d[len(d)-1] == want {
+				return
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		t.Fatalf("duck never reached %v: %v", want, f.duckLog())
+	}
+	c.SetAliceState("listening")
+	waitDuck(airPlayDuck)
+	steps := len(f.duckLog())
+	c.SetAliceState("speaking") // still Alice: no new ramp
+	time.Sleep(50 * time.Millisecond)
+	if len(f.duckLog()) != steps {
+		t.Fatalf("ramped again while Alice kept talking: %v", f.duckLog())
+	}
+	c.SetAliceState("idle")
+	waitDuck(1)
+	d := f.duckLog()
+	for i := 1; i < steps; i++ {
+		if d[i] >= d[i-1] {
+			t.Fatalf("down ramp not falling: %v", d)
+		}
+	}
+}
+
+func TestPlayerDuckScalesGainWithoutVolume(t *testing.T) {
+	p := &audio.Player{}
+	p.SetVolume(0)
+	p.SetDuck(0.15)
+	if g := p.Gain(); g < 0.149 || g > 0.151 || p.Volume() != 0 {
+		t.Fatalf("gain %v volume %v", g, p.Volume())
+	}
+	p.SetDuck(1)
+	if p.Gain() != 1 {
+		t.Fatalf("restored gain %v", p.Gain())
 	}
 }

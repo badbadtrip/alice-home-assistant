@@ -157,7 +157,7 @@ def music_state(manager, speakers):
         entity = speaker.get('media_entity')
         with manager.connection_lock:
             value = manager.connections.get(speaker['id'], {}).get('value', {})
-        if not entity or value.get('status') != 'online' or not value.get('airplay'):
+        if not entity or value.get('status') != 'online':
             continue
         try:
             state = _ha('states/' + entity)

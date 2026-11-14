@@ -242,3 +242,44 @@ func TestPlayerDuckScalesGainWithoutVolume(t *testing.T) {
 		t.Fatalf("restored gain %v", p.Gain())
 	}
 }
+
+func TestAirPlayDuckReleasesWhenAliceSticks(t *testing.T) {
+	saved := duckHold
+	duckHold = 200 * time.Millisecond
+	defer func() { duckHold = saved }()
+	f := &fakeReceiver{}
+	c := testAirPlay(t, f)
+	c.SetAliceState("speaking")
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if d := f.duckLog(); len(d) > 0 && d[len(d)-1] == 1 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if d := f.duckLog(); len(d) == 0 || d[len(d)-1] != 1 {
+		t.Fatalf("music never came back: %v", d)
+	}
+	steps := len(f.duckLog())
+	c.SetAliceState("idle") // the real end changes nothing more
+	time.Sleep(50 * time.Millisecond)
+	if len(f.duckLog()) != steps {
+		t.Fatalf("restored twice: %v", f.duckLog())
+	}
+	c.SetAliceState("listening") // and the next request ducks again
+	reached := func() bool {
+		for _, x := range f.duckLog()[steps:] {
+			if x == airPlayDuck {
+				return true
+			}
+		}
+		return false
+	}
+	deadline = time.Now().Add(time.Second)
+	for time.Now().Before(deadline) && !reached() {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !reached() {
+		t.Fatalf("no duck after release: %v", f.duckLog())
+	}
+}

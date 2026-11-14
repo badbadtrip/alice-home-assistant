@@ -5,6 +5,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -39,41 +40,76 @@ type airPlayControl struct {
 	retry    time.Duration
 	// duckTurn is bumped on every change of Alice's state; a ramp stops when
 	// it is no longer the latest one.
-	duckTurn atomic.Uint64
-	ducked   atomic.Bool
+	duckTurn  atomic.Uint64
+	ducked    atomic.Bool
+	duckLevel atomic.Uint64
 }
 
 // airPlayDuck matches the Sendspin player: music at 15 % under Alice's voice.
 const airPlayDuck = 0.15
 
+// Ducking goes down quickly so Alice hears the command and comes back softly
+// (as spotiya does: 80 ms down, 300 ms up). If Alice's state sticks while the
+// socket stays open, the music comes back by itself after duckHold.
+var (
+	duckDown = ramp{steps: 4, every: 20 * time.Millisecond}
+	duckUp   = ramp{steps: 10, every: 30 * time.Millisecond}
+	duckHold = 60 * time.Second
+)
+
+type ramp struct {
+	steps int
+	every time.Duration
+}
+
 // SetAliceState lowers AirPlay while Alice listens, thinks or speaks and brings
-// it back afterwards, in a few steps over ~120 ms so that it does not click.
+// it back afterwards.
 func (c *airPlayControl) SetAliceState(state string) {
 	down := state != "" && state != "idle"
 	if c.ducked.Swap(down) == down {
 		return
 	}
 	turn := c.duckTurn.Add(1)
-	from, to := 1.0, airPlayDuck
 	if !down {
-		from, to = airPlayDuck, 1.0
+		c.rampTo(turn, 1, duckUp)
+		return
 	}
+	c.rampTo(turn, airPlayDuck, duckDown)
+	time.AfterFunc(duckHold, func() {
+		if c.duckTurn.Load() == turn && c.ducked.CompareAndSwap(true, false) {
+			slog.Warn("airplay_duck_released", "after", duckHold.String())
+			c.rampTo(c.duckTurn.Add(1), 1, duckUp)
+		}
+	})
+}
+
+// rampTo moves the factor from where it is now, so a ramp cut short by the next
+// state change continues from that point without a jump.
+func (c *airPlayControl) rampTo(turn uint64, to float64, r ramp) {
 	go func() {
-		const steps = 6
-		for i := 1; i <= steps; i++ {
+		from := c.duckNow()
+		for i := 1; i <= r.steps; i++ {
 			if c.duckTurn.Load() != turn {
 				return
 			}
-			factor := from + (to-from)*float64(i)/steps
-			if i == steps {
+			factor := from + (to-from)*float64(i)/float64(r.steps)
+			if i == r.steps {
 				factor = to
 			}
+			c.duckLevel.Store(math.Float64bits(factor))
 			_ = c.receiver.SetDuck(factor)
-			if i < steps {
-				time.Sleep(20 * time.Millisecond)
+			if i < r.steps {
+				time.Sleep(r.every)
 			}
 		}
 	}()
+}
+
+func (c *airPlayControl) duckNow() float64 {
+	if bits := c.duckLevel.Load(); bits != 0 {
+		return math.Float64frombits(bits)
+	}
+	return 1
 }
 
 func newAirPlayControl(app context.Context, state, area string) (*airPlayControl, error) {

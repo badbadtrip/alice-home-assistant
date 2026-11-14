@@ -30,3 +30,24 @@ func TestMusicAsk(t *testing.T) {
 		}
 	}
 }
+
+func TestCommandsAsPeopleSayThem(t *testing.T) {
+	for _, tc := range []struct{ text, action string }{
+		{"Ну, Алиса, пауза", "pause"}, {"Слушай, дальше", "next"}, {"А продолжи", "resume"}, {"Окей, назад", "previous"},
+		{"Пауза, плиз", "pause"}, {"Алиса, дальше пожалуйста", "next"}, {"Ладно, хватит", "stop"}, {"Эй, стоп сейчас", "stop"},
+		{"Харэ", "stop"}, {"Стопэ", "stop"}, {"Играй", "resume"}, {"Переключи трек", "next"}, {"Переключи песню", "next"},
+	} {
+		if got := Command(tc.text); got != tc.action {
+			t.Errorf("%q: got %q want %q", tc.text, got, tc.action)
+		}
+	}
+	// Fillers alone or around something else are not commands.
+	for _, text := range []string{"Ну", "Слушай", "Ну назад в будущее", "Стоп-кран", "Играй в шахматы", "Так держать", "Окей гугл"} {
+		if got := Command(text); got != "" {
+			t.Errorf("false action %q: %s", text, got)
+		}
+	}
+	if got := normalize("ну"); got != "ну" {
+		t.Errorf("a lone filler stays: %q", got)
+	}
+}

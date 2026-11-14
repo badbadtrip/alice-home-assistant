@@ -15,7 +15,9 @@ type AirPlayPlayer interface {
 }
 
 // airPlayActions are the spoken controls the receiver passes to the sender.
-var airPlayActions = map[string]string{"pause": "pause", "resume": "resume", "next": "next", "previous": "previous", "stop": "stop"}
+// "Стоп" pauses: a stopped sender drops the session, and "продолжи" would have
+// nobody to resume (station-airplay does the same). Switching AirPlay off stops.
+var airPlayActions = map[string]string{"pause": "pause", "resume": "resume", "next": "next", "previous": "previous", "stop": "pause"}
 
 // ErrAirPlayRefused: the sender is there but did not accept the command.
 var ErrAirPlayRefused = errors.New("airplay sender refused the command")

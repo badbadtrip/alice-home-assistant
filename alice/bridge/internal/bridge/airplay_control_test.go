@@ -23,7 +23,7 @@ func TestAirPlayTakesSpokenControlsWhilePlaying(t *testing.T) {
 	ap := &fakeAirPlay{connected: true, playing: true}
 	e := &Engine{Home: maHome{"yandex"}, AirPlay: ap}
 	ctx := context.Background()
-	for text, action := range map[string]string{"пауза": "pause", "дальше": "next", "продолжи": "resume", "стоп": "stop", "назад": "previous"} {
+	for text, action := range map[string]string{"пауза": "pause", "дальше": "next", "продолжи": "resume", "стоп": "pause", "хватит": "pause", "назад": "previous"} {
 		d := e.Decide(ctx, text)
 		if d.Source != "airplay_control" {
 			t.Fatalf("%q went to %+v", text, d)
@@ -99,5 +99,24 @@ func TestStockMusicRequestPausesPhone(t *testing.T) {
 	e.Decide(context.Background(), "включи музыку")
 	if len(ap.controls) != 1 || ap.controls[0] != "pause" {
 		t.Fatalf("controls %v", ap.controls)
+	}
+}
+
+func TestStopKeepsThePhoneForResume(t *testing.T) {
+	ap := &fakeAirPlay{connected: true, playing: true}
+	e := &Engine{Home: maHome{"yandex"}, AirPlay: ap}
+	ctx := context.Background()
+	for _, text := range []string{"выключи музыку", "стоп"} {
+		if _, err := e.ResolveDecision(ctx, text, e.Decide(ctx, text)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(ap.controls) != 2 {
+		t.Fatalf("both stops reach the phone: %v", ap.controls)
+	}
+	for _, sent := range ap.controls {
+		if sent != "pause" {
+			t.Fatalf("a stop must pause the phone, sent %v", ap.controls)
+		}
 	}
 }

@@ -72,11 +72,11 @@ var commands = []struct {
 	action  string
 	pattern *regexp.Regexp
 }{
-	{"next", regexp.MustCompile(`^(?:(?:включи|поставь|переключи|перейди|переключись)(?: на)? )?(?:следующий(?: трек)?|следующую(?: (?:песню|композицию))?|следующая(?: (?:песня|композиция))?|дальше|вперед)$`)},
+	{"next", regexp.MustCompile(`^(?:(?:включи|поставь|переключи|перейди|переключись)(?: на)? )?(?:следующий(?: трек)?|следующую(?: (?:песню|композицию))?|следующая(?: (?:песня|композиция))?|дальше|вперед)$|^переключи (?:трек|песню)$`)},
 	{"previous", regexp.MustCompile(`^(?:(?:включи|поставь|верни|переключи|перейди|переключись)(?: на)? )?(?:предыдущий(?: трек)?|предыдущую(?: (?:песню|композицию))?|предыдущая(?: (?:песня|композиция))?|назад)$`)},
 	{"pause", regexp.MustCompile(`^(?:пауза|(?:поставь|поставьте)(?: (?:музыку|песню|трек|воспроизведение))? на паузу|приостанови(?: (?:музыку|песню|трек|воспроизведение))?)$`)},
-	{"resume", regexp.MustCompile(`^(?:(?:продолжи|продолжай|возобнови)(?: (?:музыку|песню|трек|воспроизведение))?|сними(?: (?:музыку|песню|трек))? с паузы)$`)},
-	{"stop", regexp.MustCompile(`^(?:хватит|стоп|останови(?: (?:музыку|песню|трек|воспроизведение))?|выключи (?:музыку|песню|трек|радио))$`)},
+	{"resume", regexp.MustCompile(`^(?:(?:продолжи|продолжай|возобнови)(?: (?:музыку|песню|трек|воспроизведение))?|сними(?: (?:музыку|песню|трек))? с паузы|играй)$`)},
+	{"stop", regexp.MustCompile(`^(?:хватит|стоп|стопэ|харэ|останови(?: (?:музыку|песню|трек|воспроизведение))?|выключи (?:музыку|песню|трек|радио))$`)},
 	{"restart", regexp.MustCompile(`^(?:сначала|начни(?: (?:песню|трек|музыку))? сначала|включи(?: текущий)? (?:трек|песню) сначала|повтори (?:трек|песню))$`)},
 }
 
@@ -169,6 +169,11 @@ func Command(text string) string {
 	return ""
 }
 
+var (
+	leadingFiller  = map[string]bool{"алиса": true, "пожалуйста": true, "ну": true, "слушай": true, "а": true, "так": true, "окей": true, "эй": true, "ладно": true}
+	trailingFiller = map[string]bool{"пожалуйста": true, "плиз": true, "сейчас": true}
+)
+
 func normalize(text string) string {
 	text = strings.ToLower(strings.Map(func(r rune) rune {
 		if unicode.IsPunct(r) {
@@ -178,13 +183,12 @@ func normalize(text string) string {
 	}, text))
 	text = strings.ReplaceAll(text, "ё", "е")
 	words := strings.Fields(text)
-	if len(words) > 0 && words[0] == "алиса" {
+	// People wrap a command in words that carry nothing: "ну алиса пауза плиз".
+	// Each is dropped once from its end, in any order, while a command remains.
+	for len(words) > 1 && leadingFiller[words[0]] {
 		words = words[1:]
 	}
-	if len(words) > 0 && words[0] == "пожалуйста" {
-		words = words[1:]
-	}
-	if len(words) > 0 && words[len(words)-1] == "пожалуйста" {
+	for len(words) > 1 && trailingFiller[words[len(words)-1]] {
 		words = words[:len(words)-1]
 	}
 	return strings.Join(words, " ")

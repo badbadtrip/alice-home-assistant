@@ -140,7 +140,16 @@ def airplay_default(manager, speakers, now):
         with manager.connection_lock:
             value = manager.connections.get(speaker['id'], {}).get('value', {})
         airplay = value.get('airplay')
-        if value.get('status') != 'online' or not airplay or airplay.get('enabled') or speaker.get('airplay_off'):
+        if value.get('status') != 'online' or not airplay:
+            continue
+        # Voice switches (10.6) reach the panel's choice here.
+        if airplay.get('user_off') and not speaker.get('airplay_off'):
+            manager.store.metadata(speaker['id'], airplay_off=True)
+            continue
+        if airplay.get('enabled') and speaker.get('airplay_off'):
+            manager.store.metadata(speaker['id'], airplay_off=False)
+            continue
+        if airplay.get('enabled') or speaker.get('airplay_off'):
             continue
         if now < _airplay_retry.get(speaker['id'], 0):
             continue

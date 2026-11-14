@@ -172,6 +172,8 @@ type Controller struct {
 	voiceAt  atomic.Int64
 	volumeAt atomic.Int64
 	journal  ringJournal
+	ackKind  atomic.Value
+	ackAt    atomic.Int64
 }
 
 // Transitions returns the ring's last changes of look, oldest first.
@@ -449,8 +451,15 @@ func (c *Controller) Serve(ctx context.Context) {
 		if !allowed && ok {
 			state = "muted"
 		}
+		ackFrame, acking := c.ack(now, led.size)
+		if acking && allowed {
+			state = "ack"
+		}
 		c.journal.note(now, state, card, sourced.Load())
 		switch {
+		case acking && allowed:
+			_ = led.show(soft.next(ackFrame))
+			lit = true
 		case ok && allowed:
 			_ = led.show(soft.next(look.Render(now.Sub(started), led.size)))
 			lit = true

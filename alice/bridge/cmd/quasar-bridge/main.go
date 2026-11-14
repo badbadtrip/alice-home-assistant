@@ -371,8 +371,8 @@ func main() {
 		// 10.2: quick phrases without «Алиса» drive AirPlay while it is connected.
 		connected := airPlay != nil && airPlay.Connected()
 		slog.Info("alice_quick_command", "phrase", phrase, "action", action, "airplay", connected)
-		if connected {
-			_ = airPlay.Control(ctx, action)
+		if connected && airPlay.Control(ctx, action) == nil && ring != nil {
+			ring.Ack(action)
 		}
 	})
 	if control, err := newAirPlayControl(ctx, os.Getenv("QUASAR_DATA_DIR"), os.Getenv("QUASAR_HOME_AREA"), airplay.VolumeHooks{Sender: speakerVolume.fromSender, Speaker: speakerVolume.speaker}); err != nil {
@@ -381,6 +381,9 @@ func main() {
 		airPlay = control
 		airPlayRef.Store(control)
 		engine.AirPlay = control
+		if ring != nil {
+			engine.Ack = ring.Ack
+		}
 		mux.Handle("GET /airplay", control)
 		defer control.shutdown()
 		go control.resume()

@@ -201,11 +201,30 @@ func routeIP() string {
 }
 
 func (c *airPlayControl) start() error {
+	_ = os.Remove(c.userOff())
 	if err := c.receiver.Start(c.app); err != nil {
 		return err
 	}
 	return os.WriteFile(c.marker, nil, 0o600)
 }
+
+// userOff marks AirPlay switched off by voice, for the panel (10.6).
+func (c *airPlayControl) userOff() string { return c.marker + ".user-off" }
+
+// SetEnabled is the voice switch: the same as the panel, plus a note for it.
+func (c *airPlayControl) SetEnabled(ctx context.Context, on bool) error {
+	if on {
+		_ = os.Remove(c.userOff())
+		return c.start()
+	}
+	if err := c.stop(ctx); err != nil {
+		return err
+	}
+	return os.WriteFile(c.userOff(), nil, 0o600)
+}
+
+// Name is how phones list the receiver.
+func (c *airPlayControl) Name() string { return c.receiver.Status().Name }
 
 func (c *airPlayControl) stop(ctx context.Context) error {
 	if err := os.Remove(c.marker); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -226,7 +245,7 @@ func (c *airPlayControl) shutdown() {
 
 func (c *airPlayControl) health() map[string]any {
 	state := c.receiver.Status()
-	return map[string]any{"enabled": c.enabled(), "state": string(state.State), "name": state.Name, "address": state.Address, "connected": state.Connected, "playing": state.Playing, "volume_db": state.VolumeDB, "error": state.Error}
+	return map[string]any{"enabled": c.enabled(), "state": string(state.State), "name": state.Name, "address": state.Address, "connected": state.Connected, "playing": state.Playing, "volume_db": state.VolumeDB, "error": state.Error, "user_off": fileExists(c.userOff())}
 }
 
 // Connected, Playing and Control make the receiver a player for the engine:
@@ -319,4 +338,9 @@ func (c *airPlayControl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	data, _ := json.Marshal(c.health())
 	_, _ = w.Write(data)
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

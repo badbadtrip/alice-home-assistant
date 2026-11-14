@@ -147,6 +147,20 @@ func RoomStem(room string) string {
 	return strings.TrimRight(room, "аеиоуыюя")
 }
 
+// airPlayWord covers how speech recognition spells AirPlay.
+const airPlayWord = `(?:эйр ?плей|аир ?плей|эир ?плей|эйрплэй|air ?play)`
+
+var airPlaySwitch = regexp.MustCompile(`^(?:(включи|включить|запусти|активируй)|(выключи|выключить|отключи|отключить|останови))(?: на колонке)? ` + airPlayWord + `(?: на колонке)?$`)
+
+// AirPlaySwitch reads «включи / выключи AirPlay» (10.6).
+func AirPlaySwitch(text string) (on, ok bool) {
+	m := airPlaySwitch.FindStringSubmatch(normalize(text))
+	if m == nil {
+		return false, false
+	}
+	return m[1] != "", true
+}
+
 func Command(text string) string {
 	text = normalize(text)
 	full := replacing()

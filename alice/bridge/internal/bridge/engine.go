@@ -37,7 +37,9 @@ type Engine struct {
 	// MusicAssistant plays Music Assistant on this speaker; nil without the app link.
 	MusicAssistant MusicAssistantPlayer
 	// AirPlay is the receiver built into the bridge; nil when it could not be set up.
-	AirPlay      AirPlayPlayer
+	AirPlay AirPlayPlayer
+	// Ack shows a silent sign on the ring after a player command (10.4); may be nil.
+	Ack          func(action string)
 	Silencer     interface{ Silence(context.Context) error }
 	Dialogue     *dialogue.Store
 	dialogueOnce sync.Once
@@ -121,15 +123,24 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 			}
 			return result, nil
 		}
+		if decision.Source == "airplay_switch" {
+			result.Answer = e.switchAirPlay(ctx, text)
+			return result, nil
+		}
 		if decision.Source == "airplay_control" {
-			if err := e.AirPlay.Control(ctx, airPlayActions[playback.Command(text)]); err != nil {
+			action := airPlayActions[playback.Command(text)]
+			if err := e.AirPlay.Control(ctx, action); err != nil {
 				result.Answer = Reply("airplay_refused", "Телефон не принял команду. Управляйте музыкой на нём.")
+			} else {
+				e.ack(action)
 			}
 			return result, nil
 		}
 		if decision.Source == "ma_control" {
 			if err := e.MusicAssistant.Control(ctx, maActions[playback.Command(text)]); err != nil {
 				result.Answer = Reply("ma_down", "Music Assistant сейчас не отвечает.")
+			} else {
+				e.ack(playback.Command(text))
 			}
 			return result, nil
 		}
@@ -357,6 +368,11 @@ func (e *Engine) Decide(ctx context.Context, text string) (decision RouteDecisio
 		// Only a known room counts: "скажи в двух словах" stays with Alice.
 		if room, _, found := playback.Relay(text); found && relay.RelayRoom(room) {
 			return RouteDecision{Route: "playback", Source: "relay"}
+		}
+	}
+	if _, ok := playback.AirPlaySwitch(text); ok {
+		if _, can := e.AirPlay.(AirPlaySwitcher); can {
+			return RouteDecision{Route: "playback", Source: "airplay_switch"}
 		}
 	}
 	if action := playback.Command(text); action != "" {

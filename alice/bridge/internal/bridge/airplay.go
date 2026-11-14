@@ -3,6 +3,8 @@ package bridge
 import (
 	"context"
 	"errors"
+
+	"quasarbridge/internal/playback"
 )
 
 // AirPlayPlayer is the speaker's AirPlay receiver: a phone or a Mac that owns
@@ -44,4 +46,32 @@ func (e *Engine) pauseAirPlay(ctx context.Context) {
 	if e.airPlayPlaying() {
 		_ = e.AirPlay.Control(ctx, "pause")
 	}
+}
+
+// AirPlaySwitcher turns the receiver on and off by voice (10.6). The bridge
+// reports a voice "off" so the panel does not switch AirPlay back on.
+type AirPlaySwitcher interface {
+	SetEnabled(ctx context.Context, on bool) error
+	Name() string
+}
+
+func (e *Engine) ack(action string) {
+	if e.Ack != nil && action != "" {
+		e.Ack(action)
+	}
+}
+
+func (e *Engine) switchAirPlay(ctx context.Context, text string) string {
+	on, _ := playback.AirPlaySwitch(text)
+	switcher := e.AirPlay.(AirPlaySwitcher)
+	if err := switcher.SetEnabled(ctx, on); err != nil {
+		return Reply("airplay_switch_failed", "Не получилось переключить AirPlay.")
+	}
+	switch {
+	case !on:
+		return Reply("airplay_off", "AirPlay выключен.")
+	case e.AirPlay.Connected():
+		return Reply("airplay_on_playing", "AirPlay включён, играет iPhone.")
+	}
+	return Reply("airplay_on", "AirPlay включён. Выберите «"+switcher.Name()+"» на iPhone.")
 }

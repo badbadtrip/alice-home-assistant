@@ -34,13 +34,14 @@ ID = re.compile(r'^[a-z0-9][a-z0-9_-]{0,63}$')
 def airplay_state(value):
     if not isinstance(value, dict):
         return None
-    state = {key: value.get(key) is True for key in ('enabled', 'connected', 'playing')}
+    state = {key: value.get(key) is True for key in ('enabled', 'connected', 'playing', 'user_off')}
     # The receiver's own words, short and on one line; paths and addresses stay out.
     error = value.get('error') if isinstance(value.get('error'), str) else ''
     error = re.sub(r'(?:/[\w.-]+)+|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b', '…', ' '.join(error.split()))[:120]
     volume = value.get('volume_db')
     state['volume_db'] = round(volume, 1) if isinstance(volume, (int, float)) and not isinstance(volume, bool) and -144 <= volume <= 0 else None
-    return state | {'error': bool(error), 'error_text': error}
+    name = value.get('name') if isinstance(value.get('name'), str) else ''
+    return state | {'error': bool(error), 'error_text': error, 'name': ' '.join(name.split())[:63]}
 
 
 

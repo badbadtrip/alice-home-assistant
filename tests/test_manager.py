@@ -63,6 +63,15 @@ class ManagerTests(unittest.TestCase):
         with patch('admin.station') as station:
             updater.airplay_default(self.manager, [{**self.manager.store.speaker(self.speaker['id']), 'airplay_off': True}], 0)
             station.assert_not_called()
+        # 10.6: a voice "off" becomes the panel's choice, a voice "on" clears it.
+        self.manager.connections[self.speaker['id']]['value']['airplay'] = {'enabled': False, 'user_off': True}
+        with patch('admin.station') as station:
+            updater.airplay_default(self.manager, [self.manager.store.speaker(self.speaker['id'])], 0)
+            station.assert_not_called()
+        self.assertTrue(self.manager.store.speaker(self.speaker['id'])['airplay_off'])
+        self.manager.connections[self.speaker['id']]['value']['airplay'] = {'enabled': True}
+        updater.airplay_default(self.manager, [self.manager.store.speaker(self.speaker['id'])], 0)
+        self.assertFalse(self.manager.store.speaker(self.speaker['id'])['airplay_off'])
 
     def test_auto_update_starts_at_once_and_skips_current_bridge(self):
         self.ready()

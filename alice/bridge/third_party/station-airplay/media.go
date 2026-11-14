@@ -97,6 +97,34 @@ func (r *Receiver) SetDuck(factor float64) error {
 
 func (s *protocolService) SetDuck(factor float64) { s.player.SetDuck(factor) }
 
+// ReportVolume is an Alice patch: it moves the sender's volume slider to db
+// (-30..0, -144 silence) without touching this receiver's gain, so that the
+// phone shows a volume the speaker itself changed.
+func (r *Receiver) ReportVolume(ctx context.Context, db float64) error {
+	if !validVolume(db) {
+		return fmt.Errorf("volume must be between -144 and 0 dB")
+	}
+	r.mu.Lock()
+	current := r.current
+	if current == nil || r.state != StateRunning {
+		r.mu.Unlock()
+		return ErrNotRunning
+	}
+	service, ok := current.service.(*protocolService)
+	r.mu.Unlock()
+	if !ok {
+		return ErrControlUnsupported
+	}
+	owner := service.player.Current()
+	if owner == nil {
+		return ErrNoSender
+	}
+	if owner.NotifyVolume == nil {
+		return ErrControlUnsupported
+	}
+	return owner.NotifyVolume(ctx, db)
+}
+
 func validVolume(db float64) bool {
 	return db >= -144 && db <= 0 && !math.IsNaN(db) && !math.IsInf(db, 0)
 }

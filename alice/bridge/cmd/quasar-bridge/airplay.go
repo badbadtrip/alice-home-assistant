@@ -112,11 +112,11 @@ func (c *airPlayControl) duckNow() float64 {
 	return 1
 }
 
-func newAirPlayControl(app context.Context, state, area string) (*airPlayControl, error) {
+func newAirPlayControl(app context.Context, state, area string, volume airplay.VolumeHooks) (*airPlayControl, error) {
 	if state == "" {
 		state = "/data/opt/quasar-bridge"
 	}
-	receiver, err := airplay.New(airplay.Config{Name: airPlayName(area), DataDir: filepath.Join(state, "airplay")})
+	receiver, err := airplay.New(airplay.Config{Name: airPlayName(area), DataDir: filepath.Join(state, "airplay"), Volume: volume})
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,18 @@ func (c *airPlayControl) health() map[string]any {
 // Connected, Playing and Control make the receiver a player for the engine:
 // voice and panel commands reach the phone over its AirPlay event channel.
 func (c *airPlayControl) Connected() bool { return c.receiver.Status().Connected }
-func (c *airPlayControl) Playing() bool   { return c.receiver.Status().Playing }
+
+// ReportVolume moves the phone's slider to the speaker's volume.
+func (c *airPlayControl) ReportVolume(ctx context.Context, db float64) error {
+	r, ok := c.receiver.(interface {
+		ReportVolume(context.Context, float64) error
+	})
+	if !ok || !c.receiver.Status().Connected {
+		return nil
+	}
+	return r.ReportVolume(ctx, db)
+}
+func (c *airPlayControl) Playing() bool { return c.receiver.Status().Playing }
 func (c *airPlayControl) Control(ctx context.Context, action string) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

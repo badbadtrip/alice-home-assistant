@@ -26,7 +26,7 @@ jobs:
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
         working-directory: alice/bridge
       # The patched libraries in third_party are replaced modules, outside ./...
-      - run: go test ./... github.com/grandcat/zeroconf github.com/skrashevich/station-airplay/audio
+      - run: go test ./... github.com/grandcat/zeroconf github.com/skrashevich/station-airplay/audio github.com/skrashevich/station-airplay/handlers
         working-directory: alice/bridge
   server:
     runs-on: ubuntu-latest

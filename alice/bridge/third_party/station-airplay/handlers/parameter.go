@@ -12,7 +12,14 @@ import (
 )
 
 func (r *Rstp) OnGetParameterWeb(req *rtsp.Request) (*rtsp.Response, error) {
-	return &rtsp.Response{StatusCode: rtsp.StatusOK, Header: rtsp.Header{"Content-Type": {"text/parameters"}}, Body: []byte(fmt.Sprintf("volume: %.6f\r\n", r.currentVolume()))}, nil
+	volume := r.currentVolume()
+	// Alice patch: with the speaker's volume in charge, the sender starts from it.
+	if r.player.SpeakerVolume != nil {
+		if db, ok := r.player.SpeakerVolume(); ok {
+			volume = db
+		}
+	}
+	return &rtsp.Response{StatusCode: rtsp.StatusOK, Header: rtsp.Header{"Content-Type": {"text/parameters"}}, Body: []byte(fmt.Sprintf("volume: %.6f\r\n", volume))}, nil
 }
 func (r *Rstp) OnSetParameterWeb(req *rtsp.Request) (*rtsp.Response, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(req.Body))
@@ -27,8 +34,16 @@ func (r *Rstp) OnSetParameterWeb(req *rtsp.Request) (*rtsp.Response, error) {
 				return &rtsp.Response{StatusCode: rtsp.StatusMethodNotValidInThisState}, nil
 			}
 			r.volume = v
+			gain := v
+			// Alice patch: the speaker takes the slider; locally only silence.
+			if r.player.SenderVolume != nil && r.player.SenderVolume(v) {
+				gain = 0
+				if v <= -144 {
+					gain = -144
+				}
+			}
 			for _, s := range r.streams {
-				r.player.SetVolumeFor(s, v)
+				r.player.SetVolumeFor(s, gain)
 			}
 		}
 	}

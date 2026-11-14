@@ -29,6 +29,9 @@ type Player struct {
 	// duck is an Alice patch: a local factor under Alice's voice; 0 means none.
 	duck   atomic.Uint64
 	volume atomic.Uint64
+	// SenderVolume and SpeakerVolume are an Alice patch, see VolumeHooks.
+	SenderVolume  func(db float64) bool
+	SpeakerVolume func() (db float64, ok bool)
 }
 
 func NewPlayer(ctx context.Context, clock *ptp.VirtualClock, opts codec.OutputOptions) *Player {

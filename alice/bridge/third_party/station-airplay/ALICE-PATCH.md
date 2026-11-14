@@ -31,5 +31,13 @@ scripts are left out. Every change is marked
    with a 300 ms lead instead of waiting. Tests: `audio/alice_patch_test.go`, run with
    `go test github.com/skrashevich/station-airplay/audio` from `alice/bridge`.
 
-Tests for item 1 live in the bridge (`cmd/quasar-bridge`); item 3 has its own in
-`audio/alice_patch_test.go`. To be offered upstream; drop this copy once a release has the same call.
+4. **One volume with the speaker** (`options.go` `VolumeHooks`, `runtime.go`, `audio/player.go`,
+   `handlers/parameter.go`, `media.go`). With `Config.Volume` set, the sender's slider
+   (`SET_PARAMETER volume`) goes to the host instead of the receiver's gain, which stays at
+   0 dB (only -144, silence, is applied locally); `GET_PARAMETER volume` answers with the
+   host's volume so a connecting phone starts from it; `Receiver.ReportVolume` moves the
+   sender's slider (`NotifyVolume`) without touching the gain. Without hooks nothing
+   changes.
+
+Tests for item 1 live in the bridge (`cmd/quasar-bridge`); item 3 in
+`audio/alice_patch_test.go`, item 4 in `handlers/alice_patch_test.go`. To be offered upstream; drop this copy once a release has the same call.

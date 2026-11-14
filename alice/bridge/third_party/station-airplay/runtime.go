@@ -142,6 +142,10 @@ func openService(ctx context.Context, cfg settings) (_ service, failure error) {
 	s.player.Logger = cfg.logger
 	s.player.BindIP, s.player.Timing, s.player.OutputDelay = env.IP, s.timing, cfg.delay
 	s.player.SetVolume(cfg.volume)
+	s.player.SenderVolume, s.player.SpeakerVolume = cfg.hooks.Sender, cfg.hooks.Speaker
+	if cfg.hooks.Sender != nil {
+		s.player.SetVolume(0) // the speaker's volume rules; the receiver stays at unity
+	}
 	actualPort := s.control.Addr().(*net.TCPAddr).Port
 	s.mdns, err = zeroconf.Register(cfg.name, "_airplay._tcp", "local.", actualPort, s.accessory.ToRecords(), []net.Interface{iface})
 	if err != nil {

@@ -29,6 +29,8 @@ import (
 	"quasarbridge/internal/metrics"
 	"quasarbridge/internal/nowplaying"
 	"quasarbridge/internal/sendspin"
+
+	airplay "github.com/skrashevich/station-airplay"
 )
 
 func main() {
@@ -308,10 +310,34 @@ func main() {
 	server := &http.Server{Addr: cfg.Listen, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// One volume for the phone's AirPlay slider and the speaker (part 10.10).
+	var airPlayRef atomic.Pointer[airPlayControl]
+	speakerVolume := &unifiedVolume{
+		set: proxy.SetVolume,
+		level: func() (float64, bool) {
+			if v := volume.Load(); v != nil {
+				return v.Level, true
+			}
+			return 0, false
+		},
+		report: func(ctx context.Context, db float64) error {
+			if c := airPlayRef.Load(); c != nil {
+				return c.ReportVolume(ctx, db)
+			}
+			return nil
+		},
+		busy: func() bool {
+			state, _ := voice.Load().(string)
+			return state != "" && state != "idle"
+		},
+	}
 	go localstate.WatchVolume(ctx, func(v localstate.Volume) {
 		first := volume.Swap(&v) == nil
 		if ring != nil && !first {
 			ring.VolumeChanged()
+		}
+		if !first {
+			speakerVolume.changed(v.Level)
 		}
 		changed()
 	})
@@ -337,12 +363,16 @@ func main() {
 		if ring != nil {
 			ring.SetVoice(state)
 		}
+		if state == "idle" {
+			speakerVolume.aliceIdle()
+		}
 		changed()
 	})
-	if control, err := newAirPlayControl(ctx, os.Getenv("QUASAR_DATA_DIR"), os.Getenv("QUASAR_HOME_AREA")); err != nil {
+	if control, err := newAirPlayControl(ctx, os.Getenv("QUASAR_DATA_DIR"), os.Getenv("QUASAR_HOME_AREA"), airplay.VolumeHooks{Sender: speakerVolume.fromSender, Speaker: speakerVolume.speaker}); err != nil {
 		slog.Warn("airplay_unavailable", "error", err)
 	} else {
 		airPlay = control
+		airPlayRef.Store(control)
 		engine.AirPlay = control
 		mux.Handle("GET /airplay", control)
 		defer control.shutdown()

@@ -21,6 +21,19 @@ type Config struct {
 	OutputDelay                                            *time.Duration
 	InitialVolumeDB                                        *float64
 	Logger                                                 *log.Logger
+	// Volume is an Alice patch: when set, the sender's slider drives the
+	// speaker's own volume instead of this receiver's PCM gain.
+	Volume VolumeHooks
+}
+
+// VolumeHooks connect the sender's volume slider to the host's volume (Alice
+// patch). Sender gets the slider in dB (-30..0, -144 for silence) and reports
+// whether the host took it; while it does, the receiver's gain stays at 0 dB
+// and only silence (-144) is applied locally. Speaker answers the sender's
+// question about the current volume, in the same dB scale.
+type VolumeHooks struct {
+	Sender  func(db float64) bool
+	Speaker func() (db float64, ok bool)
 }
 
 type settings struct {
@@ -29,6 +42,7 @@ type settings struct {
 	delay                                     time.Duration
 	volume                                    float64
 	logger                                    *log.Logger
+	hooks                                     VolumeHooks
 }
 
 func normalize(c Config) (settings, error) {
@@ -40,7 +54,7 @@ func normalize(c Config) (settings, error) {
 	s := settings{name: name, iface: c.Interface, listen: cmp.Or(c.ListenAddress, ":7000"),
 		state: c.DataDir, aplay: c.Aplay, device: cmp.Or(c.Device, "default"),
 		ownedOutput: c.Aplay == "",
-		delay:       160 * time.Millisecond, volume: -20, logger: c.Logger}
+		delay:       160 * time.Millisecond, volume: -20, logger: c.Logger, hooks: c.Volume}
 	if s.ownedOutput {
 		executable, err := os.Executable()
 		if err != nil {

@@ -47,7 +47,7 @@ func TestExactHomePlanAndExecutionStatuses(t *testing.T) {
 			}
 			chimes := 0
 			ctx := sound.WithPlayer(t.Context(), func(_ context.Context, r sound.Request) error {
-				if r.Sound != "success" {
+				if r.Sound != "iot_off" {
 					t.Error("wrong sound")
 				}
 				chimes++

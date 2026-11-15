@@ -120,6 +120,9 @@ func TestNativeSoundBuiltinsDeduplicateAndIsolateSessions(t *testing.T) {
 	}{
 		{"notification", fileplayer.TAudioFilePlayerCapability_NotificationSound},
 		{"success", fileplayer.TAudioFilePlayerCapability_AliceIoTSoundsDone},
+		{"iot_on", fileplayer.TAudioFilePlayerCapability_AliceIoTSoundsTurnOn},
+		{"iot_off", fileplayer.TAudioFilePlayerCapability_AliceIoTSoundsTurnOff},
+		{"iot_done", fileplayer.TAudioFilePlayerCapability_AliceIoTSoundsOnOffUnknownState},
 		{"error", fileplayer.TAudioFilePlayerCapability_SpotterError},
 		{"timer", fileplayer.TAudioFilePlayerCapability_Timer},
 	} {

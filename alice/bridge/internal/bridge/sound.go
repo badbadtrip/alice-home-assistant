@@ -109,6 +109,12 @@ func makeSoundDirective(request sound.Request) (*directives.TDirective, error) {
 		stored = fileplayer.TAudioFilePlayerCapability_NotificationSound
 	case "success":
 		stored = fileplayer.TAudioFilePlayerCapability_AliceIoTSoundsDone
+	case "iot_on":
+		stored = fileplayer.TAudioFilePlayerCapability_AliceIoTSoundsTurnOn
+	case "iot_off":
+		stored = fileplayer.TAudioFilePlayerCapability_AliceIoTSoundsTurnOff
+	case "iot_done":
+		stored = fileplayer.TAudioFilePlayerCapability_AliceIoTSoundsOnOffUnknownState
 	case "error":
 		stored = fileplayer.TAudioFilePlayerCapability_SpotterError
 	case "timer":
@@ -129,5 +135,5 @@ func makeSoundDirective(request sound.Request) (*directives.TDirective, error) {
 func (n *Native) hasQueuedSuccess(p *nativeRequest) bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	return p.soundDirective != nil && p.soundRequest != nil && (p.soundRequest.Sound == "success" || p.soundRequest.Sound == "notification")
+	return p.soundDirective != nil && p.soundRequest != nil && (p.soundRequest.Sound == "success" || p.soundRequest.Sound == "notification" || strings.HasPrefix(p.soundRequest.Sound, "iot_"))
 }

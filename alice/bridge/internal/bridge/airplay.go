@@ -55,12 +55,6 @@ type AirPlaySwitcher interface {
 	Name() string
 }
 
-func (e *Engine) ack(action string) {
-	if e.Ack != nil && action != "" {
-		e.Ack(action)
-	}
-}
-
 func (e *Engine) switchAirPlay(ctx context.Context, text string) string {
 	on, _ := playback.AirPlaySwitch(text)
 	switcher := e.AirPlay.(AirPlaySwitcher)

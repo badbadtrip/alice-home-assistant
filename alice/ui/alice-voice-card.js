@@ -38,7 +38,6 @@ p{color:var(--muted)}a{color:var(--accent)}code{font-family:var(--ha-font-family
 ha-icon{--mdc-icon-size:20px;flex-shrink:0;pointer-events:none}
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .help{font-size:13px;color:var(--muted)}.error{color:var(--err)}
-
 button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border:0;border-radius:var(--control);background:transparent;color:var(--accent);font:inherit;font-weight:500;cursor:pointer;white-space:nowrap}
 button:hover:not(:disabled){background:var(--accent-tint)}
 button.primary{background:var(--accent);color:var(--on-accent)}button.primary:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 88%,var(--text))}
@@ -47,7 +46,6 @@ button.icon{width:42px;padding:0;border-radius:50%;color:var(--muted)}button.ico
 button:disabled{opacity:.4;cursor:default}
 :is(button,input,select,textarea,summary,a):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-
 label{display:grid;gap:6px;font-size:13px;color:var(--muted)}
 input,select,textarea{width:100%;min-width:0;min-height:46px;padding:10px 14px;border:1px solid transparent;border-radius:var(--control);background:var(--tint);color:var(--text);font:inherit;font-size:15px}
 select option{background:var(--dialog);color:var(--text)}
@@ -62,20 +60,17 @@ details>summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:32px
 details>summary::-webkit-details-marker{display:none}
 details>summary:before{content:'';width:6px;height:6px;margin:0 4px 0 2px;border-right:1.5px solid;border-bottom:1.5px solid;transform:rotate(-45deg)}
 details[open]>summary:before{transform:rotate(45deg)}
-
 .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin-bottom:16px}
 .bar.framed{justify-content:flex-end}
 .notice{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;min-height:44px;padding:8px 16px;margin-bottom:16px;border-radius:var(--control);background:var(--accent-tint);font-size:14px}
 .notice button{min-height:32px;padding:0 10px}
 .alert{display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:16px;border-radius:var(--radius);background:color-mix(in srgb,var(--warn) 14%,transparent)}
 .alert>ha-icon{color:var(--warn)}.alert>div{flex:1;min-width:0}.alert strong{font-weight:500}.alert p{font-size:13px}
-
 .cols{display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
 @media(min-width:1000px){.cols{grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:32px;align-items:start}}
 .sec{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;margin-bottom:10px}
 .sec>div:first-child{min-width:0}.sec p{font-size:13px}
 .sec-actions{display:flex;align-items:center;flex-shrink:0}
-
 .speakers{display:grid;gap:12px}
 @media(min-width:640px) and (max-width:999px){.speakers{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .spk{min-width:0;padding:14px;border-radius:var(--radius);background:var(--surface);box-shadow:var(--lift)}
@@ -89,15 +84,11 @@ details[open]>summary:before{transform:rotate(45deg)}
 .state button{min-height:28px;padding:0 8px;margin-left:-4px;font-size:13px}
 .now{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden}
 .now span{overflow:hidden;text-overflow:ellipsis}.now ha-icon{--mdc-icon-size:16px;color:var(--accent)}
-
-.art{position:relative;flex-shrink:0;width:84px;--led-color:#8a8a8a;--led-brightness:1;--led-period:2400ms}
-.art .indicator-photo{width:72px;margin:0 auto 2px;border-radius:50%;background:var(--tint)}.art .indicator-product-image,.art .indicator-photo-light{inset:7px;width:calc(100% - 14px);height:calc(100% - 14px)}
+.art{position:relative;flex-shrink:0;width:84px}
+.art .indicator-photo{width:72px;margin:0 auto 2px;border-radius:50%;background:var(--tint)}.art .indicator-product-image{inset:7px;width:calc(100% - 14px);height:calc(100% - 14px)}
 .spk:has(.now) .art .indicator-photo{background:color-mix(in srgb,var(--accent) 20%,transparent)}
 .indicator-photo{position:relative;width:100%;aspect-ratio:540/541}
-.indicator-product-image,.indicator-photo-light{position:absolute;inset:0;display:block;width:100%;height:100%}
-.indicator-photo-light{overflow:visible;pointer-events:none}.indicator-led{opacity:var(--led-brightness)}
-[data-enabled=false]:not([data-preview=true]) .indicator-led{opacity:0!important}
-
+.indicator-product-image{position:absolute;inset:0;display:block;width:100%;height:100%}
 .range{position:relative;display:flex;align-items:center;gap:8px;height:46px;padding:0 16px;border-radius:14px;overflow:hidden;background:color-mix(in srgb,var(--fill-color) 14%,transparent);--fill-color:var(--accent)}
 .range-fill{position:absolute;inset:0 auto 0 0;width:var(--fill,0%);background:color-mix(in srgb,var(--fill-color) 50%,transparent);border-radius:14px}
 .range-fill:after{content:'';position:absolute;top:13px;bottom:13px;right:6px;width:4px;border-radius:2px;background:#fff;box-shadow:0 1px 3px rgb(0 0 0/.25)}
@@ -107,14 +98,12 @@ details[open]>summary:before{transform:rotate(45deg)}
 .range input{position:absolute;inset:0;width:100%;height:100%;min-height:0;margin:0;padding:0;border:0;opacity:0;cursor:pointer}
 .range.unknown .range-fill{display:none}.range input:disabled{cursor:default}.range:has(input:disabled){opacity:.5}
 .range:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
-
 .controls{display:flex;align-items:center;gap:6px;margin-top:10px}
 .controls button.icon{background:var(--tint);color:var(--text)}.controls button.icon:hover:not(:disabled){background:var(--tint-strong)}
 .controls button[data-action=media]{background:var(--accent-tint);color:var(--accent)}.controls button[data-action=media]:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 24%,transparent);color:var(--accent)}
 .controls .gap{flex:1}
 .ap-row{display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 10px;border-radius:18px;background:var(--well,color-mix(in srgb,var(--primary-text-color) 6%,transparent));color:var(--ink,var(--primary-text-color))}.ap-badge{display:grid;flex:none;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--well-fill,color-mix(in srgb,var(--primary-text-color) 12%,transparent));color:var(--ink,var(--primary-text-color));opacity:.75}.ap-badge ha-icon{--mdc-icon-size:18px}.ap-row[data-state=ready] .ap-badge{opacity:1}.ap-row:is([data-state=connected],[data-state=playing]) .ap-badge{opacity:1;background:var(--ink,var(--primary-color));color:var(--mood,var(--surface,var(--card-background-color,#fff)))}.ap-row[data-state=error] .ap-badge{opacity:1;background:var(--error-color,#db4437);color:#fff}.ap-text{flex:1;min-width:0;display:grid;gap:1px}.ap-text b{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ap-text small{font-size:12px;line-height:1.3;opacity:.72}.ap-row[data-state=error] .ap-text small{opacity:1;color:var(--error-color,#db4437);white-space:normal}.ap-keys{display:flex;gap:2px;flex:none}.ap-keys .icon{width:36px;height:36px;color:inherit}.ap-row .phrase-switch{background:var(--well-fill,var(--tint-strong))}.ap-row .phrase-switch i{background:var(--ink,var(--muted));opacity:.55}.ap-row .phrase-switch[aria-checked=true]{background:var(--ink,var(--accent))}.ap-row .phrase-switch[aria-checked=true] i{background:var(--mood,var(--surface,var(--card-background-color,#fff)));opacity:1}.look-tile .ap-row{display:none}
 .media-note{font-size:13px;color:var(--muted);margin-top:4px}.media-note:empty{display:none}
-
 .list{border-radius:var(--radius);background:var(--surface);box-shadow:var(--lift);overflow:hidden}
 .dialog .list{background:var(--tint);box-shadow:none}
 .cmd{position:relative;display:flex;align-items:center;gap:12px;padding:10px 8px 10px 14px;min-height:64px}
@@ -128,7 +117,6 @@ details[open]>summary:before{transform:rotate(45deg)}
 .cmd-actions{display:flex;flex-shrink:0}
 .empty{padding:32px 20px;text-align:center}.empty h3{margin-bottom:4px}.empty button{margin-top:14px}
 .foot{margin-top:8px;font-size:13px;color:var(--muted)}
-
 .journal{margin-top:28px;border-top:1px solid var(--line);padding-top:8px}
 .journal>summary{min-height:44px;font-size:18px;font-weight:500;color:var(--text)}
 .journal-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
@@ -138,7 +126,6 @@ details[open]>summary:before{transform:rotate(45deg)}
 .who{--who:var(--ok);flex:none;align-self:flex-start;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:500;color:var(--text);background:color-mix(in srgb,var(--who) 20%,transparent)}.who-yandex{--who:var(--warn)}.who-llm{--who:var(--primary-color)}
 .ev strong{font-size:15px;font-weight:500}.ev p{font-size:13px}
 .pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)}
-
 .overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgb(0 0 0/.55)}
 .dialog{display:flex;flex-direction:column;width:min(560px,100%);max-height:min(860px,100%);overflow:hidden;border-radius:28px;background:var(--dialog);box-shadow:0 12px 40px rgb(0 0 0/.3);overflow-wrap:anywhere}
 .dialog-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;min-height:60px;padding:8px 10px 8px 24px}
@@ -161,7 +148,6 @@ details[open]>summary:before{transform:rotate(45deg)}
 .seg button{flex:1;min-height:36px;border-radius:10px;color:var(--muted)}
 .seg button[aria-selected=true]{background:var(--dialog);color:var(--text);box-shadow:0 1px 2px rgb(0 0 0/.2)}
 .seg .mark{width:7px;height:7px;border-radius:50%;background:var(--warn)}
-
 .steps{display:flex;list-style:none;gap:4px;padding:0;margin:0 0 16px}
 .steps li{flex:1;min-width:0;font-size:12px;color:var(--muted);text-align:center}
 .steps li:before{content:'';display:block;height:4px;margin-bottom:6px;border-radius:2px;background:var(--tint-strong)}
@@ -174,7 +160,6 @@ details[open]>summary:before{transform:rotate(45deg)}
 .ready{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;background:color-mix(in srgb,var(--ok) 13%,transparent)}
 .ready>ha-icon{color:var(--ok)}.ready p{font-size:13px}
 .service{margin-top:12px}.service-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.service-grid button{white-space:normal;padding:6px 10px}
-
 .admin-dialog{width:min(1040px,100%);height:min(780px,100%)}
 .admin-shell{display:grid;grid-template-columns:200px minmax(0,1fr);flex:1;min-height:0;border-top:1px solid var(--line)}
 .rail{display:flex;flex-direction:column;gap:2px;padding:10px;overflow:auto;border-right:1px solid var(--line)}
@@ -207,7 +192,6 @@ details[open]>summary:before{transform:rotate(45deg)}
 .setup-more h3{margin:0 0 12px}.setup-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}.setup-links button{justify-content:flex-start;gap:12px;height:auto;padding:12px;text-align:left;white-space:normal}.setup-links span{display:grid}.setup-links small{color:var(--muted);font-weight:400}
 .music-page{display:grid;gap:16px;width:100%;max-width:640px;margin:0 auto}.music-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.music-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.music-choice button{min-height:56px;gap:8px;border-radius:14px;background:var(--tint);color:var(--muted)}.music-choice button[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--text);box-shadow:inset 0 0 0 2px var(--accent)}.music-card code{overflow-wrap:anywhere}.music-card{padding:16px;border-radius:var(--radius);background:var(--surface);box-shadow:var(--lift)}.music-page .group+.group{padding-top:16px;border-top:0}.pl-row{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;gap:12px;align-items:start;padding:12px;border-radius:16px;background:var(--tint)}.pl-mark{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}.pl-fields{display:grid;gap:8px;min-width:0}.pl-empty{padding:16px;border-radius:16px;background:var(--tint);color:var(--muted);font-size:13px;text-align:center}
 .group{display:grid;gap:12px}.group+.group{padding-top:16px;border-top:1px solid var(--line)}
-
 .access-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .access-head p{font-size:14px}.access-head strong{font-weight:500;color:var(--text)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -235,49 +219,16 @@ details[open]>summary:before{transform:rotate(45deg)}
 .dev-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 8px 8px 0}
 .dev details p,.dev details code{font-size:12px;color:var(--muted)}
 .pages{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted)}
-
-.look-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;border-radius:14px;background:var(--tint)}.look-tabs button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 8px;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;font-weight:500}.look-tabs button:hover:not(:disabled){background:var(--tint)}.look-tabs button[aria-selected=true]{background:var(--tint-strong);color:var(--text)}.look-tabs i{width:8px;height:8px;border-radius:50%;background:var(--tint-strong);flex:none}.look-tabs i.on{background:var(--look,var(--accent))}
-.ring-stage{position:relative;display:grid;place-items:center;aspect-ratio:1;min-width:0;border-radius:var(--radius);background:#0d0f13;overflow:hidden}.ring-canvas{position:absolute;inset:0;width:100%;height:100%}.ring-stage .indicator-photo{width:46%}.ring-stage .indicator-photo-light{display:none}.ring-stage>span{position:absolute;left:0;right:0;bottom:12px;text-align:center;font-size:12px;color:rgb(255 255 255/.55)}
-.look-head{display:flex;align-items:center;justify-content:space-between;gap:16px}.look-head p{flex:1 1 0;min-width:0;margin:0;font-size:13px;color:var(--muted)}.look-head .switch{flex:none;width:auto}
-.indicator-controls .effects{grid-template-columns:repeat(4,minmax(0,1fr))}.ring-glow{pointer-events:none}@media(max-width:480px){.indicator-controls .effects button{font-size:12px;padding-inline:2px}}
-.indicator-panel{--led-color:#00d5ff;--led-brightness:1;--led-period:2400ms;display:grid;gap:14px}
-.indicator-top{display:flex;align-items:flex-end;gap:16px}.indicator-top>label{flex:1;min-width:0}.indicator-top select{min-height:40px;font-size:14px;padding:6px 10px}
 .switch{position:relative;display:flex;align-items:center;gap:10px;min-height:40px;font-size:14px;color:var(--text);cursor:pointer;flex-shrink:0}
 .switch input{position:absolute;right:0;width:40px;height:24px;min-height:0;margin:0;opacity:0;cursor:pointer}
 .switch i{position:relative;width:40px;height:24px;border-radius:12px;background:var(--tint-strong)}
 .switch i:after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/.35)}
 .switch input:checked+i{background:var(--accent)}.switch input:checked+i:after{transform:translateX(16px)}
-.switch input:focus-visible+i{outline:2px solid var(--accent);outline-offset:2px}
-.indicator-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}@media(max-width:700px){.indicator-layout{grid-template-columns:minmax(0,1fr)}.ring-stage{aspect-ratio:auto;height:300px}.ring-canvas{inset:auto;width:300px;height:300px}}
-.indicator-preview{position:relative;display:grid;place-items:center;min-height:300px;padding:36px 12px 52px;border-radius:var(--radius);background:var(--tint)}
-.preview-tag{position:absolute;top:10px;left:12px;font-size:12px;color:var(--muted)}
-.indicator-photo-target{display:block;width:100%;max-width:280px;height:auto;padding:0;border-radius:12px}.indicator-photo-target:hover:not(:disabled){background:transparent}
-.indicator-preview-toggle{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);min-height:34px;padding:0 12px;background:var(--surface);color:var(--text);font-size:13px}
-.indicator-preview-toggle:hover:not(:disabled){background:var(--surface)}.indicator-preview-toggle ha-icon{--mdc-icon-size:16px}
-.indicator-controls{display:grid;gap:14px;align-content:start;min-width:0}
-.indicator-controls .range{--fill-color:var(--led-color)}
-.indicator-panel:is([data-mode=rainbow],[data-mode=fire]) .range{--fill-color:var(--accent)}.indicator-panel:is([data-mode=rainbow],[data-mode=fire]) .palette{opacity:.5}
-.control-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:13px;color:var(--muted)}
-.indicator-hex{font-family:var(--ha-font-family-code,ui-monospace,monospace);font-size:12px}
-.palette{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
-.indicator-swatch{width:36px;min-height:36px;padding:0;border-radius:50%;background:var(--swatch);box-shadow:inset 0 0 0 1px rgb(127 127 127/.25)}
-.indicator-swatch:hover:not(:disabled){background:var(--swatch)}
-.indicator-swatch[aria-pressed=true]{outline:2px solid var(--text);outline-offset:2px}
-.custom{position:relative;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--tint);color:var(--muted);cursor:pointer}
-.custom input{position:absolute;inset:0;width:100%;height:100%;min-height:0;padding:0;border:0;opacity:0;cursor:pointer}
-.custom:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
-.effects{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:6px}
-.effects button{flex-direction:column;gap:2px;min-height:68px;border-radius:14px;padding:8px 4px;background:var(--tint);color:var(--muted);font-weight:400;font-size:13px}
-.effects button svg{width:40px;height:20px}
-.effects button[aria-pressed=true]{background:var(--accent-tint);color:var(--accent);font-weight:500}
-.range-hints{display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:var(--muted)}
-.indicator-speed[hidden]{display:none}
+.switch input:focus-visible+i{outline:2px solid var(--accent);outline-offset:2px}[data-mode=fire]) .range{--fill-color:var(--accent)}
 .indicator-empty{display:grid;justify-items:center;gap:6px;padding:40px 16px;text-align:center}
-
 @media(prefers-reduced-motion:no-preference){button,.chip,.mode span,.switch i,.switch i:after{transition:background-color .15s,color .15s,transform .15s}.range-fill{transition:width .12s linear}}
 @media(max-width:760px){.admin-shell{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
-  .rail{flex-direction:row;gap:4px;padding:6px 12px;border-right:0;border-bottom:1px solid var(--line);scrollbar-width:none}.rail h3{display:none}.rail button{width:auto;flex-shrink:0;min-height:36px;padding:0 10px}.rail button ha-icon{display:none}
-  .indicator-layout{grid-template-columns:minmax(0,1fr)}.indicator-preview{min-height:0}.indicator-photo-target{max-width:200px}}
+  .rail{flex-direction:row;gap:4px;padding:6px 12px;border-right:0;border-bottom:1px solid var(--line);scrollbar-width:none}.rail h3{display:none}.rail button{width:auto;flex-shrink:0;min-height:36px;padding:0 10px}.rail button ha-icon{display:none}}
 @media(max-width:600px){main{padding:12px 12px 28px}
   .overlay{padding:0;align-items:flex-end}.dialog{width:100%;max-height:94dvh;border-radius:28px 28px 0 0}.admin-dialog{height:94dvh}
   .dialog-head{padding-left:16px}.dialog-body{padding:4px 16px 16px}.dialog-foot{padding:10px 16px}.admin-scroll{padding:12px 16px 16px}.admin-footer{padding:8px 16px;flex-wrap:wrap}.admin-footer>div:first-child{flex:1 1 100%}.admin-footer .actions{margin-left:auto}
@@ -285,11 +236,9 @@ details[open]>summary:before{transform:rotate(45deg)}
   .filters{grid-template-columns:1fr 1fr}.filters .wide{grid-column:1/-1}
   .dev-main{flex-wrap:wrap}.dev-name{flex-basis:calc(100% - 60px)}.mode{margin-left:48px}.mode span{min-width:44px}
   .alert{flex-wrap:wrap}.alert>button{width:100%}
-  .admin-footer>div:first-child span{display:none}
-  .indicator-top{flex-wrap:wrap}.indicator-top>label:first-child{flex-basis:100%}.switch{justify-content:space-between;width:100%}
+  .admin-footer>div:first-child span{display:none}.switch{justify-content:space-between;width:100%}
   .bar-label{display:none}}
 @media(max-width:360px){.controls{gap:3px}.controls button.icon{width:38px;min-height:38px}.seg button{padding:0 6px}}
-
 /* App frame */
 main{max-width:1360px;padding:0 24px 48px}
 .appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:24px;height:64px;margin:0 -24px 20px;padding:0 24px;background:var(--primary-background-color,var(--surface));box-shadow:0 1px 0 var(--line)}
@@ -327,7 +276,6 @@ main{max-width:1360px;padding:0 24px 48px}
 .phrase-switch[aria-checked=true]{background:var(--accent-tint)}.phrase-switch[aria-checked=true] i{transform:translateX(16px);background:var(--accent)}
 .badge[data-kind=rule]{color:var(--muted)}
 .phrase-list{max-height:520px;overflow:auto}
-
 .phrase-foot{margin-top:8px}
 .reply-list{display:flex;flex-direction:column;gap:2px;margin-top:10px;border-radius:14px;overflow:hidden}
 .reply-row{display:grid;grid-template-columns:minmax(160px,240px) minmax(0,1fr);align-items:center;gap:12px;padding:8px 10px;background:var(--tint);margin:0}
@@ -387,7 +335,7 @@ main{max-width:1360px;padding:0 24px 48px}
 :is(.look-tile,.look-wide) .spk-head{padding-right:70px}
 :is(.look-tile,.look-wide) .art{position:absolute;top:14px;right:14px;display:grid;place-items:center;width:58px;height:58px;border-radius:50%;background:rgb(0 0 0/.3);box-shadow:0 0 0 1.5px rgb(255 255 255/.35);filter:drop-shadow(0 2px 4px rgb(0 0 0/.45))}
 :is(.look-tile,.look-wide) .art .indicator-photo{width:44px;margin:0;background:none}
-:is(.look-tile,.look-wide) .art .indicator-photo-light{display:none}
+:is(.look-tile{display:none}
 :is(.look-tile,.look-wide) .spk[data-mood=off] .art img{filter:grayscale(1) opacity(.7)}
 :is(.look-tile,.look-wide) .state{font-size:12.5px}
 :is(.look-tile,.look-wide) .now-pill{margin-top:6px;background:var(--well)}
@@ -560,11 +508,7 @@ button.small{min-height:32px;padding:0 12px;font-size:13px}
 .art{width:88px;height:88px}
 .art .device-midi{transform:scale(1.22)}.art .device-lite2{transform:scale(.94)}
 .art .indicator-photo{position:relative;width:100%;margin:0;border-radius:0;background:none}.spk:has(.now) .art .indicator-photo{background:none}
-.led-note{display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--muted)}
-.led-note:before{content:'';flex:none;width:20px;height:4px;border-radius:2px;background:var(--led-color);opacity:var(--led-brightness)}
-.led-note[data-mode=rainbow]:before{background:linear-gradient(90deg,#f580b6,#ffc46b,#4dd6a5,#528bff)}
-.led-note[data-enabled=false]:before{background:var(--tint);opacity:1}
-.art .indicator-product-image,.art .indicator-photo-light{inset:0;width:100%;height:100%}.art .indicator-photo-light{display:none}
+.art .indicator-product-image{inset:0;width:100%;height:100%}
 .deck-volume{display:flex;align-items:center;gap:8px}.deck-volume .range{flex:1;min-width:0;height:56px;border-radius:18px;--fill-color:var(--spk)}.deck-volume .range-fill{border-radius:18px}.deck-volume .range-fill:after{top:18px;bottom:18px}
 .deck-volume button.icon{width:56px;height:56px;flex-shrink:0;background:color-mix(in srgb,var(--spk) 22%,transparent);color:var(--text)}.deck-volume button.icon:hover:not(:disabled){background:color-mix(in srgb,var(--spk) 34%,transparent);color:var(--text)}
 .deck-volume output{min-width:52px;text-align:right;font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
@@ -587,22 +531,11 @@ button:active:not(:disabled){transform:scale(.97)}
   .tools{gap:0}.tool{padding:6px 0;font-size:11px}
   .appbar.under-ha .brand{visibility:hidden}
   .admin-page .admin-footer{bottom:calc(64px + env(safe-area-inset-bottom));flex-wrap:nowrap;min-height:0}.admin-page .admin-footer>span{min-width:0;font-size:12px}
-  .indicator-layout{gap:12px}.ring-stage{z-index:4;aspect-ratio:auto;height:168px}.ring-canvas{inset:auto;width:168px;height:168px}.ring-stage>span{bottom:4px;font-size:11px}
   .page-seg{overflow-x:auto;scrollbar-width:none}.page-seg button{flex:1 0 auto;padding:0 10px}.journal-filters{flex-wrap:wrap}.journal-filters input{flex-basis:100%}}
-.led-note{min-height:0;width:fit-content;padding:0;border-radius:4px;background:none;font-weight:400;cursor:pointer}.led-note:hover:not(:disabled){background:none;color:var(--text)}
 .admin-footer:empty{display:none}.page-seg{margin-bottom:16px}.admin-solo{max-width:920px;margin-inline:auto}.admin-solo .admin-shell.solo{grid-template-columns:minmax(0,1fr)}
 .speaker-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}.speaker-head h2{margin:0;font-size:18px}.speaker-head p{margin:0;font-size:13px;color:var(--muted)}
 .utility-inline{display:grid;gap:12px;max-width:560px;margin:0 auto}.utility-inline form{display:grid;gap:12px}.utility-inline .actions{justify-content:flex-end}
-.journal-filters{justify-content:flex-start}.journal-filters input{flex:1;min-width:0}.journal-filters select{width:auto}
-.indicator-layout{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}.ring-stage{position:sticky;top:80px}.indicator-panel[data-enabled=false] .ring-canvas{opacity:.35}
-.indicator-controls{gap:8px}.look-row{border-radius:var(--radius);background:var(--tint)}.look-row[data-open=true]{box-shadow:inset 0 0 0 1px var(--line)}
-.look-row-head{display:flex;align-items:center;gap:8px;padding-right:12px}.look-row-head>button{flex:1;min-width:0;justify-content:flex-start;gap:12px;min-height:56px;padding:8px 12px;border-radius:var(--radius);background:none;color:var(--text);font-weight:400;text-align:left}.look-row-head>button:hover:not(:disabled){background:none}
-.look-row-head>button>i{flex:none;width:14px;height:14px;border-radius:50%;background:var(--look)}.look-row[data-on=false] .look-row-head>button>i{opacity:.35}.look-row[data-mode=rainbow] .look-row-head>button>i{background:conic-gradient(#f580b6,#ffc46b,#4dd6a5,#528bff,#f580b6)}.look-row[data-mode=fire] .look-row-head>button>i{background:#ff7a1a}
-.look-row-head span{display:grid;min-width:0}.look-row-head strong{font-weight:500}.look-row-head small{font-size:12px;color:var(--muted)}.look-row .switch{flex:none;width:auto;min-height:40px}
-@media(max-width:700px){.indicator-layout{grid-template-columns:minmax(0,1fr)}.ring-stage{top:56px}.ring-stage .indicator-photo{width:112px}}
-.look-editor{display:grid;gap:14px;padding:4px 12px 12px}.look-row[data-on=false] .look-editor{opacity:.7}.look-copy{justify-self:start;color:var(--muted);font-weight:400}
-@media(prefers-reduced-motion:no-preference){.led-note[data-mode=breathe]:before{animation:spk-breathe var(--led-period) ease-in-out infinite}}
-@keyframes spk-breathe{50%{opacity:calc(var(--led-brightness)*.45)}}
+.journal-filters{justify-content:flex-start}.journal-filters input{flex:1;min-width:0}.journal-filters select{width:auto}.look-row{border-radius:var(--radius);background:var(--tint)}.look-row[data-open=true]{box-shadow:inset 0 0 0 1px var(--line)}.look-row .switch{flex:none;width:auto;min-height:40px}
 `;
   const sheet=new CSSStyleSheet();sheet.replaceSync(STYLES);
   class AliceVoiceCard extends HTMLElement {
@@ -634,7 +567,6 @@ button:active:not(:disabled){transform:scale(.97)}
         if(this._admin&&e.target.dataset.deviceField&&e.target.tagName==='INPUT'&&e.target.type!=='checkbox'){this._setAdminEntity(e.target);return;}
         if(e.target.dataset.adminField&&this._admin)this._admin[e.target.dataset.adminField]=e.target.value;
         if(e.target.dataset.adminField==='dictSearch'){const list=this.shadowRoot.getElementById('dictionary-list');if(list)list.innerHTML=this._dictionaryList();}
-        if(e.target.dataset.indicatorField&&this._admin?.indicator){const moved=e.target.dataset.look&&e.target.dataset.look!==(this._admin.ringLook??'model');if(moved)this._admin.ringLook=e.target.dataset.look;const key=e.target.dataset.indicatorField;const look=this._look();if(key==='color'&&['rainbow','fire'].includes(look.mode))look.mode='steady';look[key]=e.target.type==='checkbox'?e.target.checked:['brightness','period_ms'].includes(key)?Number(e.target.value):e.target.value;const output=this.shadowRoot.querySelector('[data-indicator-output="'+key+'"]');if(output)output.textContent=key==='brightness'?e.target.value+' %':(Number(e.target.value)/1000).toFixed(1)+' с';if(moved)this._render();else this._refreshIndicatorPreview();this._renderAdminFooter();}
         if(e.target.dataset.appField&&this._admin){this._admin.appDraft??={};this._admin.appDraft[e.target.dataset.appField]=e.target.value;}
         if (e.target.id === 'phrases') this._draftPhrases = e.target.value;
         if(e.target.dataset.volume){this._volumeDragging=e.target.dataset.volume;e.target.closest('.range')?.style.setProperty('--fill',e.target.value+'%');const output=this.shadowRoot.querySelector('[data-volume-output="'+e.target.dataset.volume+'"]');if(output)output.textContent=e.target.value+' %';return;}
@@ -643,9 +575,7 @@ button:active:not(:disabled){transform:scale(.97)}
       this.shadowRoot.addEventListener('change', e => {
         if(this._admin?.look&&e.target.dataset?.lookColor){this._saveLook({colors:{[e.target.dataset.lookColor]:e.target.value}});return;}if(this._admin?.music&&e.target.dataset?.relayIntro!==undefined){this._admin.music={...this._admin.music,relay_intro:e.target.value};clearTimeout(this._relaySave);this._relaySave=setTimeout(()=>this._saveMusic(),500);return;}
         if(this._admin&&e.target.dataset?.relaySpeaker!==undefined){this._admin.relaySpeaker=e.target.value;return;}
-        if(e.target.dataset.adminField==='speakerId'&&this._admin?.tab==='indicator'){this._adminAction('admin-indicator-load');return;}
         if(e.target.dataset.adminField==='speakerId'&&this._admin?.tab==='dictionary'){this._adminAction('admin-dictionary-load');return;}
-        if(e.target.tagName==='SELECT'&&e.target.dataset.indicatorField&&this._admin?.indicator){this._admin.indicator.config[e.target.dataset.indicatorField]=e.target.value;return;}
         if(this._admin&&e.target.dataset.accessLabel){const set=new Set(this._admin.config.labels);if(e.target.checked)set.add(e.target.dataset.accessLabel);else set.delete(e.target.dataset.accessLabel);this._admin.config.labels=[...set];this._admin.page=0;this._renderAdminDevices();return;}
         if(this._admin&&e.target.dataset.accessAll!==undefined){this._admin.config.expose_all=e.target.checked;this._admin.page=0;this._renderAdminDevices();return;}
         if(this._admin&&e.target.dataset.deviceField){this._setAdminEntity(e.target);this._renderAdminDevices();return;}
@@ -786,12 +716,12 @@ button:active:not(:disabled){transform:scale(.97)}
     _snapshotKey(){return 'alice-panel-snapshot:v1:'+(this._config.manager_app??this._config.manager_url??'')+':'+this._config.label;}
     _restoreSnapshot(){
       try{const saved=JSON.parse(localStorage.getItem(this._snapshotKey())||'null');if(!saved||!Array.isArray(saved.speakers))return false;
-        this._speakers=saved.speakers;if(saved.look&&typeof saved.look==='object')this._look=saved.look;this._registry=saved.commands??[];this._assignments=saved.assignments??{};this._speakerIndicators=saved.indicators??{};this._mediaPlatforms=saved.platforms??{};this._speakersStale=true;this._commandsStale=true;this._indicatorsStale=true;return true;
+        this._speakers=saved.speakers;if(saved.look&&typeof saved.look==='object')this._look=saved.look;this._registry=saved.commands??[];this._assignments=saved.assignments??{};this._mediaPlatforms=saved.platforms??{};this._speakersStale=true;this._commandsStale=true;return true;
       }catch{return false;}
     }
     _saveSnapshot(){
       if(this._managerError)return;
-      try{localStorage.setItem(this._snapshotKey(),JSON.stringify({look:this._look,speakers:this._speakers.map(s=>({id:s.id,name:s.name,area:s.area,area_id:s.area_id,profile:s.profile,model:s.model,media_entity:s.media_entity,trusted_fingerprint:!!s.trusted_fingerprint,install:s.install?{state:s.install.state,adopted:s.install.adopted}:undefined,last_check:s.last_check?{root:s.last_check.root}:undefined,connection:{status:s.connection?.status==='online'?'online':'unknown',last_seen:s.connection?.last_seen,volume:s.connection?.volume}})),commands:this._registry.filter(item=>this._selected(item)),assignments:this._assignments,indicators:this._speakerIndicators??{},platforms:this._mediaPlatforms}));}catch{}
+      try{localStorage.setItem(this._snapshotKey(),JSON.stringify({look:this._look,speakers:this._speakers.map(s=>({id:s.id,name:s.name,area:s.area,area_id:s.area_id,profile:s.profile,model:s.model,media_entity:s.media_entity,trusted_fingerprint:!!s.trusted_fingerprint,install:s.install?{state:s.install.state,adopted:s.install.adopted}:undefined,last_check:s.last_check?{root:s.last_check.root}:undefined,connection:{status:s.connection?.status==='online'?'online':'unknown',last_seen:s.connection?.last_seen,volume:s.connection?.volume}})),commands:this._registry.filter(item=>this._selected(item)),assignments:this._assignments,platforms:this._mediaPlatforms}));}catch{}
     }
     _name(item) { return this._hass?.states[item.entity_id]?.attributes.friendly_name ?? item.name ?? item.original_name ?? item.entity_id; }
     _selected(item) { return (item.labels ?? []).includes(this._config.label); }
@@ -862,7 +792,7 @@ button:active:not(:disabled){transform:scale(.97)}
     }
     async _readManager() {
       if(!this._config.manager_url&&!this._config.manager_app)return;
-      try {const [data,assign,look]=await Promise.all([this._api('/api/speakers'),this._api('/api/assignments'),this._api('/api/look').catch(()=>null)]);if(look)this._look=look;this._speakers=data.speakers??[];this._speakerRevision=data.revision;this._key=data.public_key;this._installationReady=data.installation_ready;this._advertisedUrl=data.advertised_url;this._adoptionEnabled=data.adoption_enabled===true;this._assignments=assign.assignments??{};this._managerError='';await Promise.all(this._speakers.filter(s=>s.media_entity&&!(s.media_entity in this._mediaPlatforms)).map(async speaker=>{try{const entry=await this._hass.callWS({type:'config/entity_registry/get',entity_id:speaker.media_entity});this._mediaPlatforms[speaker.media_entity]=entry?.platform??null;}catch{this._mediaPlatforms[speaker.media_entity]=null;}}));this._speakersStale=false;this._renderIdle();this._loadSpeakerPreviews().then(()=>{this._saveSnapshot();this._renderIdle();});}
+      try {const [data,assign,look]=await Promise.all([this._api('/api/speakers'),this._api('/api/assignments'),this._api('/api/look').catch(()=>null)]);if(look)this._look=look;this._speakers=data.speakers??[];this._speakerRevision=data.revision;this._key=data.public_key;this._installationReady=data.installation_ready;this._advertisedUrl=data.advertised_url;this._adoptionEnabled=data.adoption_enabled===true;this._assignments=assign.assignments??{};this._managerError='';await Promise.all(this._speakers.filter(s=>s.media_entity&&!(s.media_entity in this._mediaPlatforms)).map(async speaker=>{try{const entry=await this._hass.callWS({type:'config/entity_registry/get',entity_id:speaker.media_entity});this._mediaPlatforms[speaker.media_entity]=entry?.platform??null;}catch{this._mediaPlatforms[speaker.media_entity]=null;}}));this._speakersStale=false;this._renderIdle();this._saveSnapshot();}
       catch(error){this._managerError=error.message;this._speakersStale=false;}
       this._resumeAddressSetup();
     }
@@ -883,7 +813,7 @@ button:active:not(:disabled){transform:scale(.97)}
       const rows=this._registry.filter(item=>this._selected(item));
       const page=document.createElement('template');page.innerHTML=`<main class="${this._speakersStale?'is-stale':''}"><div id="ops-region" class="ops" aria-live="polite">${this._opsStrip()}</div>${this._tab==='home'?this._home(rows,disabled):this._standalone(rows,disabled)}${this._dialog?this._editor(disabled):''}${this._speakerDialog?this._speakerEditor(disabled):''}${this._utility&&!this._utility.inline?this._utilityDialog():''}</main>`;
       morphChildren(this.shadowRoot,page.content,this.shadowRoot.activeElement);
-      this._bindNativePicker();this._bindUtilityPickers();this._syncIndicatorAnimations();this._fitNowPills();
+      this._bindNativePicker();this._bindUtilityPickers();this._fitNowPills();
       if(this._dialog)queueMicrotask(()=>this.shadowRoot.querySelector('#phrases')?.focus());
     }
     _notice(){return this._message&&!this._dialog&&!this._utility?`<div class="notice" role="status"><span>${escape(this._message)}</span>${this._undo?'<button data-action="undo">Отменить</button>':''}</div>`:'';}
@@ -920,7 +850,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if(this._admin!==a)unsubs.forEach(fn=>fn());else this._adminUnsubs=unsubs;
     }
     _stopAdminHA(){clearTimeout(this._adminRefreshTimer);for(const unsubscribe of this._adminUnsubs??[])unsubscribe();this._adminUnsubs=[];}
-    _adminDirty(){const a=this._admin;return !!a&&(a.saved!==undefined&&JSON.stringify(a.config)!==a.saved||Object.values(a.indicatorCache??{}).some(x=>x.saved!==undefined&&JSON.stringify(x.config)!==x.saved));}
+    _adminDirty(){const a=this._admin;return !!a&&(a.saved!==undefined&&JSON.stringify(a.config)!==a.saved);}
     _adminDomainName(domain){return ({light:'Освещение',switch:'Выключатели и розетки',sensor:'Датчики',binary_sensor:'Датчики состояния',climate:'Климат',cover:'Шторы и ворота',fan:'Вентиляторы',media_player:'Медиаплееры',humidifier:'Увлажнители',vacuum:'Пылесосы',lock:'Замки',input_boolean:'Переключатели',input_button:'Кнопки',button:'Кнопки устройств',input_number:'Числовые помощники',number:'Регуляторы',input_select:'Выбор режима',select:'Режимы устройств',scene:'Сцены',script:'Скрипты',siren:'Сирены',alarm_control_panel:'Сигнализации',lawn_mower:'Газонокосилки',valve:'Клапаны',water_heater:'Водонагреватели'})[domain]??this._hass.localize?.('component.'+domain+'.title')??domain;}
     _adminRows(a=this._admin){
       const registry=new Map(a.entities.map(e=>[e.entity_id,e])),devices=new Map((a.devices??[]).map(d=>[d.id,d])),areas=new Map((a.areas??[]).map(x=>[x.area_id,x.name]));
@@ -965,7 +895,6 @@ button:active:not(:disabled){transform:scale(.97)}
     _adminFooter(){
       const a=this._admin,dirty=this._adminDirty();
       if(a.closeConfirm)return `<span>Есть несохранённые изменения.</span><div class="actions"><button type="button" data-action="admin-keep-editing">Продолжить</button><button type="button" class="secondary" data-action="admin-discard-close">Закрыть без сохранения</button></div>`;
-      if(a.tab==='indicator')return `<span>${a.busy?'Подождите…':a.indicator?.speaker===a.speakerId&&JSON.stringify(a.indicator.config)!==a.indicator.saved?'Есть несохранённые изменения':'Все изменения сохранены'}</span><div class="actions"><button type="button" class="primary" data-action="admin-indicator-save" ${a.busy||a.indicator?.speaker!==a.speakerId?'disabled':''}>Применить на колонке</button></div>`;
       if(a.tab!=='devices')return '';
       return `<div><strong>${a.busy?'Подождите…':a.failed?'Настройки не загружены':dirty?'Есть несохранённые изменения':'Все изменения сохранены'}</strong><span>${escape(a.refreshError||'Настройки применяются без перезапуска колонок.')}</span></div><div class="actions"><button type="button" data-action="admin-undo-access" ${a.busy||!dirty?'disabled':''}>Отменить изменения</button><button type="button" class="primary" data-action="admin-save-access" ${a.busy||a.failed||!dirty?'disabled':''}>Сохранить</button></div>`;
     }
@@ -976,112 +905,10 @@ button:active:not(:disabled){transform:scale(.97)}
     _speakerModel(s){const value=[s.profile,s.name,s.model].join(' ');return /midi|миди/i.test(value)?'midi':/mini[ _-]?2|мини[ _-]?2/i.test(value)?'mini2':'lite2';}
     _devicePhoto(model,identity){
       const image=model==='midi'?MIDI_PRODUCT_IMAGE:model==='mini2'?MINI2_PRODUCT_IMAGE:LITE2_PRODUCT_IMAGE,name=model==='midi'?'Яндекс Станция Миди':model==='mini2'?'Яндекс Станция Мини 2':'Яндекс Станция Лайт 2',id='led-'+String(identity).replace(/[^a-z0-9_-]/gi,''),path=model==='midi'?'M122 139 C181 147 246 155 309 162 Q324 166 339 159 L437 128':model==='mini2'?'M250 190 C263 185 290 185 305 190 C290 195 263 195 250 190':'M233 110 C247 104 277 104 291 110 C277 116 247 116 233 110';
-      return `<div class="indicator-photo device-${model}"><img class="indicator-product-image" src="${image}" alt="${name}" width="540" height="541" decoding="async"><svg class="indicator-photo-light" viewBox="0 0 540 541" aria-hidden="true"><defs><linearGradient id="${id}-colors"><stop offset="0%" data-led-zone="0" stop-color="var(--led-color)"/><stop offset="50%" data-led-zone="1" stop-color="var(--led-color)"/><stop offset="100%" data-led-zone="2" stop-color="var(--led-color)"/></linearGradient><mask id="${id}-mask"><path d="${path}" fill="none" stroke="white" stroke-width="16" stroke-linecap="round"/></mask><filter id="${id}-off" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR type="linear" slope="0.28"/><feFuncG type="linear" slope="0.28"/><feFuncB type="linear" slope="0.28"/></feComponentTransfer></filter><filter id="${id}-glow" x="-20%" y="-80%" width="140%" height="260%"><feGaussianBlur stdDeviation="3"/></filter></defs>${model==='midi'?`<image href="${image}" width="540" height="541" mask="url(#${id}-mask)" filter="url(#${id}-off)"/>`:''}<g class="indicator-led" fill="none" stroke-linecap="round"><path d="${path}" stroke="${model==='lite2'?'url(#'+id+'-colors)':'var(--led-color)'}" stroke-width="9" opacity="0.48" filter="url(#${id}-glow)"/><path d="${path}" stroke="${model==='lite2'?'url(#'+id+'-colors)':'var(--led-color)'}" stroke-width="5"/><path d="${path}" stroke="white" stroke-width="1" opacity="0.3"/></g></svg></div>`;
+      return `<div class="indicator-photo device-${model}"><img class="indicator-product-image" src="${image}" alt="${name}" width="540" height="541" decoding="async"></div>`;
     }
-    _speakerPreviewConfig(s){const cfg=this._speakerIndicators?.[s.id]??{color:'#8a8a8a',brightness:75,mode:this._media(s).state?.state==='playing'?'breathe':'steady',enabled:true},color=/^#[0-9a-f]{6}$/i.test(cfg.color)?cfg.color:'#8a8a8a';return {cfg,attrs:`data-mode="${escape(cfg.mode??'steady')}" data-enabled="${!!cfg.enabled}" style="--led-color:${color};--led-brightness:${(cfg.brightness??100)/100};--led-period:${cfg.period_ms??2400}ms"`};}
-    _speakerIllustration(s){return `<div class="art" data-speaker-preview="${escape(s.id)}" ${this._speakerPreviewConfig(s).attrs} title="Предпросмотр подсветки на экране, не состояние колонки">${this._devicePhoto(this._speakerModel(s),'home-'+s.id)}</div>`;}
-    _speakerLedNote(s){const {attrs}=this._speakerPreviewConfig(s),c=this._speakerIndicators?.[s.id],on=c?[c.enabled&&'нейросеть',c.music?.enabled&&'музыка',c.lamp?.enabled&&'лампа'].filter(Boolean):null,text=!c?'Подсветка':on.length?'Подсветка: '+on.join(', '):'Подсветка выключена';return `<button type="button" class="led-note" data-action="speaker-led" data-id="${escape(s.id)}" ${attrs}>${text}</button>`;}
-    async _loadSpeakerPreviews(){this._speakerIndicators??={};const refresh=this._indicatorsStale;this._indicatorsStale=false;await Promise.allSettled(this._speakers.filter(s=>['midi','lite2'].includes(this._speakerModel(s))&&s.trusted_fingerprint&&(refresh||!this._speakerIndicators[s.id])).map(async s=>{const result=await this._api('/api/speakers/'+encodeURIComponent(s.id)+'/indicator','POST',{action:'get'});this._speakerIndicators[s.id]=result.config;}));}
+    _speakerIllustration(s){return `<div class="art" data-speaker-preview="${escape(s.id)}" >${this._devicePhoto(this._speakerModel(s),'home-'+s.id)}</div>`;}
 
-    _indicatorValues(cfg,elapsed){
-      const period=cfg.period_ms||2400,phase=(elapsed%period)/period,brightness=cfg.brightness??100;
-      let factor=1;
-      if(cfg.mode==='breathe')factor=.625+.375*Math.cos(2*Math.PI*phase);
-      if(cfg.mode==='rainbow')factor=.875+.125*Math.cos(2*Math.PI*phase);
-      if(cfg.mode==='double'){const peak=center=>{const d=Math.abs(phase-center),v=Math.min(d,1-d)/.065;return Math.exp(-v*v)};factor=.2+.8*Math.max(peak(0),peak(.24));}
-      const level=Math.round(brightness*factor),base=[1,3,5].map(i=>parseInt((cfg.color||'#00d5ff').slice(i,i+2),16));
-      const frame=[],colors=[];
-      for(let zone=0;zone<3;zone++){
-        let rgb=base;
-        if(cfg.mode==='rainbow'){const h=((phase+zone/3)%1)*6,x=1-Math.abs(h%2-1);rgb=[[1,x,0],[x,1,0],[0,1,x],[0,x,1],[x,0,1],[1,0,x]][Math.floor(h)].map(v=>v*255);}
-        colors.push('rgb('+rgb.map(v=>Math.round(v)).join(',')+')');frame.push(...rgb.map(v=>Math.floor(v*160*level/255/100)));
-      }
-      return {level,frame,colors};
-    }
-    _animateIndicator(scope,cfg,paused=false){
-      if(!scope)return;
-      const key=JSON.stringify(cfg),reduced=matchMedia('(prefers-reduced-motion:reduce)').matches,period=cfg.period_ms||2400;
-      const led=scope.querySelector('.indicator-led');if(!led)return;
-      if(scope._animationKey===key){for(const el of [led,...scope.querySelectorAll('[data-led-zone]')])for(const a of el.getAnimations())if(a.id.startsWith('alice-led-'))paused?a.pause():a.play();return;}
-      const old=led.getAnimations().find(a=>a.id==='alice-led-level'),phase=old?(Number(old.currentTime||0)/Number(old.effect.getTiming().duration))%1:0;
-      for(const el of [led,...scope.querySelectorAll('[data-led-zone]')]){el.style.animation='none';for(const a of el.getAnimations())a.cancel();}
-      scope._animationKey=key;
-      const disabled=scope.dataset.enabled==='false'&&scope.dataset.preview!=='true';
-      if(disabled){led.style.opacity='0';return;}
-      const count=Math.ceil(period/40),values=Array.from({length:count+1},(_,i)=>this._indicatorValues(cfg,period*i/count));
-      const animate=(el,frames,id)=>{const a=el.animate(frames,{duration:period,iterations:Infinity,easing:'linear'});a.id=id;a.currentTime=phase*period;if(paused)a.pause();return a;};
-      led.style.opacity=String(values[0].level/100);
-      if(!reduced&&cfg.mode!=='steady')animate(led,values.map(v=>({opacity:v.level/100})),'alice-led-level');
-      for(const stop of scope.querySelectorAll('[data-led-zone]')){
-        const zone=Number(stop.dataset.ledZone),colors=values.map(v=>cfg.mode==='rainbow'?v.colors[zone]:cfg.color);
-        stop.style.stopColor=colors[0];
-        if(!reduced&&cfg.mode==='rainbow')animate(stop,colors.map(stopColor=>({stopColor})),'alice-led-zone-'+zone);
-      }
-    }
-    _syncIndicatorAnimations(){
-      for(const scope of this.shadowRoot.querySelectorAll('[data-speaker-preview]')){const speaker=this._speakers.find(s=>s.id===scope.dataset.speakerPreview);if(speaker)this._animateIndicator(scope,this._speakerIndicators?.[speaker.id]??{enabled:true,color:'#a78bfa',brightness:75,mode:this._media(speaker).state?.state==='playing'?'breathe':'steady',period_ms:2400});}
-      if(this._admin?.indicator&&this._admin.indicator.speaker===this._admin.speakerId)this._startLedPreview(this.shadowRoot.querySelector('.indicator-panel'));
-    }
-    _ringPeriods(){const speed={steady:2400,breathe:4200,double:2400,rainbow:6000,comet:2600,wave:3200,sparkle:4200,fire:3600},config=this._admin?.indicator?.config;for(const look of [config,config?.music,config?.lamp])if(look)look.period_ms=speed[look.mode]??2400;}
-    _look(){const a=this._admin,config=a?.indicator?.config,key=a?.ringLook;if(!config)return {};if(key!=='music'&&key!=='lamp')return config;config[key]??={enabled:false,color:key==='music'?'#a78bfa':'#ffc46b',mode:key==='music'?'wave':'steady',brightness:key==='music'?100:60,period_ms:2400};return config[key];}
-    _ledFrame(cfg,ms,n){
-      const period=cfg.period_ms||2400,phase=(ms%period)/period,hex=/^#[0-9a-f]{6}$/i.test(cfg.color??'')?cfg.color:'#00d5ff',base=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)),top=(cfg.brightness??100)/100;
-      const random=(i,step)=>{let x=Math.imul(i,374761393)+Math.imul(step,668265263);x=Math.imul(x^(x>>>13),1274126177);return ((x^(x>>>16))&65535)/65535;},drift=(i,t)=>{const step=Math.floor(t);let blend=t-step;blend=blend*blend*(3-2*blend);return random(i,step)*(1-blend)+random(i,step+1)*blend;};
-      const hue=h=>{h=((h%1+1)%1)*6;const x=1-Math.abs(h%2-1);return [[1,x,0],[x,1,0],[0,1,x],[0,x,1],[x,0,1],[1,0,x]][Math.floor(h)%6].map(v=>v*255);};
-      return Array.from({length:n},(_,i)=>{
-        const position=i/n;let rgb=base,level=top;
-        if(cfg.mode==='rainbow')rgb=hue(phase+position);
-        else if(cfg.mode==='breathe')level*=.625+.375*Math.cos(2*Math.PI*phase);
-        else if(cfg.mode==='double'){const peak=center=>{const d=Math.abs(phase-center),v=Math.min(d,1-d)/.065;return Math.exp(-v*v);};level*=.2+.8*Math.max(peak(0),peak(.24));}
-        else if(cfg.mode==='comet'){const behind=(phase-position+1)%1,lead=1.5/n;level*=Math.max(.03,behind>1-lead?(behind-1+lead)/lead:Math.exp(-behind*5));}
-        else if(cfg.mode==='wave')level*=.55+.45*Math.sin(2*Math.PI*(phase*2-position));
-        else if(cfg.mode==='sparkle'){const beat=ms/period*(.7+.6*random(i,1))+random(i,2),glint=Math.max(0,Math.sin(2*Math.PI*beat));level*=.12+.88*glint**3;}
-        else if(cfg.mode==='fire'){const t=ms/period*8,flame=.3+.7*(.6*drift(i,t)+.4*drift(i+64,t*2.3));rgb=[255,255*(.08+.42*flame*flame),0];level*=flame;}
-        return {rgb,level};
-      });
-    }
-    _startLedPreview(panel){
-      cancelAnimationFrame(this._ledRaf);
-      const canvas=panel?.querySelector('.ring-canvas');if(!canvas)return;
-      const context=canvas.getContext('2d'),leds=panel.querySelector('.device-midi')?24:3,steps=144,reduced=matchMedia('(prefers-reduced-motion:reduce)').matches,started=performance.now(),now=Array.from({length:leds},()=>[0,0,0]);
-      const draw=time=>{
-        if(!panel.isConnected)return;
-        const size=canvas.clientWidth,scale=Math.min(devicePixelRatio||1,2);if(canvas.width!==Math.round(size*scale)){canvas.width=canvas.height=Math.round(size*scale);}
-        const look=this._look(),frame=this._ledFrame(look,reduced?0:Math.max(0,time-started),leds),center=canvas.width/2,radius=canvas.width*.4;
-        frame.forEach((pixel,i)=>{for(let c=0;c<3;c++){const target=pixel.rgb[c]*pixel.level;now[i][c]+=(target-now[i][c])*.25;}});
-        context.clearRect(0,0,canvas.width,canvas.height);context.globalCompositeOperation='lighter';context.lineCap='butt';
-        const color=step=>{const at=step/steps*leds,left=Math.floor(at)%leds,right=(left+1)%leds,mix=at-Math.floor(at),blend=mix*mix*(3-2*mix);return now[left].map((v,c)=>v*(1-blend)+now[right][c]*blend);};
-        const paint=context.createConicGradient(-Math.PI/2,center,center);for(let step=0;step<=steps;step++)paint.addColorStop(step/steps,'rgb('+color(step%steps).map(Math.round).join(',')+')');
-        context.strokeStyle=paint;
-        for(const [width,alpha,blur] of [[canvas.width*.1,.55,canvas.width*.05],[canvas.width*.022,1,0]]){context.lineWidth=width;context.globalAlpha=alpha;context.filter=blur?'blur('+blur+'px)':'none';context.beginPath();context.arc(center,center,radius,0,2*Math.PI);context.stroke();}
-        context.globalAlpha=1;
-        context.filter='none';
-        if(!reduced)this._ledRaf=requestAnimationFrame(draw);
-      };
-      draw(started);
-    }
-    _refreshIndicatorPreview(){
-      const cfg=this._look(),panel=this.shadowRoot.querySelector('.indicator-panel');if(!cfg||!panel)return;
-      const color=/^#[0-9a-f]{6}$/i.test(cfg.color)?cfg.color:'#00d5ff',mode=cfg.mode??'steady';
-      const row=panel.querySelector('.look-row[data-open=true]');if(row){row.style.setProperty('--look',color);row.dataset.on=String(!!cfg.enabled);row.dataset.mode=mode;row.querySelector('[data-look-summary]').textContent=this._lookSummary(cfg);}
-      const stage=panel.querySelector('[data-stage-label]');if(stage)stage.textContent=cfg.enabled?'Предпросмотр на экране':'Выключено, предпросмотр на экране';
-      panel.style.setProperty('--led-color',mode==='rainbow'?'#a78bfa':color);panel.style.setProperty('--led-brightness',String((cfg.brightness??100)/100));panel.style.setProperty('--led-period',(cfg.period_ms??2400)+'ms');panel.dataset.mode=mode;panel.dataset.enabled=String(cfg.enabled);panel.dataset.previewPaused=String(!!this._admin.previewPaused);for(const button of panel.querySelectorAll('[data-action=admin-preview-toggle]')){button.setAttribute('aria-label',this._admin.previewPaused?'Запустить предпросмотр':'Приостановить предпросмотр');if(button.classList.contains('indicator-preview-toggle')){button.setAttribute('aria-pressed',String(!this._admin.previewPaused));button.querySelector('[data-preview-symbol]').innerHTML=icon(this._admin.previewPaused?'play':'pause');button.querySelector('[data-preview-label]').textContent=this._admin.previewPaused?'Продолжить':'Пауза';}}
-      for(const el of panel.querySelectorAll('[data-indicator-hex]'))el.textContent=mode==='rainbow'?'Спектр':mode==='fire'?'Цвета пламени':color.toUpperCase();
-      for(const el of panel.querySelectorAll('[data-action=admin-indicator-color]'))el.setAttribute('aria-pressed',String(!['rainbow','fire'].includes(mode)&&el.dataset.color.toLowerCase()===color.toLowerCase()));
-      for(const el of panel.querySelectorAll('[data-action=admin-indicator-mode]'))el.setAttribute('aria-pressed',String(el.dataset.mode===mode));
-      const picker=panel.querySelector('[data-indicator-field=color]');if(picker)picker.value=color;
-      for(const field of panel.querySelectorAll('input[type=range]')){const min=Number(field.min),max=Number(field.max);field.closest('.range')?.style.setProperty('--fill',((Number(field.value)-min)/(max-min)*100)+'%');}
-      const speed=panel.querySelector('.indicator-speed');if(speed)speed.hidden=mode==='steady';const label=panel.querySelector('[data-indicator-period-label]');if(label)label.textContent=mode==='rainbow'?'Цикл':'Период';
-    }
-
-    _lookSummary(look){const names={steady:'Постоянный',breathe:'Дыхание',double:'Пульсация',rainbow:'Радуга',comet:'Комета',wave:'Волна',sparkle:'Мерцание',fire:'Огонь'},name=names[look?.mode]??'Постоянный';return look?.enabled?name:'Выключено · '+name;}
-    _lookRows(blocked,editor){const a=this._admin,config=a.indicator.config,current=a.ringLook??'model',looks=[['model','Когда отвечает нейросеть',config],['music','Когда играет музыка',config.music],['lamp','В остальное время',config.lamp]];return looks.map(([id,name,look])=>{const open=id===current,on=!!look?.enabled,color=/^#[0-9a-f]{6}$/i.test(look?.color??'')?look.color:'var(--accent)';return `<section class="look-row" data-open="${open}" data-on="${on}" data-mode="${escape(look?.mode??'steady')}" style="--look:${color}"><div class="look-row-head"><button type="button" data-action="admin-ring-look" data-look="${id}" aria-expanded="${open}" ${blocked}><i aria-hidden="true"></i><span><strong>${name}</strong><small data-look-summary>${this._lookSummary(look)}</small></span></button><label class="switch"><input type="checkbox" role="switch" aria-label="${name}" data-indicator-field="enabled" data-look="${id}" ${on?'checked':''} ${blocked}><i aria-hidden="true"></i></label></div>${open?`<div class="look-editor">${editor}</div>`:''}</section>`;}).join('');}
-    _indicatorBody(station,blocked){
-      const a=this._admin,model=this._speakerModel(this._speakers.find(s=>s.id===a.speakerId)??{}),ready=a.indicator?.speaker===a.speakerId,cfg=ready?this._look():{},color=/^#[0-9a-f]{6}$/i.test(cfg.color)?cfg.color:'#00d5ff',mode=cfg.mode??'steady',brightness=cfg.brightness??100,period=cfg.period_ms??2400;
-      const wave=path=>`<svg viewBox="0 0 48 24" fill="none" aria-hidden="true"><path d="${path}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-      const effects=[['steady','Постоянный','Ровное свечение','M4 12H44'],['breathe','Дыхание','Плавная волна','M3 18C11 18 11 5 23 5S35 18 45 18'],['double','Пульсация','Двойной импульс','M3 18H8L13 5L18 18H23L28 5L33 18H45'],['rainbow','Радуга','Цвета по кольцу','M4 16C10 2 17 2 23 16M19 16C25 2 32 2 38 16M34 16H44'],['comet','Комета','Огонёк с хвостом','M4 12H26M26 12L44 12M36 6L44 12L36 18'],['wave','Волна','Бежит по кольцу','M3 12C8 3 13 3 18 12S28 21 33 12S41 5 45 8'],['sparkle','Мерцание','Случайные искры','M8 16V8M4 12H12M28 10V4M25 7H31M38 20V14M35 17H41'],['fire','Огонь','Тёплое пламя','M24 20C14 20 12 12 18 8C18 12 21 12 22 4C28 8 34 13 30 18C29 19 27 20 24 20']];
-      return `<div class="indicator-panel" data-enabled="${!!cfg.enabled}" data-mode="${escape(mode)}" data-preview="true" data-preview-paused="${!!a.previewPaused}" style="--led-color:${mode==='rainbow'?'#a78bfa':color};--led-brightness:${brightness/100};--led-period:${period}ms">${ready?`<div class="indicator-layout"><section class="ring-stage" aria-label="Предпросмотр подсветки, только на экране"><canvas class="ring-canvas" aria-hidden="true"></canvas>${this._devicePhoto(model,'settings')}<span data-stage-label>${cfg.enabled?'Предпросмотр на экране':'Выключено, предпросмотр на экране'}</span></section><div class="indicator-controls">${this._lookRows(blocked,`<section><div class="control-title"><span>Цвет</span><span class="indicator-hex" data-indicator-hex>${mode==='rainbow'?'Спектр':color.toUpperCase()}</span></div><div class="palette">${[['#00d5ff','Голубой'],['#a78bfa','Фиолетовый'],['#528bff','Синий'],['#4dd6a5','Мятный'],['#ffc46b','Янтарный'],['#f580b6','Розовый']].map(([hex,name])=>`<button type="button" class="indicator-swatch" data-action="admin-indicator-color" data-color="${hex}" aria-label="${name}" title="${name}" aria-pressed="${mode!=='rainbow'&&color.toLowerCase()===hex}" style="--swatch:${hex}" ${blocked}></button>`).join('')}<label class="custom" title="Свой цвет">${icon('eyedropper')}<input type="color" aria-label="Свой цвет" data-indicator-field="color" value="${color}" ${blocked}></label></div></section><div class="range" style="--fill:${(brightness-1)/99*100}%"><span class="range-fill"></span>${icon('brightness-6')}<span>Яркость</span><output data-indicator-output="brightness">${brightness} %</output><input type="range" aria-label="Яркость" data-indicator-field="brightness" min="1" max="100" step="1" value="${brightness}" ${blocked}></div><section><div class="control-title"><span>Эффект</span></div><div class="effects" role="group" aria-label="Эффект подсветки">${effects.map(([id,name,description,path])=>`<button type="button" data-action="admin-indicator-mode" data-mode="${id}" aria-pressed="${mode===id}" title="${description}" ${blocked}>${wave(path)}${name}</button>`).join('')}</div></section>`)}${this._speakers.filter(item=>item.id!==a.speakerId).map(item=>`<button type="button" class="look-copy" data-action="admin-indicator-copy" data-target="${escape(item.id)}" ${blocked}>${icon('content-copy')}Скопировать на ${escape(item.name)}</button>`).join('')}</div></div>`:`<div class="indicator-empty"><h3>${a.busy?'Подключаемся к колонке…':'Настройки не загружены'}</h3><p>Подсветка работает на Станции Миди и Лайт 2.</p><button type="button" class="secondary" data-action="admin-indicator-load" ${blocked}>${a.busy?'Загрузка…':'Загрузить'}</button></div>`}</div>`;
-    }
 
 
 
@@ -1333,7 +1160,6 @@ button:active:not(:disabled){transform:scale(.97)}
       const a=this._admin,blocked=a.busy?'disabled':'',groups=[['Алиса',[['setup','Быстрая настройка','rocket-launch-outline'],['ai','AI','creation-outline'],['music','Музыка','music-note'],['relay','Интерком','message-arrow-right-outline'],['phrases','Фразы','text-box-edit-outline']]],['Вид',[['look','Кастомизация','palette-outline']]],['Приложение',[['app','Подключение','connection'],['advanced','Конфигурация','code-json']]]],page=this._section==='speaker',speaker=this._speakers.find(s=>s.id===a.speakerId);let body='';
       const station=page?'':`<label>Колонка<select data-admin-field="speakerId" ${blocked}>${this._speakers.map(s=>`<option value="${escape(s.id)}" ${s.id===a.speakerId?'selected':''}>${escape(s.name)} · ${escape(s.host)}</option>`).join('')}</select></label>`;
       if(a.tab==='devices')body=`<div id="admin-access-body" class="fields">${this._adminAccessBody()}</div>`;
-      if(a.tab==='indicator')body=this._indicatorBody(station,blocked);
       if(a.tab==='setup')body=this._setupPage();
       if(a.tab==='ai')body=this._aiPage(blocked);
       if(a.tab==='music')body=this._musicPage(blocked);
@@ -1351,7 +1177,7 @@ button:active:not(:disabled){transform:scale(.97)}
         body=a.options?`<section class="group"><h3>Колонки</h3>${field('advertised_url','Локальный адрес приложения','http://192.168.…:18081')}<details><summary>Дополнительно</summary><div class="fields">${field('speaker_network','Сеть колонок (CIDR)')}${field('voice_command_label','Метка голосовых команд')}</div></details></section><div class="actions"><button type="button" class="primary" data-action="admin-save-app" ${blocked}>Сохранить</button><button type="button" class="secondary" data-action="admin-restart-app" ${blocked}>Перезапустить приложение</button></div><p class="help">Новые значения начинают работать после перезапуска. Подключённые колонки обновляются через настройки моста.</p>`:'<p>Загрузка…</p>';
       }
       const inline=a.tab==='general'||a.tab==='bridge',solo=this._section!=='settings',seg=tabs=>`<div class="seg page-seg" role="tablist" aria-label="Разделы">${tabs.map(([id,label])=>`<button type="button" role="tab" aria-selected="${a.tab===id}" data-action="admin-tab" data-tab="${id}" ${blocked}>${label}</button>`).join('')}</div>`;
-      const head=page?`<div class="speaker-head"><button type="button" class="icon" data-action="admin-close" aria-label="К колонкам" title="К колонкам">${icon('arrow-left')}</button><div><h2 id="admin-title">${escape(speaker?.name??'Колонка')}</h2><p>${escape([speaker?.area,speaker?.host].filter(Boolean).join(' · '))}</p></div></div>${seg([['general','Колонка'],['indicator','Подсветка'],['service','Обслуживание']])}`:this._section==='house'?this._houseHead(a.tab):this._section==='music'?'<h2 id="admin-title" class="admin-title">Музыка</h2>':'<h2 id="admin-title" class="admin-title">Настройки</h2>';
+      const head=page?`<div class="speaker-head"><button type="button" class="icon" data-action="admin-close" aria-label="К колонкам" title="К колонкам">${icon('arrow-left')}</button><div><h2 id="admin-title">${escape(speaker?.name??'Колонка')}</h2><p>${escape([speaker?.area,speaker?.host].filter(Boolean).join(' · '))}</p></div></div>${seg([['general','Колонка'],['service','Обслуживание']])}`:this._section==='house'?this._houseHead(a.tab):this._section==='music'?'<h2 id="admin-title" class="admin-title">Музыка</h2>':'<h2 id="admin-title" class="admin-title">Настройки</h2>';
       return `<section class="dialog admin-dialog admin-page ${solo?'admin-solo':''}" aria-labelledby="admin-title">${head}<div class="admin-shell ${solo?'solo':''}">${solo?'':`<nav class="rail" role="tablist" aria-orientation="vertical" aria-label="Разделы настроек">${groups.map(([name,tabs])=>`<h3>${name}</h3>${tabs.map(([id,label,glyph])=>`<button type="button" role="tab" aria-selected="${a.tab===id}" data-action="admin-tab" data-tab="${id}" ${blocked}>${icon(glyph)}${label}</button>`).join('')}`).join('')}</nav>`}<div class="admin-main"><div class="admin-scroll">${a.message?`<div class="notice" role="status">${escape(a.message)}</div>`:''}${inline?body:`<form id="admin-form">${body}</form>`}</div><footer id="admin-footer" class="admin-footer" aria-live="polite">${this._adminFooter()}</footer></div></div></section>`;
     }
     _leaveAdmin(section='speakers'){if(this._utility?.inline)this._utility=null;this._stopAdminHA();this._admin=null;this._section=section;this._journalOpen=section==='journal';this._render();if(section==='journal')this._loadActivity();this.shadowRoot.querySelector('[data-section="'+section+'"]')?.focus();}
@@ -1373,18 +1199,12 @@ button:active:not(:disabled){transform:scale(.97)}
       if(action==='admin-alias-save'){if(!a.aliasText?.trim()||!a.aliasEntity){a.message='Укажите алиас и устройство.';this._render();return;}a.busy=true;a.message='';this._render();let saved=false;try{const result=await this._api('/api/dictionary/alias','POST',{alias:a.aliasText.trim(),entity_id:a.aliasEntity});saved=!!result.saved;a.message=saved?'':result.error??'Алиас не сохранён.';}catch(error){a.message=error.message;}finally{a.busy=false;}if(!saved){this._render();return;}a.aliasPhrase=null;await this._adminAction('admin-dictionary-load');a.message='Алиас сохранён. Колонка получит фразу в течение нескольких секунд.';this._render();return;}
       if(action==='admin-dictionary-load'){const id=a.speakerId;if(!id)return;a.busy=true;a.message='';this._render();try{a.dictionary={speaker:id,data:await this._api('/api/speakers/'+encodeURIComponent(id)+'/dictionary')};}catch(error){a.dictionary=null;a.message=error.message;}finally{a.busy=false;this._render();}return;}
       if(action==='admin-tab'){if(this._utility?.inline)this._utility=null;a.message='';a.tab=button.dataset.tab;if(a.tab==='indicator'){await this._adminAction('admin-indicator-load');return;}if(a.tab==='dictionary'){await this._adminAction('admin-dictionary-load');return;}if(a.tab==='advanced')a.raw=JSON.stringify(a.config,null,2);this._render();if((a.tab==='app'||a.tab==='ai')&&!a.options){a.busy=true;try{const info=await this._hass.callWS({type:'supervisor/api',endpoint:'/addons/'+this._config.manager_app+'/info',method:'GET'});a.options=info.options;}catch(error){a.message=error.message;}finally{a.busy=false;this._render();}}return;}
-      if(action==='admin-preview-toggle'){a.previewPaused=!a.previewPaused;this._refreshIndicatorPreview();return;}
-      if(action==='admin-ring-look'){a.ringLook=button.dataset.look;this._look();this._render();return;}
-      if(action==='admin-indicator-color'||action==='admin-indicator-mode'){if(a.indicator?.speaker!==a.speakerId)return;const look=this._look();if(action==='admin-indicator-color'){look.color=button.dataset.color;if(['rainbow','fire'].includes(look.mode))look.mode='steady';}else look.mode=button.dataset.mode;this._ringPeriods();this._refreshIndicatorPreview();this._renderAdminFooter();return;}
       if(action==='admin-path'){a.path=button.dataset.path;a.fileRevision=null;a.content='';this._render();return;}
       if(action==='admin-diagnostic'){a.command='uname -a; uptime; ps w; netstat -lnt; wget -qO- http://127.0.0.1:18861/healthz';this._render();return;}
       a.busy=true;a.message='Выполняем…';
       // Read application form fields before replacing the DOM.
       const appFields=Object.fromEntries([...this.shadowRoot.querySelectorAll('[data-app-field]')].map(e=>[e.dataset.appField,e.value]));this._render();
       try{
-        if(action==='admin-indicator-load'){a.indicatorCache??={};if(a.indicatorCache[a.speakerId])a.indicator=a.indicatorCache[a.speakerId];else{const result=await this._api('/api/speakers/'+encodeURIComponent(a.speakerId)+'/indicator','POST',{action:'get'});const config={brightness:100,mode:'steady',period_ms:2400,...result.config};a.indicator={...result,config,speaker:a.speakerId,saved:JSON.stringify(config)};a.indicatorCache[a.speakerId]=a.indicator;}a.message='';}
-        if(action==='admin-indicator-save'){if(a.indicator?.speaker!==a.speakerId)throw Error('Загрузите настройки выбранной колонки.');this._ringPeriods();const result=await this._api('/api/speakers/'+encodeURIComponent(a.speakerId)+'/indicator','POST',{action:'save',...a.indicator.config,revision:a.indicator.revision});a.indicator={...result,speaker:a.speakerId,saved:JSON.stringify(result.config)};a.indicatorCache??={};a.indicatorCache[a.speakerId]=a.indicator;this._speakerIndicators??={};this._speakerIndicators[a.speakerId]=result.config;a.closeConfirm=false;a.message='Подсветка сохранена, колонка применит её за пару секунд.';}
-        if(action==='admin-indicator-copy'){const target=button.dataset.target,path='/api/speakers/'+encodeURIComponent(target)+'/indicator';this._ringPeriods();const current=await this._api(path,'POST',{action:'get'}),result=await this._api(path,'POST',{action:'save',...a.indicator.config,revision:current.revision});this._speakerIndicators??={};this._speakerIndicators[target]=result.config;if(a.indicatorCache)delete a.indicatorCache[target];a.message='Подсветка скопирована на '+(this._speakers.find(s=>s.id===target)?.name??'колонку')+'.';}
         if(action==='admin-save-access'||action==='admin-save-json'){
           const config=action==='admin-save-json'?JSON.parse(a.raw):a.config,result=await this._api('/api/access','PUT',{config,revision:a.revision});a.config=result.config;a.saved=JSON.stringify(result.config);a.revision=result.revision;a.closeConfirm=false;a.lastBackup=result.backup;a.message='';
         }
@@ -1460,7 +1280,7 @@ button:active:not(:disabled){transform:scale(.97)}
       const cards=charts.map(chart=>this._metricChart(chart,shown,now-range,now)).filter(Boolean).join('');
       return pick+head+`<div class="m-grid">${cards}</div>`+this._diagnosticsCards(speaker.id);
     }
-    /* What the bridge measured itself: where each request spent time and why the ring changed. */
+    /* What the bridge measured itself: where each request spent time. */
     _diagnosticsCards(id){
       const d=this._diagnostics?.[id];if(!d)return '';
       const ms=v=>typeof v==='number'&&v>0?(v>=1000?(v/1000).toFixed(1)+' с':v+' мс'):'—';
@@ -1471,10 +1291,7 @@ button:active:not(:disabled){transform:scale(.97)}
       const byRoute=Object.entries(Object.groupBy?Object.groupBy(d.timeline??[],t=>t.route||'?'):{}).map(([r,list])=>`${escape(route[r]??r)}: ${ms(median(list.map(t=>t.total_ms)))}`).join(' · ');
       const timeline=rows.length?`<table class="m-table"><thead><tr><th>Время</th><th>Кто ответил</th><th>Распознавание</th><th>Решение</th><th>Выполнение</th><th>До голоса</th><th>Всего</th></tr></thead><tbody>${rows.map(t=>`<tr><td>${time(t.at)}</td><td>${escape(route[t.route]??t.route??'')}<small>${escape(t.source??'')}</small></td><td>${ms(t.asr_ms)}</td><td>${ms(t.decide_ms)}</td><td>${ms(t.exec_ms)}</td><td>${ms(t.voice_ms)}</td><td><b>${ms(t.total_ms)}</b></td></tr>`).join('')}</tbody></table>`:'<p class="m-note">Запросов ещё не было или мост старше версии с замерами.</p>';
       const looks={off:'выкл',lamp:'лампа',music:'музыка',thinking:'думает',muted:'микрофон выкл','yield:volume':'громкость (прошивка)','yield:listening':'слушает (прошивка)','yield:speaking':'говорит (прошивка)','yield:thinking':'думает (прошивка)'};
-      const name=v=>escape(looks[v]??v??'—');
-      const changes=(d.ring??[]).slice(-15).reverse();
-      const ring=changes.length?`<table class="m-table"><thead><tr><th>Время</th><th>Было</th><th>Стало</th><th>Держалось</th><th>Звук / плеер</th></tr></thead><tbody>${changes.map(t=>`<tr class="${t.held_ms>0&&t.held_ms<1500?'m-short':''}"><td>${time(t.at)}</td><td>${name(t.from)}</td><td>${name(t.to)}</td><td>${ms(t.held_ms)}</td><td>${t.card?'да':'нет'} / ${t.player?'да':'нет'}</td></tr>`).join('')}</tbody></table>`:'<p class="m-note">Подсветка ещё не менялась или мост старше версии с журналом.</p>';
-      return `<div class="m-grid m-diag"><article class="m-card"><header><div><h3>Задержки запросов</h3><p>От конца фразы до голоса. Медиана: ${byRoute||'—'}</p></div></header>${timeline}</article><article class="m-card"><header><div><h3>Подсветка</h3><p>Смены вида кольца; короче 1,5 с выделены — это и есть моргание</p></div></header>${ring}</article></div>`;
+      return `<div class="m-grid m-diag"><article class="m-card"><header><div><h3>Задержки запросов</h3><p>От конца фразы до голоса. Медиана: ${byRoute||'—'}</p></div></header>${timeline}</article></div>`;
     }
     _metricChart(chart,rows,from,to){
       const series=chart.series.map(([name,key,color])=>({name,color:color??chart.color,values:rows.map(row=>{const v=typeof key==='function'?key(row):row[key];return typeof v==='number'&&isFinite(v)?v:null;})}));
@@ -1671,8 +1488,7 @@ button:active:not(:disabled){transform:scale(.97)}
     _patch(region,markup){if(region._markup===markup)return;region._markup=markup;region.innerHTML=markup;}
     async _mediaAction(id,service,data={}){const speaker=this._speakers.find(s=>s.id===id);if(!speaker||this._stationBusy.has(id))return;const media=this._media(speaker);const bits={volume_set:4,media_stop:4096,media_pause:1,media_play:16384,play_media:512};if(!bits[service]||!media.can(bits[service])||(service==='play_media'&&!media.yandex)){this._stationMessages[id]='Это действие недоступно для выбранного медиаплеера.';this._note(id,this._stationMessages[id]);return false;}
       this._stationBusy.add(id);const utility=this._utility;const relatedButtons=[...this.shadowRoot.querySelectorAll('.utility-dialog button[data-id="'+id+'"]')].filter(el=>['tts','test-sound','media'].includes(el.dataset.action)).map(el=>({el,disabled:el.disabled}));for(const item of relatedButtons)item.el.disabled=true;if(utility?.type==='control'&&utility.speakerId===id){utility.message='Отправка запроса…';this._utilityMessage();}for(const control of this.shadowRoot.querySelectorAll('[data-media="'+id+'"] input,[data-media="'+id+'"] button[data-service]'))control.disabled=true;try{await this._hass.callService('media_player',service,data,{entity_id:speaker.media_entity});this._stationMessages[id]=service==='volume_set'?'':'Запрос отправлен в Home Assistant.';return true;}catch(error){this._stationMessages[id]='Не удалось отправить запрос. Повторите ещё раз.';this._note(id,this._stationMessages[id]);return false;}finally{this._stationBusy.delete(id);for(const item of relatedButtons)if(item.el.isConnected)item.el.disabled=item.disabled;if(this._utility===utility&&utility?.type==='control'&&utility.speakerId===id){utility.message=this._stationMessages[id];this._utilityMessage();}this._refreshMedia();}}
-    _speakerTint(s){const color=this._speakerIndicators?.[s.id]?.color;return /^#[0-9a-f]{6}$/i.test(color??'')?`style="--spk:${color}"`:'';}
-    _speakerPanel(disabled){return `${this._managerError?'<div class="notice" data-manager-error role="status"><span>Нет связи с сервисом колонок. Данные могут быть устаревшими.</span><button data-action="refresh">Повторить</button></div>':''}${this._tab==='home'?'':`<div class="sec"><p id="speaker-summary">${this._speakerSummary()}</p>${iconButton('refresh','refresh','Обновить',disabled)}</div>`}<div class="speakers ${this._lookClass().cls}" style="${this._lookClass().style}">${this._speakers.map(s=>`<article class="spk" data-spk="${escape(s.id)}" data-mood="${this._mood(s)[0]}" ${this._speakerTint(s)}><div class="spk-head"><div class="spk-name"><h3>${escape(s.name)}</h3><p class="help">${escape(s.area||'Комната не указана')}</p><div class="spk-mood">${this._mood(s)[1]}</div><div class="state" data-connection="${escape(s.id)}">${this._speakerStatus(s)}</div></div>${this._speakerIllustration(s)}</div><div data-media="${escape(s.id)}">${this._mediaControls(s)}</div></article>`).join('')}</div>${!this._speakers.length&&!this._managerError?`<div class="list"><div class="empty">${this._loaded?'<h3>Колонок пока нет</h3><p>Добавьте станцию, чтобы управлять звуком и назначать команды.</p>':'<h3>Загрузка…</h3>'}</div></div>`:''}`;}
+    _speakerPanel(disabled){return `${this._managerError?'<div class="notice" data-manager-error role="status"><span>Нет связи с сервисом колонок. Данные могут быть устаревшими.</span><button data-action="refresh">Повторить</button></div>':''}${this._tab==='home'?'':`<div class="sec"><p id="speaker-summary">${this._speakerSummary()}</p>${iconButton('refresh','refresh','Обновить',disabled)}</div>`}<div class="speakers ${this._lookClass().cls}" style="${this._lookClass().style}">${this._speakers.map(s=>`<article class="spk" data-spk="${escape(s.id)}" data-mood="${this._mood(s)[0]}" ><div class="spk-head"><div class="spk-name"><h3>${escape(s.name)}</h3><p class="help">${escape(s.area||'Комната не указана')}</p><div class="spk-mood">${this._mood(s)[1]}</div><div class="state" data-connection="${escape(s.id)}">${this._speakerStatus(s)}</div></div>${this._speakerIllustration(s)}</div><div data-media="${escape(s.id)}">${this._mediaControls(s)}</div></article>`).join('')}</div>${!this._speakers.length&&!this._managerError?`<div class="list"><div class="empty">${this._loaded?'<h3>Колонок пока нет</h3><p>Добавьте станцию, чтобы управлять звуком и назначать команды.</p>':'<h3>Загрузка…</h3>'}</div></div>`:''}`;}
     _diagnostics(){return `<div class="journal-tools journal-filters"><input type="search" data-journal="query" aria-label="Поиск по журналу" placeholder="Поиск фразы" value="${escape(this._journalQuery??'')}" autocomplete="off"><select data-journal="speaker" aria-label="Колонка"><option value="">Все колонки</option>${this._speakers.map(s=>`<option value="${escape(s.id)}" ${s.id===this._journalSpeaker?'selected':''}>${escape(s.name)}</option>`).join('')}</select>${iconButton('activity-refresh','refresh','Обновить журнал')}</div><div id="activity-region">${this._activityMarkup()}</div>`;}
     _statusLabel(status){return ({handled:'Обработано',forwarded:'Передано Алисе',answered:'Ответ дан',accepted:'Запрос принят',confirmed:'Состояние подтверждено',already:'Уже в нужном состоянии',clarification:'Нужно уточнение',unavailable:'Недоступно',error:'Ошибка',cancelled:'Отменено',success:'Выполнено',completed:'Выполнено',failed:'Ошибка',pending:'В обработке'})[status]??'Статус не указан';}
     _routeLabel(route){return ({home:'Управление домом',yandex:'Штатная Алиса',llm:'Нейросеть',playback:'Воспроизведение'})[route]??'Маршрут не определён';}
@@ -1827,7 +1643,7 @@ button:active:not(:disabled){transform:scale(.97)}
       if (!button || button.disabled || this._busy) return;
       const {action,id}=button.dataset;
       if(action.startsWith('admin-'))return this._adminAction(action,button);
-      if(action==='settings'||action==='speaker-led'){this._openSpeaker(id,action==='settings'?'general':'indicator');return;}
+      if(action==='settings'){this._openSpeaker(id,'general');return;}
       if(['tts','activity','preview','setup'].includes(action)){this._openUtility(action,id);return;}
       if(action==='save-app-url')return this._saveAppUrl();
       if(action==='key-added'){if(this._utility&&!this._stationBusy.has(this._utility.speakerId)){this._utility.setupStep=2;this._utility.message='';this._render();}return;}

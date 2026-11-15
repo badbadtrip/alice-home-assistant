@@ -98,11 +98,11 @@ func main() {
 		ChatParameters: cfg.LLMChatParameters,
 	}
 	var planner home.Planner = lc
-	var ring *indicator.Controller
 	if diagnostics == 0 {
-		ring = indicator.New(*path)
-		go ring.Serve(context.Background())
-		lc.OnRequest = ring.Request
+		// The ring is the firmware's; undo the pattern mount an older bridge left behind.
+		if err := indicator.RestoreStock(); err != nil {
+			slog.Warn("ring_restore_failed", "error", err)
+		}
 	}
 	llmDisabled := os.Getenv("QUASAR_LLM_DISABLED") == "1"
 	if llmDisabled {
@@ -197,14 +197,6 @@ func main() {
 		}
 		return track
 	}
-	if ring != nil {
-		ring.AddMusic(func() bool {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			info := currentTrack(ctx)
-			return info != nil && info.Status == nowplaying.Playing
-		})
-	}
 	mux := http.NewServeMux()
 	mcpConfigured := 0
 	if cfg.Mode == "hybrid" && cfg.AssistantTools.Enabled {
@@ -260,16 +252,6 @@ func main() {
 		_, _ = w.Write(data)
 	})
 	mux.HandleFunc("GET /volume", proxy.VolumeHandler)
-	// The ring's last changes of look with the reason, to find what makes it blink.
-	mux.HandleFunc("GET /ring", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		var items []indicator.Transition
-		if ring != nil {
-			items = ring.Transitions()
-		}
-		data, _ := json.Marshal(items)
-		_, _ = w.Write(data)
-	})
 	// Where the last requests spent their time; no text, only the route and milliseconds.
 	mux.HandleFunc("GET /timeline", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -284,9 +266,6 @@ func main() {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("GET /music-state", func(w http.ResponseWriter, r *http.Request) {
-		if ring != nil {
-			ring.SetMusic(r.URL.Query().Get("playing") == "1")
-		}
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.Handle("/uni.ws", proxy)
@@ -333,9 +312,6 @@ func main() {
 	}
 	go localstate.WatchVolume(ctx, func(v localstate.Volume) {
 		first := volume.Swap(&v) == nil
-		if ring != nil && !first {
-			ring.VolumeChanged()
-		}
 		if !first {
 			speakerVolume.changed(v.Level)
 		}
@@ -346,9 +322,6 @@ func main() {
 		// QUASAR_SENDSPIN_URL points a development bridge at a separately run service.
 		musicAssistant = &sendspin.Player{URL: cmp.Or(os.Getenv("QUASAR_SENDSPIN_URL"), hf.URL), Token: hf.Token, Speaker: hf.SpeakerID}
 		musicAssistant.OnChange = func() {
-			if ring != nil {
-				ring.SetMusic(musicAssistant.Streaming())
-			}
 			changed()
 		}
 	}
@@ -360,9 +333,6 @@ func main() {
 		if airPlay != nil {
 			airPlay.SetAliceState(state)
 		}
-		if ring != nil {
-			ring.SetVoice(state)
-		}
 		if state == "idle" {
 			speakerVolume.aliceIdle()
 		}
@@ -371,8 +341,8 @@ func main() {
 		// 10.2: quick phrases without «Алиса» drive AirPlay while it is connected.
 		connected := airPlay != nil && airPlay.Connected()
 		slog.Info("alice_quick_command", "phrase", phrase, "action", action, "airplay", connected)
-		if connected && airPlay.Control(ctx, action) == nil && ring != nil {
-			ring.Ack(action)
+		if connected {
+			_ = airPlay.Control(ctx, action)
 		}
 	})
 	if control, err := newAirPlayControl(ctx, os.Getenv("QUASAR_DATA_DIR"), os.Getenv("QUASAR_HOME_AREA"), airplay.VolumeHooks{Sender: speakerVolume.fromSender, Speaker: speakerVolume.speaker}); err != nil {
@@ -381,9 +351,6 @@ func main() {
 		airPlay = control
 		airPlayRef.Store(control)
 		engine.AirPlay = control
-		if ring != nil {
-			engine.Ack = ring.Ack
-		}
 		mux.Handle("GET /airplay", control)
 		defer control.shutdown()
 		go control.resume()

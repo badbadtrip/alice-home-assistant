@@ -37,9 +37,7 @@ type Engine struct {
 	// MusicAssistant plays Music Assistant on this speaker; nil without the app link.
 	MusicAssistant MusicAssistantPlayer
 	// AirPlay is the receiver built into the bridge; nil when it could not be set up.
-	AirPlay AirPlayPlayer
-	// Ack shows a silent sign on the ring after a player command (10.4); may be nil.
-	Ack          func(action string)
+	AirPlay      AirPlayPlayer
 	Silencer     interface{ Silence(context.Context) error }
 	Dialogue     *dialogue.Store
 	dialogueOnce sync.Once
@@ -131,16 +129,12 @@ func (e *Engine) ResolveDecision(ctx context.Context, text string, decision Rout
 			action := airPlayActions[playback.Command(text)]
 			if err := e.AirPlay.Control(ctx, action); err != nil {
 				result.Answer = Reply("airplay_refused", "Телефон не принял команду. Управляйте музыкой на нём.")
-			} else {
-				e.ack(action)
 			}
 			return result, nil
 		}
 		if decision.Source == "ma_control" {
 			if err := e.MusicAssistant.Control(ctx, maActions[playback.Command(text)]); err != nil {
 				result.Answer = Reply("ma_down", "Music Assistant сейчас не отвечает.")
-			} else {
-				e.ack(playback.Command(text))
 			}
 			return result, nil
 		}

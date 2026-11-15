@@ -50,25 +50,5 @@ class AdminTests(unittest.TestCase):
   m.ssh.assert_not_called()
   m.store.metadata.assert_called_with('test',airplay_off=True)
   with self.assertRaises(Error):station(m,'test','airplay',{'action':'reboot'})
- def test_indicator_validates_and_uses_atomic_persistent_write(self):
-  raw=b'{"enabled":false,"color":"#00bfff"}\n'
-  m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'}),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(side_effect=[b'ready\n',raw,b'']))
-  result=station(m,'test','indicator',{'action':'save','enabled':True,'color':'#12ABef','revision':revision(raw)})
-  self.assertEqual(result['config'],{'enabled':True,'color':'#12abef','brightness':100,'mode':'steady','period_ms':2400})
-  self.assertFalse(result['restarted'])
-  self.assertIn('mv ',m.ssh.call_args.args[1]);self.assertIn('cp -p',m.ssh.call_args.args[1])
-  for change in ({'color':'#fff;reboot'},{'enabled':'true'},{'revision':'stale'},{'brightness':101},{'brightness':True},{'period_ms':0},{'mode':'strobe'}):
-   m.ssh=Mock(side_effect=[b'ready\n',raw])
-   with self.assertRaises(Error):station(m,'test','indicator',{'action':'save','enabled':True,'color':'#00bfff','revision':revision(raw),**change})
- def test_rainbow_requires_updated_plum_bridge(self):
-  raw=b'{"enabled":true,"color":"#00bfff"}\n'
-  m=SimpleNamespace(store=SimpleNamespace(speaker=lambda _: {'trusted_fingerprint':'test'}),operation_lock=threading.Lock(),jobs_lock=threading.Lock(),jobs={},ssh=Mock(side_effect=[b'ready\n',raw,b'']))
-  payload={'action':'save','enabled':True,'color':'#00bfff','mode':'rainbow','revision':revision(raw)}
-  with self.assertRaises(Error):station(m,'test','indicator',payload)
-  self.assertEqual(m.ssh.call_count,3)
-  m.ssh=Mock(side_effect=[b'ready\n',raw,b'rainbow\n',b''])
-  result=station(m,'test','indicator',payload)
-  self.assertEqual(result['config']['mode'],'rainbow')
-  self.assertFalse(result['restarted'])
 if __name__=='__main__':unittest.main()
 

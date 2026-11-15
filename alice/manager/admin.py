@@ -155,48 +155,6 @@ def station(manager, speaker_id, operation, payload):
             output = manager.ssh(speaker, 'sh -c ' + shlex.quote(script) + ' | head -c 48000', timeout=14).decode('utf-8', errors='replace')
             match = re.search(r'\nALICE_EXIT_CODE=(\d+)\n$', output)
             return {'output': output[:match.start()] if match else output, 'exit_code': int(match[1]) if match else None, 'truncated': match is None}
-        if operation == 'indicator':
-            root = '/data/opt/quasar-bridge/'
-            status = manager.ssh(speaker, 'if test -f ' + root + 'indicator-ready && { test -d /sys/class/leds/cucumber:red:ring23 || test -d /sys/class/leds/plum:red:ring3; }; then echo ready; else echo unsupported; fi', timeout=12).decode().strip()
-            if status != 'ready':
-                raise Error('Подсветка доступна на Миди и Лайт 2 после обновления моста.', 409)
-            path = root + 'indicator.json'
-            current = manager.ssh(speaker, 'if test -L ' + path + '; then exit 1; elif test -f ' + path + '; then head -c 1024 ' + path + '; else printf \'{"enabled":false,"color":"#00bfff"}\\n\'; fi', timeout=12)
-            config = json.loads(current)
-            config = {'brightness':100,'mode':'steady','period_ms':2400,**config}
-            if payload.get('action', 'get') == 'get':
-                return {'config': config, 'revision': revision(current)}
-            if payload.get('action') != 'save' or not isinstance(payload.get('enabled'), bool) or not isinstance(payload.get('color'), str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', payload['color']):
-                raise Error('Выберите цвет и включите или выключите индикацию.')
-            if payload.get('revision') != revision(current):
-                raise Error('Настройка уже изменена. Загрузите её заново.', 409)
-            brightness=payload.get('brightness',100)
-            mode=payload.get('mode','steady')
-            period=payload.get('period_ms',2400)
-            modes=('steady','breathe','double','rainbow','comet','wave','sparkle','fire')
-            if type(brightness) is not int or not 1<=brightness<=100 or mode not in modes or type(period) is not int or not 800<=period<=8000:
-                raise Error('Яркость: 1–100%, эффект из списка; период: 800–8000 мс.')
-            layers={}
-            for key in ('music','lamp'):
-                layer=payload.get(key)
-                if layer is None:
-                    continue
-                if not isinstance(layer,dict) or not isinstance(layer.get('enabled'),bool) or not isinstance(layer.get('color'),str) or not re.fullmatch(r'#[0-9a-fA-F]{6}',layer['color']) or layer.get('mode') not in modes or type(layer.get('brightness',100)) is not int or not 1<=layer.get('brightness',100)<=100 or type(layer.get('period_ms',2400)) is not int or not 800<=layer.get('period_ms',2400)<=8000:
-                    raise Error('Проверьте настройки подсветки для музыки и лампы.')
-                layers[key]={'enabled':layer['enabled'],'color':layer['color'].lower(),'mode':layer['mode'],'brightness':layer.get('brightness',100),'period_ms':layer.get('period_ms',2400)}
-            if mode not in ('steady','breathe','double') or layers:
-                capable = manager.ssh(speaker, 'if test "$(cat /data/opt/quasar-bridge/indicator-ready)" = 3; then echo rainbow; fi', timeout=12).decode().strip()
-                if capable != 'rainbow':
-                    raise Error('Эти эффекты доступны после обновления моста.', 409)
-            config = {'enabled': payload['enabled'], 'color': payload['color'].lower(),'brightness':brightness,'mode':mode,'period_ms':period,**layers}
-            raw = (json.dumps(config) + '\n').encode()
-            suffix = '.alice-backup-' + secrets.token_hex(8)
-            # Color is read on the next model request; no service restart needed.
-            script = ('umask 077; test ! -L ' + path + ' && '
-                      'if test -f ' + path + '; then test "$(sha256sum ' + path + ' | cut -d " " -f 1)" = ' + revision(current) + ' && cp -p ' + path + ' ' + path + suffix + '; else test ! -e ' + path + '; fi && '
-                      'cat > ' + path + suffix + '.tmp && test "$(sha256sum ' + path + suffix + '.tmp | cut -d " " -f 1)" = ' + revision(raw) + ' && mv ' + path + suffix + '.tmp ' + path)
-            manager.ssh(speaker, script, data=raw, timeout=12)
-            return {'config': config, 'revision': revision(raw), 'restarted': False}
         try:
             path = remote_path(payload.get('path'))
         except ValueError as error:

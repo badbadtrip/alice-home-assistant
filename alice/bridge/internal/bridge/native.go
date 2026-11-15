@@ -26,7 +26,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"quasarbridge/internal/dialogue"
-	"quasarbridge/internal/indicator"
 	"quasarbridge/internal/llm"
 	"quasarbridge/internal/sound"
 	"quasarbridge/internal/wire"
@@ -521,8 +520,7 @@ func (n *Native) Server(ctx context.Context, k websocket.MessageType, data []byt
 			query := p.text
 			n.mu.Unlock()
 			n.wg.Go(func() {
-				turnCtx, finish := indicator.WithTurn(p.ctx)
-				defer finish()
+				turnCtx := p.ctx
 				result, err := resolver.Fallback(turnCtx, query)
 				if p.ctx.Err() != nil {
 					return
@@ -602,8 +600,7 @@ func (n *Native) maybeResolve(p *nativeRequest) {
 	text := p.text
 	n.mu.Unlock()
 	n.wg.Go(func() {
-		turnCtx, finish := indicator.WithTurn(p.ctx)
-		defer finish()
+		turnCtx := p.ctx
 		if n.DecisionDelay > 0 {
 			select {
 			case <-time.After(n.DecisionDelay):

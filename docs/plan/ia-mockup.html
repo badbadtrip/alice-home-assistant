@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Алиса — новая структура</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+<style>
+:root{--bg:#0b0b0d;--panel:#16171c;--card:#bfc6f5;--ink:#1c1f3a;--muted:#9aa0b4;--text:#eceef5;--line:#26283a;--acc:#8ea2ff;--soft:#22243a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.bar{display:flex;align-items:center;gap:22px;padding:14px 24px;border-bottom:1px solid var(--line);max-width:1200px;margin:auto;flex-wrap:wrap}
+.brand{font-size:18px;font-weight:600;display:flex;gap:8px;align-items:center}
+.tabs{display:flex;gap:4px;flex:1;flex-wrap:wrap}.tabs button{padding:8px 12px;border-radius:10px;color:var(--muted)}
+.tabs button.on{color:var(--text);background:var(--soft)}
+.pill{padding:8px 14px;border-radius:12px;background:var(--soft)}
+main{max-width:1200px;margin:auto;padding:22px 24px 60px}
+h2{font-size:18px;margin:0 0 4px}h3{font-size:15px;margin:0 0 6px}.m{color:var(--muted);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-top:14px}
+.spk{background:var(--card);color:var(--ink);border-radius:18px;padding:14px;cursor:pointer}
+.spk .m{color:#4a5078}.row{display:flex;align-items:center;gap:10px}
+.img{width:46px;height:46px;border-radius:50%;background:#e6e9ff;display:grid;place-items:center;font-size:22px;margin-left:auto}
+.vol{flex:1;height:34px;border-radius:10px;background:#d9ddfb;position:relative;overflow:hidden}.vol i{position:absolute;inset:0 auto 0 0;background:#8e97d6}
+.vol span{position:absolute;right:10px;top:8px;font-size:12px}
+.layout{display:grid;grid-template-columns:220px 1fr;gap:22px;margin-top:16px}
+.rail{display:flex;flex-direction:column;gap:2px}.rail button{text-align:left;padding:9px 12px;border-radius:10px;color:var(--muted);display:flex;gap:10px;align-items:center}
+.rail button.on{background:var(--soft);color:var(--text)}.rail .g{font-size:11px;color:var(--muted);margin:12px 12px 4px;text-transform:uppercase;letter-spacing:.04em}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+.f{display:grid;grid-template-columns:180px 1fr;gap:10px 16px;align-items:center}
+.in{background:var(--soft);border-radius:10px;padding:9px 12px}
+.tg{width:38px;height:22px;border-radius:11px;background:var(--acc);position:relative}.tg:after{content:"";position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff}
+.tg.off{background:#3a3d52}.tg.off:after{right:auto;left:3px}
+.back{color:var(--acc);display:flex;gap:6px;align-items:center;margin-bottom:10px}
+.cmd{display:flex;gap:12px;align-items:center;padding:12px;border-radius:12px;background:var(--soft);margin-top:8px}
+.chip{font-size:11px;padding:2px 8px;border-radius:8px;background:#30344f;color:#c9cff5}
+.where{font-size:11px;color:#c9cff5;background:#2b2f4d;border-radius:6px;padding:1px 6px;margin-left:6px}
+.note{border:1px dashed #4a4f78;border-radius:12px;padding:10px 14px;color:var(--muted);font-size:12px;margin-bottom:16px}
+@media(max-width:700px){.layout{grid-template-columns:1fr}.rail{flex-direction:row;overflow-x:auto}.rail .g{display:none}.f{grid-template-columns:1fr}}
+</style></head><body>
+<header class="bar"><div class="brand"><span class="mdi mdi-waveform"></span>Алиса</div>
+<nav class="tabs" id="tabs"></nav><button class="pill"><span class="mdi mdi-bullhorn-outline"></span> Объявление</button><button class="pill" data-go="settings" title="Настройки"><span class="mdi mdi-cog-outline"></span></button></header>
+<main id="app"></main>
+<script>
+const S={view:'speakers',spk:null,sub:'main',voice:'commands',set:'setup'};
+const speakers=[{id:'midi',name:'MIDI',room:'Комната',icon:'mdi-cube-outline',vol:40,state:'Тихо'},{id:'lite',name:'Lite 2',room:'Кухня',icon:'mdi-circle-slice-8',vol:50,state:'Играет: Музыка для вечера'}];
+const tabs=[['speakers','Колонки'],['voice','Голос'],['journal','Журнал']];
+function nav(){document.getElementById('tabs').innerHTML=tabs.map(([k,l])=>`<button data-go="${k}" class="${S.view===k?'on':''}">${l}</button>`).join('')}
+const note=t=>`<div class="note"><span class="mdi mdi-information-outline"></span> ${t}</div>`;
+function railHtml(groups,cur,key){return `<div class="rail">${groups.map(([g,items])=>`<div class="g">${g}</div>`+items.map(([k,l,i,w])=>`<button data-${key}="${k}" class="${cur===k?'on':''}"><span class="mdi ${i}"></span>${l}${w?`<span class="where">было: ${w}</span>`:''}</button>`).join('')).join('')}</div>`}
+function speakersView(){return note('Карточки колонок без изменений. Клик по карточке открывает страницу колонки — там всё про эту колонку.')+`<h2>Колонки</h2><div class="m">2 колонки · на связи 2</div><div class="grid">${speakers.map(s=>`<div class="spk" data-spk="${s.id}"><div class="row"><div><b>${s.name}</b><div class="m">${s.room}</div></div><div class="img"><span class="mdi ${s.icon}"></span></div></div><div style="font-size:18px;font-weight:600;margin:6px 0 10px">${s.state.startsWith('Играет')?'Играет':'Тихо'}</div><div class="row"><span class="mdi mdi-stop"></span><div class="vol"><i style="width:${s.vol}%"></i><span>${s.vol} %</span></div><span class="mdi mdi-cog-outline"></span></div></div>`).join('')}</div>`}
+function speakerPage(){const s=speakers.find(x=>x.id===S.spk);const g=[['Колонка',[['main','Основное','mdi-tune','⚙ колонки'],['music','Музыка','mdi-music-note','Настройки → Музыка'],['airplay','AirPlay','mdi-cast','карточка'],['ring','Подсветка','mdi-palette-outline','Настройки → Кастомизация']]],['Состояние',[['metrics','Метрики','mdi-chart-areaspline','вкладка Метрики'],['history','Запросы','mdi-history','Журнал'],['service','Обслуживание','mdi-wrench-outline','⚙ колонки']]]];
+const body={main:`<div class="box"><h3>Основное</h3><div class="f"><span>Название</span><div class="in">${s.name}</div><span>Комната</span><div class="in">${s.room}</div><span>Медиаплеер HA</span><div class="in">media_player.yandex_${s.id}</div></div></div>`,
+music:`<div class="box"><h3>Музыка на этой колонке</h3><div class="f"><span>Источник</span><div class="in">Яндекс Музыка ▾</div><span>Music Assistant</span><div class="row"><div class="tg off"></div><span class="m">по Sendspin</span></div></div><p class="m">Аккаунты сервисов — в ⚙ Настройки → Музыкальные сервисы.</p></div>`,
+airplay:`<div class="box"><h3>AirPlay</h3><div class="f"><span>Видна как</span><div class="in">Алиса ${s.room}</div><span>Включено</span><div class="tg"></div><span>Приглушать при голосе</span><div class="tg"></div></div></div>`,
+ring:`<div class="box"><h3>Подсветка кольца</h3><div class="f"><span>Вид</span><div class="in">Пастель ▾</div><span>Яркость</span><div class="vol" style="background:#2b2f4d"><i style="width:60%;background:var(--acc)"></i></div></div><p class="m">Предпросмотр меняет только экран.</p></div>`,
+metrics:`<div class="box"><h3>Метрики ${s.name}</h3><div style="height:140px;border-radius:10px;background:linear-gradient(180deg,#22243a,#16171c)"></div><p class="m">Задержка ответа, Wi‑Fi, CPU за 24 ч.</p></div>`,
+history:`<div class="box"><h3>Запросы с этой колонки</h3>${['выключи свет','какая погода','таймер на 10 минут'].map(t=>`<div class="cmd"><span class="mdi mdi-microphone"></span>${t}<span class="m" style="margin-left:auto">сегодня</span></div>`).join('')}</div>`,
+service:`<div class="box"><h3>Обслуживание</h3><div class="f"><span>Мост</span><div>0.67.0 · актуален</div><span>SSH</span><div>проверен</div></div><div class="row" style="margin-top:12px;gap:8px"><button class="pill">Перезапустить мост</button><button class="pill">Перезагрузить колонку</button></div></div>`}[S.sub];
+return `<button class="back" data-go="speakers"><span class="mdi mdi-arrow-left"></span>Колонки</button><div class="row"><div class="img" style="margin:0;background:var(--card);color:var(--ink)"><span class="mdi ${s.icon}"></span></div><div><h2>${s.name}</h2><div class="m">${s.room} · на связи</div></div></div><div class="layout">${railHtml(g,S.sub,'sub')}<div>${note('«было:» — где это лежит сейчас. Всё про колонку собрано в одном месте.')}${body}</div></div>`}
+function voiceView(){const g=[['Что понимает',[['commands','Команды','mdi-text-box-outline','Дом'],['devices','Устройства','mdi-lightbulb-outline','Дом'],['dictionary','Словарь','mdi-book-alphabet','Дом'],['listen','Распознавание','mdi-ear-hearing','Настройки → Фразы']]],['Как отвечает',[['replies','Ответы','mdi-message-reply-outline','Настройки → Фразы']]]];
+const b={commands:`<div class="box"><div class="row"><h3>Команды</h3><button class="pill" style="margin-left:auto">+ Команда</button></div><div class="cmd"><span class="mdi mdi-microphone"></span><div><b>Не включай свет на кухне</b><div class="m">также: «не включай свет в кухне» · все колонки</div></div><span class="mdi mdi-pencil-outline" style="margin-left:auto"></span></div></div>`,
+devices:`<div class="box"><h3>Устройства</h3>${['Свет на кухне','Свет в комнате','Пылесос'].map(t=>`<div class="cmd"><span class="mdi mdi-lightbulb-outline"></span>${t}<span class="chip" style="margin-left:auto">доступно</span></div>`).join('')}</div>`,
+dictionary:`<div class="box"><h3>Словарь</h3><p class="m">Как Алиса называет устройства и комнаты.</p><div class="cmd">кухня → <span class="chip">area.kitchen</span></div></div>`,
+listen:`<div class="box"><h3>Распознавание</h3><div class="f"><span>Сначала дом, потом нейросеть</span><div class="tg"></div><span>Без слова «Алиса»</span><div class="tg off"></div></div></div>`,
+replies:`<div class="box"><h3>Ответ после команды</h3><div class="row" style="gap:8px"><button class="pill">Штатное слово</button><button class="pill" style="outline:1px solid var(--acc)">Звук без слов</button><button class="pill">Своё слово</button></div></div>`}[S.voice];
+return `<h2>Голос</h2><div class="m">Всё, что Алиса понимает и как отвечает</div><div class="layout">${railHtml(g,S.voice,'voice')}<div>${b}</div></div>`}
+function journalView(){return note('Журнал — только история. Метрики переехали на страницы колонок.')+`<h2>Журнал</h2><div class="box">${[['выключи свет на кухне','Lite 2','Локально'],['какая погода завтра','MIDI','Нейросеть'],['поставь таймер','Lite 2','Яндекс']].map(([t,s,w])=>`<div class="cmd"><span class="mdi mdi-microphone"></span><div><b>${t}</b><div class="m">${s} · только что</div></div><span class="chip" style="margin-left:auto">${w}</span></div>`).join('')}</div>`}
+function settingsView(){const g=[['Начало',[['setup','Быстрая настройка','mdi-rocket-launch-outline']]],['Сервисы',[['ai','Нейросеть','mdi-creation-outline'],['music','Музыкальные сервисы','mdi-music-note','только аккаунты'],['relay','Интерком и объявления','mdi-message-arrow-right-outline']]],['Вид',[['look','Оформление панели','mdi-palette-outline']]],['Система',[['app','Подключение','mdi-connection'],['advanced','Конфигурация','mdi-code-json']]]];
+const t={setup:'Мастер: колонка → доступ → мост → проверка звука.',ai:'Провайдер, модель, ключ, проверка.',music:'Аккаунты Яндекс Музыки и Music Assistant. Выбор источника для колонки — на странице колонки.',relay:'Кто кому может передавать сообщения; объявления на все колонки.',look:'Тема и плотность карточек. Подсветка колонок — на странице колонки.',app:'Адрес приложения, токен.',advanced:'JSON-конфигурация для опытных.'}[S.set];
+return `<h2>Настройки</h2><div class="m">Только общее для всей системы</div><div class="layout">${railHtml(g,S.set,'set')}<div><div class="box"><h3>${g.flatMap(x=>x[1]).find(x=>x[0]===S.set)[1]}</h3><p class="m">${t}</p></div></div></div>`}
+function render(){nav();document.getElementById('app').innerHTML=S.view==='speakers'?(S.spk?speakerPage():speakersView()):S.view==='voice'?voiceView():S.view==='journal'?journalView():settingsView()}
+document.addEventListener('click',e=>{const el=e.target.closest('[data-go],[data-spk],[data-sub],[data-voice],[data-set]');if(!el)return;const d=el.dataset;
+if(d.go){S.view=d.go;S.spk=null}if(d.spk){S.spk=d.spk;S.sub='main'}if(d.sub)S.sub=d.sub;if(d.voice)S.voice=d.voice;if(d.set)S.set=d.set;render()});
+render();
+</script></body></html>

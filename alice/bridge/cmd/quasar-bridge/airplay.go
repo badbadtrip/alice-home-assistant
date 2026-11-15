@@ -160,7 +160,9 @@ func (c *airPlayControl) resume() {
 
 // followAddress restarts the receiver when the speaker's address changes: the
 // receiver, its clock and its announcement are bound to the address it started
-// with, and phones would keep a dead entry.
+// with, and phones would keep a dead entry. While Wi-Fi is down the route falls
+// to a link-local address the receiver cannot use, so it waits for a real one,
+// and it starts a receiver that a failed restart left stopped.
 func (c *airPlayControl) followAddress(every time.Duration, current func() string) {
 	ticker := time.NewTicker(every)
 	defer ticker.Stop()
@@ -170,13 +172,26 @@ func (c *airPlayControl) followAddress(every time.Duration, current func() strin
 			return
 		case <-ticker.C:
 		}
+		if !c.enabled() {
+			continue
+		}
 		state := c.receiver.Status()
-		if !c.enabled() || state.State != airplay.StateRunning || state.Connected {
+		now := current()
+		if ip := net.ParseIP(now); ip == nil || !ip.IsGlobalUnicast() {
+			continue
+		}
+		if state.State == airplay.StateStopped {
+			slog.Info("airplay_recover", "address", now)
+			if err := c.receiver.Start(c.app); err != nil {
+				slog.Warn("airplay_restart_failed", "error", err)
+			}
+			continue
+		}
+		if state.State != airplay.StateRunning || state.Connected {
 			continue
 		}
 		host, _, err := net.SplitHostPort(state.Address)
-		now := current()
-		if err != nil || now == "" || host == now {
+		if err != nil || host == now {
 			continue
 		}
 		slog.Info("airplay_address_changed", "from", host, "to", now)

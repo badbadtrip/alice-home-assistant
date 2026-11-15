@@ -126,6 +126,56 @@ func TestAirPlayFollowsNewAddress(t *testing.T) {
 	}
 }
 
+func TestAirPlayWaitsOutWiFiLoss(t *testing.T) {
+	f := &fakeReceiver{status: &airplay.Status{State: airplay.StateRunning, Address: "192.168.1.59:7000"}}
+	c := testAirPlay(t, f)
+	airPlayCall(c, "start")
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	c.app = ctx
+	addresses := make(chan string, 4)
+	addresses <- "169.254.212.46" // Wi-Fi down: route falls to p2p0
+	addresses <- ""
+	current := func() string {
+		select {
+		case a := <-addresses:
+			return a
+		default:
+			cancel()
+			return ""
+		}
+	}
+	c.followAddress(time.Millisecond, current)
+	if f.stops != 0 || f.starts != 1 {
+		t.Fatalf("stops=%d starts=%d", f.stops, f.starts)
+	}
+}
+
+func TestAirPlayRecoversStoppedReceiver(t *testing.T) {
+	f := &fakeReceiver{status: &airplay.Status{State: airplay.StateStopped}}
+	c := testAirPlay(t, f)
+	airPlayCall(c, "start")
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	c.app = ctx
+	addresses := make(chan string, 4)
+	addresses <- "169.254.212.46" // still no Wi-Fi: wait
+	addresses <- "192.168.1.59"   // back: start again
+	current := func() string {
+		select {
+		case a := <-addresses:
+			return a
+		default:
+			cancel()
+			return ""
+		}
+	}
+	c.followAddress(time.Millisecond, current)
+	if f.starts != 2 {
+		t.Fatalf("starts=%d", f.starts)
+	}
+}
+
 func TestAirPlayKeepsSessionOnNewAddress(t *testing.T) {
 	f := &fakeReceiver{status: &airplay.Status{State: airplay.StateRunning, Address: "192.168.1.59:7000", Connected: true}}
 	c := testAirPlay(t, f)

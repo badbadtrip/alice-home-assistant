@@ -358,7 +358,7 @@ main{max-width:1360px;padding:0 24px 48px}
 .op>div{flex:1;min-width:0}.op b{display:block;font-weight:500;font-size:13.5px}.op small{display:block;color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .op .time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px}
 .op ha-icon{flex:none;--mdc-icon-size:22px}.op.ok ha-icon{color:var(--ok)}.op.fail ha-icon{color:var(--err)}
-@media(max-width:700px){.ops{left:16px;right:16px;width:auto;bottom:calc(82px + env(safe-area-inset-bottom))}}
+@media(max-width:700px){.ops{left:16px;right:16px;width:auto;bottom:calc(76px + max(8px,calc(env(safe-area-inset-bottom) - 20px)))}}
 .svc-fact b{flex-wrap:wrap;word-break:break-all}.fact-note{display:block;width:100%;margin-top:2px;color:var(--muted);font-size:12px;font-weight:400;word-break:normal}.fact-note.bad{color:var(--err)}
 .svc-more-body label{display:grid;gap:6px;margin:0 0 12px;pointer-events:auto}
 .svc-more-body .actions{position:static;margin:0 0 14px;flex-wrap:wrap}
@@ -581,12 +581,12 @@ button:active:not(:disabled){transform:scale(.97)}
 @media(max-width:760px){.admin-page .admin-shell{grid-template-columns:minmax(0,1fr);grid-template-rows:none;gap:8px}.admin-page .rail{position:static;flex-direction:row;overflow-x:auto;padding-bottom:6px}}
 @media(max-width:700px){main{padding:0 16px calc(88px + env(safe-area-inset-bottom))}
   .appbar{height:56px;margin:0 -16px 12px;padding:0 16px}
-  .tabs{position:fixed;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));left:12px;z-index:30;gap:4px;height:60px;padding:5px;align-self:auto;border-radius:22px;background:color-mix(in srgb,var(--surface) 88%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 0 1px var(--line),0 8px 24px rgba(0,0,0,.28)}
+  .tabs{position:fixed;right:12px;bottom:max(8px,calc(env(safe-area-inset-bottom) - 20px));left:12px;z-index:30;gap:4px;height:60px;padding:5px;align-self:auto;border-radius:22px;background:color-mix(in srgb,var(--surface) 88%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 0 1px var(--line),0 8px 24px rgba(0,0,0,.28)}
   .tabs button{flex:1;flex-direction:column;gap:2px;height:100%;padding:0 2px;border-radius:17px;font-size:11px;font-weight:500;letter-spacing:.01em;transition:background .2s,color .2s}.tabs button ha-icon{--mdc-icon-size:22px}.tabs button ha-icon{display:block}.tabs button[aria-current]{color:var(--accent);background:color-mix(in srgb,var(--accent) 22%,transparent)}.tabs button[aria-current]:after{display:none}
   .speakers{grid-template-columns:minmax(0,1fr);gap:12px}
   .tools{gap:0}.tool{padding:6px 0;font-size:11px}
   .appbar.under-ha .brand{visibility:hidden}
-  .admin-page .admin-footer{bottom:calc(74px + env(safe-area-inset-bottom));flex-wrap:nowrap;min-height:0}.admin-page .admin-footer>span{min-width:0;font-size:12px}
+  .admin-page .admin-footer{bottom:calc(68px + max(8px,calc(env(safe-area-inset-bottom) - 20px)));flex-wrap:nowrap;min-height:0}.admin-page .admin-footer>span{min-width:0;font-size:12px}
   .indicator-layout{gap:12px}.ring-stage{z-index:4;aspect-ratio:auto;height:168px}.ring-canvas{inset:auto;width:168px;height:168px}.ring-stage>span{bottom:4px;font-size:11px}
   .page-seg{overflow-x:auto;scrollbar-width:none}.page-seg button{flex:1 0 auto;padding:0 10px}.journal-filters{flex-wrap:wrap}.journal-filters input{flex-basis:100%}}
 .led-note{min-height:0;width:fit-content;padding:0;border-radius:4px;background:none;font-weight:400;cursor:pointer}.led-note:hover:not(:disabled){background:none;color:var(--text)}
